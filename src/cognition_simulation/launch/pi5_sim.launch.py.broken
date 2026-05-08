@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+import os
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess, TimerAction
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+def generate_launch_description():
+    pkg_share = FindPackageShare('cognition_simulation')
+    
+    urdf_path = PathJoinSubstitution([pkg_share, 'urdf', 'pi5_car_official.urdf.xacro'])
+    world_path = PathJoinSubstitution([pkg_share, 'worlds', 'empty.sdf'])
+    bridge_config = PathJoinSubstitution([pkg_share, 'config', 'pi5_bridge.yaml'])
+    
+    robot_desc = Command([FindExecutable(name='xacro'), ' ', urdf_path])
+    
+    robot_state_pub = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[{
+            'robot_description': robot_desc,
+            'use_sim_time': True,
+        }]
+    )
+    
+    gz_sim = ExecuteProcess(
+        cmd=['gz', 'sim', '-r', world_path],
+        output='screen'
+    )
+    
+    spawn_robot = Node(
+        package='ros_gz_sim',
+        executable='create',
+        name='spawn_pi5',
+        output='screen',
+        arguments=[
+            '-name', 'pi5_car',
+            '-topic', 'robot_description',
+            '-x', '0.0',
+            '-y', '0.0',
+            '-z', '0.1',
+            '-Y', '0.0',
+        ]
+    )
+    
+    bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        name='ros_gz_bridge',
+        output='screen',
+        parameters=[{'config_file': bridge_config}]
+    )
+    
+    spawn_robot_delayed = TimerAction(
+        period=5.0,
+        actions=[spawn_robot]
+    )
+    
+    bridge_delayed = TimerAction(
+        period=7.0,
+        actions=[bridge]
+    )
+    
+    return LaunchDescription([
+        gz_sim,
+        robot_state_pub,
+        spawn_robot_delayed,
+        bridge_delayed,
+    ])
