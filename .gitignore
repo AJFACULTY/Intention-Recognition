@@ -215,3 +215,7 @@ src.zip
 
 # VS Code settings
 .vscode/
+src/cognition_simulation/meshes/pi5_car.stl
+# Temporary backup files
+*.broken3
+*.primitive_backup

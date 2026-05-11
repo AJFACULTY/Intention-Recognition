@@ -31,6 +31,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
+            'scan_republisher = cognition_simulation.scan_republisher:main',
             'direct_drive = cognition_simulation.direct_drive:main',
         ],
     },

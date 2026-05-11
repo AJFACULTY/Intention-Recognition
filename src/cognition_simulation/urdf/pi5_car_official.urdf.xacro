@@ -1,85 +1,249 @@
 <?xml version="1.0"?>
 <robot name="pi5_car" xmlns:xacro="http://www.ros.org/wiki/xacro">
-
-  <!-- PROPERTIES -->
-  <xacro:property name="wheel_radius" value="0.05"/>
-  <xacro:property name="wheel_width" value="0.03"/>
-  <xacro:property name="wheel_mass" value="0.5"/>
-  <xacro:property name="wheel_separation" value="0.25"/>
-  <xacro:property name="body_length" value="0.4"/>
-  <xacro:property name="body_width" value="0.2"/>
-  <xacro:property name="body_height" value="0.06"/>
-
-  <!-- BASE -->
   <link name="base_footprint"/>
-  <link name="base_link">
-    <visual>
-      <geometry><box size="${body_length} ${body_width} ${body_height}"/></geometry>
-      <material name="blue"><color rgba="0.1 0.3 0.8 1.0"/></material>
-    </visual>
-    <collision>
-      <geometry><box size="${body_length} ${body_width} ${body_height}"/></geometry>
-      <surface>
-        <friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction>
-      </surface>
-    </collision>
-    <inertial>
-      <mass value="3.0"/>
-      <inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.02"/>
-    </inertial>
-  </link>
-  <joint name="base_joint" type="fixed">
+  <joint name="base_footprint_joint" type="fixed">
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
   </joint>
-
-  <!-- WHEEL MACRO -->
-  <xacro:macro name="wheel" params="prefix reflect">
-    <link name="${prefix}_wheel">
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.0038187037800903 -0.000532399212617988 -0.00668209865413972" rpy="0 0 0"/>
+      <mass value="0.222555109690442"/>
+      <inertia ixx="0.000160582675692647" ixy="-8.18530574494391E-07" ixz="-2.74575507729664E-06"
+               iyy="0.000176217109527607" iyz="1.64721285063183E-07" izz="0.000302441932451338"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/base_link.STL"/>
+      </geometry>
+      <material name="white"><color rgba="1 1 1 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/base_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="base_link"><material>Gazebo/White</material></gazebo>
+  <xacro:macro name="wheel" params="name x y axis_y mesh_file">
+    <link name="${name}_Link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.0141019725825625"/>
+        <inertia ixx="2.663E-06" ixy="0" ixz="0" iyy="4.685E-06" iyz="0" izz="2.664E-06"/>
+      </inertial>
       <visual>
-        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
-        <material name="black"><color rgba="0.1 0.1 0.1 1.0"/></material>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/${mesh_file}"/>
+        </geometry>
+        <material name="dark_grey"><color rgba="0.647 0.620 0.588 1"/></material>
       </visual>
       <collision>
-        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
-        <surface>
-          <friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction>
-        </surface>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/${mesh_file}"/>
+        </geometry>
       </collision>
-      <inertial>
-        <mass value="${wheel_mass}"/>
-        <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0003"/>
-      </inertial>
     </link>
-    <joint name="${prefix}_wheel_joint" type="continuous">
+    <joint name="${name}_Joint" type="continuous">
+      <origin xyz="${x} ${y} -0.02125" rpy="0 0 0"/>
       <parent link="base_link"/>
-      <child link="${prefix}_wheel"/>
-      <origin xyz="0 ${reflect * wheel_separation/2} 0" rpy="0 0 0"/>
-      <axis xyz="0 1 0"/>
-      <limit effort="10" velocity="50"/>
-      <dynamics damping="0.2" friction="0.2"/>
+      <child link="${name}_Link"/>
+      <axis xyz="0 ${axis_y} 0"/>
+      <dynamics damping="0.1" friction="0.1"/>
     </joint>
+    <gazebo reference="${name}_Link">
+      <mu1>1.0</mu1><mu2>0.5</mu2>
+      <material>Gazebo/DarkGrey</material>
+    </gazebo>
   </xacro:macro>
-
-  <xacro:wheel prefix="left" reflect="1"/>
-  <xacro:wheel prefix="right" reflect="-1"/>
-
-  <!-- DIFF DRIVE PLUGIN -->
-  <gazebo reference="pi5_car">
+  <xacro:wheel name="zq" x="0.0455" y="0.0675" axis_y="1" mesh_file="zq_Link.STL"/>
+  <xacro:wheel name="yq" x="0.0455" y="-0.0675" axis_y="1" mesh_file="yq_Link.STL"/>
+  <xacro:wheel name="zh" x="-0.0495" y="0.0675" axis_y="1" mesh_file="zh_Link.STL"/>
+  <xacro:wheel name="yh" x="-0.0495" y="-0.0675" axis_y="1" mesh_file="yh_Link.STL"/>
+  <link name="imu_Link">
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.01 0.01 0.003"/></geometry>
+      <material name="blue"><color rgba="0.2 0.2 0.8 1"/></material>
+    </visual>
+  </link>
+  <joint name="imu_Joint" type="fixed">
+    <origin xyz="-0.002999 -0.0030001 0.031701" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="imu_Link"/>
+  </joint>
+  <link name="radar_Link">
+    <inertial>
+      <mass value="0.0384696758414604"/>
+      <inertia ixx="8.82e-6" ixy="0" ixz="0" iyy="1.45e-5" iyz="0" izz="2.24e-5"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/radar_Link.STL"/>
+      </geometry>
+      <material name="near_black"><color rgba="0.18 0.18 0.18 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/radar_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="radar_Joint" type="fixed">
+    <origin xyz="0 0 0.078933557468359" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="radar_Link"/>
+  </joint>
+  <link name="laser_frame"/>
+  <joint name="laser_frame_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="radar_Link"/>
+    <child link="laser_frame"/>
+  </joint>
+  <link name="jq1_Link">
+    <inertial>
+      <mass value="0.0115074341427154"/>
+      <inertia ixx="1.62e-6" ixy="0" ixz="0" iyy="9.62e-7" iyz="0" izz="1.36e-6"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/jq1_Link.STL"/>
+      </geometry>
+      <material name="light_grey"><color rgba="0.78 0.76 0.74 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/jq1_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="jq1_Joint" type="revolute">
+    <origin xyz="0.064 0 0.014" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="jq1_Link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="1.0"/>
+  </joint>
+  <link name="jq2_Link">
+    <inertial>
+      <mass value="0.0133313425901211"/>
+      <inertia ixx="1.96e-6" ixy="0" ixz="0" iyy="1.53e-6" iyz="0" izz="1.99e-6"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/jq2_Link.STL"/>
+      </geometry>
+      <material name="camera_dark"><color rgba="0.30 0.30 0.30 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/j/yahboomcar_jazzy_ws/src/yahboomcar_description/meshes/jq2_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="jq2_Joint" type="revolute">
+    <origin xyz="0.016864 8.4892E-05 0.023959" rpy="0 0 0"/>
+    <parent link="jq1_Link"/>
+    <child link="jq2_Link"/>
+    <axis xyz="0.0037845 -0.99999 0"/>
+    <limit lower="-1.57" upper="0.35" effort="1.0" velocity="1.0"/>
+  </joint>
+  <link name="camera_link"/>
+  <joint name="camera_joint" type="fixed">
+    <origin xyz="0.012 0 0.005" rpy="0 0 0"/>
+    <parent link="jq2_Link"/>
+    <child link="camera_link"/>
+  </joint>
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5707963 0 -1.5707963"/>
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+  </joint>
+  <gazebo>
     <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-      <left_joint>left_wheel_joint</left_joint>
-      <right_joint>right_wheel_joint</right_joint>
-      <wheel_separation>${wheel_separation}</wheel_separation>
-      <wheel_radius>${wheel_radius}</wheel_radius>
+      <left_joint>zq_Joint</left_joint>
+      <left_joint>zh_Joint</left_joint>
+      <right_joint>yq_Joint</right_joint>
+      <right_joint>yh_Joint</right_joint>
+      <wheel_separation>0.135</wheel_separation>
+      <wheel_radius>0.024</wheel_radius>
       <topic>/cmd_vel</topic>
-      <odom_topic>/odom</odom_topic>
-      <frame_id>odom</frame_id>
+      <odom_topic>/odom_raw</odom_topic>
+      <frame_id>odom_frame</frame_id>
       <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>20</odom_publish_frequency>
       <max_linear_acceleration>1.0</max_linear_acceleration>
-      <max_angular_acceleration>2.0</max_angular_acceleration>
     </plugin>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>/joint_states</topic>
+    </plugin>
+  </gazebo>
+  <gazebo reference="radar_Link">
+    <sensor name="lidar" type="gpu_lidar">
+      <frame_id>laser_frame</frame_id>
+      <topic>/scan</topic>
+      <update_rate>11</update_rate>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples><resolution>1</resolution>
+            <min_angle>-3.14159265</min_angle>
+            <max_angle>3.14159265</max_angle>
+          </horizontal>
+        </scan>
+        <range><min>0.12</min><max>8.0</max><resolution>0.001</resolution></range>
+        <noise><type>gaussian</type><mean>0.0</mean><stddev>0.004</stddev></noise>
+      </lidar>
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+  <gazebo reference="imu_Link">
+    <sensor name="imu_sensor" type="imu">
+      <topic>/imu</topic>
+      <update_rate>20</update_rate>
+      <always_on>true</always_on>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0</mean><stddev>0.009</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0</mean><stddev>0.009</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0</mean><stddev>0.009</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0</mean><stddev>0.021</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0</mean><stddev>0.021</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0</mean><stddev>0.021</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+  <gazebo reference="camera_link">
+    <sensor name="camera" type="camera">
+      <topic>/image_raw</topic>
+      <update_rate>30</update_rate>
+      <camera>
+        <horizontal_fov>1.0472</horizontal_fov>
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>10.0</far></clip>
+      </camera>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+    </sensor>
   </gazebo>
 </robot>
