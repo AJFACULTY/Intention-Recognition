@@ -1,0 +1,8 @@
+build/
+install/
+log/
+
+# Large static model
+src/yahboomcar_mediapipe/yahboomcar_mediapipe/file/shape_predictor_68_face_landmarks.dat
+# Embedded git repo – ignore
+src/robot_localization/
