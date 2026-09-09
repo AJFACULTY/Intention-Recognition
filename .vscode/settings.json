@@ -1,4 +1,7 @@
 {
     "editor.fontSize": 15,
-    "files.autoSave": "afterDelay"
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "files.hotExit": "onExitAndWindowClose",
+    "workbench.editor.restoreWindows": "all"
 }
