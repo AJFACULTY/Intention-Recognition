@@ -148,43 +148,33 @@ Because the machine has 5.7 GB of physical RAM, keeping memory usage healthy pre
 
 If a crash ever happens in any conversation, here is the exact procedure to recover everything:
 
-#### Step 1: Locate the Conversation ID
-All Antigravity conversations are stored under `~/.gemini/antigravity-ide/brain/` and `~/.gemini/antigravity-ide/conversations/`.
-Run this command to find the most recently active sessions sorted by time:
+#### Step 1: Check the Consolidated History Archive
+All chat sessions, implementation plans, and walkthroughs are archived in:
+👉 `/home/j/ros2_cognition_ws/project_history/`
+- `project_history/chat_sessions/`: Chronological records of all user prompts and agent replies.
+- `project_history/implementation_plans/`: Formal engineering design plans.
+- `project_history/walkthroughs/`: Tested verification results and walkthroughs.
+- `project_history/technical_evolution/`: Architecture audits and error postmortems.
+
+#### Step 2: Auto-Export Current or Past Session
+To archive the active or past session at any time:
 ```bash
-ls -lt ~/.gemini/antigravity-ide/brain/
+python3 scripts/export_chat_history.py <CONVERSATION_ID> [OPTIONAL_LABEL]
 ```
-The top entries correspond to your latest sessions.
+This automatically parses the raw JSONL transcript, generates a formatted markdown document, copies any implementation plans/walkthroughs, and sends a desktop notification.
 
-#### Step 2: Read the Implementation Plan & Artifacts
-Each session directory contains the full implementation plan and scratch files generated during that chat:
-```bash
-cat ~/.gemini/antigravity-ide/brain/<CONVERSATION_ID>/implementation_plan.md
-```
-
-#### Step 3: Inspect the Exact Last Prompts and Agent Responses
-The complete step-by-step history is recorded in `transcript.jsonl`. You can extract the user prompts or the last actions using Python or `jq`:
-
-```bash
-# View the last 5 user messages in that conversation:
-grep '"type":"USER_INPUT"' ~/.gemini/antigravity-ide/brain/<CONVERSATION_ID>/.system_generated/logs/transcript.jsonl | jq -r '.content' | tail -n 5
-
-# View the last 5 tool calls and status:
-tail -n 15 ~/.gemini/antigravity-ide/brain/<CONVERSATION_ID>/.system_generated/logs/transcript.jsonl | jq -c '{step_index, type, status}'
-```
-
-#### Step 4: Resume in a New Chat
-Open a new chat window and tell the agent:
-> *"Resume work from conversation `<CONVERSATION_ID>`. Check `TODO_AND_ROADMAP.md` and proceed with the next task."*
-
-The agent will inspect the transcript and roadmap, and continue seamlessly without any context loss.
+#### Step 3: Milestone & Chat Limit Notifications
+We established automated desktop alerts via `scripts/notify_milestone.sh`:
+- **Milestone Completed:** Triggers a popup alert prompting you to checkpoint in Git and start a fresh chat.
+- **Chat Turn Limit Warning:** Proactively warns you when a chat approaches ~45 turns to prevent Chromium/Electron heap exhaustion.
 
 ---
 
 ## 3. Current System State & Readiness
 
 As of this moment:
-- [x] **Git Version Control:** Initialized, clean `.gitignore`, initial baseline commit `9f1d261` recorded.
+- [x] **Consolidated History:** All chat transcripts, plans, walkthroughs, and postmortems consolidated into `project_history/`.
+- [x] **Git Version Control:** Initialized, clean `.gitignore`, baseline commits recorded.
 - [x] **Auto-Save & Hot Exit:** Hardened to 1000 ms flush with full window restoration enabled.
 - [x] **Chapters 1–5:** 100% written, peer-reviewed against GCTU standards, non-indented 3+ sentence paragraphs, with ERQs and real hardware results integrated.
 - [x] **Figures:** 9 high-resolution engineering schematics and data plots saved in `write_up/figures/`.
