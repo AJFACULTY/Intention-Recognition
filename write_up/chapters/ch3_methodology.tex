@@ -1,0 +1,432 @@
+\chapter{System Design and Methodology}
+
+\section{Introduction}
+This chapter details the methodology, architectural design, and physical implementation of the real-time, gesture-controlled autonomous mobile robot engineered for this study. Moving beyond theoretical simulation, the system is engineered as a fully edge-deployed platform executing a complex perception pipeline natively on onboard embedded hardware. Spatial mapping was validated directly on the physical mobile platform in indoor environments, while autonomous navigation frameworks were architecturally integrated for spatial trajectory planning.
+
+The chapter presents a comprehensive breakdown of the system components, progressing from physical hardware components and containerized middleware deployment to high-level intention inference algorithms. Specifically, it outlines the perception pipeline—encompassing spatial-zone person detection, hand landmark tracking, and scale-invariant geometric feature engineering. Furthermore, it details the centralized decision-making state machine, the micro-ROS hardware bridge, and the physical SLAM mapping pipeline. By detailing these interconnected subsystems, this chapter documents how human intention cues were captured, classified, and translated into deterministic robot motions.
+
+\section{System Requirements}
+Before detailing the system architecture, this section specifies the hardware and software components required to implement this system, along with the engineering rationale behind each selection.
+
+\subsection{Hardware Requirements}
+Table~\ref{tab:hardware_requirements} lists the physical components utilized in this project. Component specifications are detailed to support rigorous replication and evaluation.
+
+\begin{table}[H]
+\centering
+\caption{Hardware Components and Technical Specifications}
+\label{tab:hardware_requirements}
+\begin{tabular}{|p{4.2cm}|p{10cm}|}
+\hline
+\textbf{Component} & \textbf{Technical Specification} \\
+\hline
+Primary computing unit & Raspberry Pi 5 single-board computer, 8GB LPDDR4X SDRAM, quad-core ARM Cortex-A76 @ 2.4 GHz \\
+\hline
+Robot expansion board & Custom ESP32-S3 co-processor; 4-channel encoder motor driver; 2-channel PWM servo driver; LiDAR UART interface; 6-axis MPU6050 IMU \\
+\hline
+Drive motors & 4$\times$ 310 DC encoder motors (metal spur gearbox, magnetic Hall-effect quadrature encoders) \\
+\hline
+LiDAR sensor & MS200 Time-of-Flight (ToF) LiDAR; 12m measuring range; 360$^\circ$ planar scan; 12.5 Hz scan frequency; 30 Klux ambient light resistance \\
+\hline
+Vision sensor & 2MP USB monocular CMOS camera (1080p @ 30 FPS); mounted on a 2-DOF pan-tilt servo gimbal \\
+\hline
+Power storage & 7.4V 2000mAh rechargeable Li-ion battery pack with high-current 5V/5A step-down buck converter \\
+\hline
+Chassis & Yahboom industrial aluminium-alloy differential-drive robotic chassis \\
+\hline
+\end{tabular}
+\end{table}
+
+The Raspberry Pi 5 was initially provisioned with 2GB of RAM; the technical rationale and failure diagnostics that motivated the upgrade to 8GB are detailed in Section~\ref{sec:ram_planning}.
+
+\subsection{Software Requirements}
+\label{sec:software_requirements}
+Table~\ref{tab:software_requirements} outlines the software stack, distinguishing between processes executing on the host development workstation and those deployed natively on the mobile robot platform.
+
+\begin{table}[H]
+\centering
+\caption{Software Components, Deployment Targets, and System Roles}
+\label{tab:software_requirements}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|p{3.8cm}|p{3.8cm}|p{6.6cm}|}
+\hline
+\textbf{Component} & \textbf{Deployment Target} & \textbf{System Role} \\
+\hline
+Ubuntu 24.04 LTS & Development Workstation & Host OS (x86\_64 quad-core architecture, 8GB RAM) \\
+\hline
+ROS2 Jazzy Jalisco & Development Workstation & Development middleware, RViz2 spatial visualization, simulation validation \\
+\hline
+ROS2 Humble Hawksbill & Robot (Docker Container) & Deployed robotics middleware, LTS release with deterministic DDS transport \\
+\hline
+Docker Engine 26.1 & Robot (Raspberry Pi 5) & Multi-container isolation and environment virtualization \\
+\hline
+MediaPipe HandLandmarker & Robot (Container) & 21-point 3D hand anatomical landmark tracking \\
+\hline
+Ultralytics YOLOv8n & Robot (Container) & Spatial-zone person detection and bounding box extraction \\
+\hline
+ONNX Runtime 1.18 & Robot (Container) & High-speed, GPU-independent inference for MLP and LSTM models \\
+\hline
+scikit-learn (joblib) & Robot (Container) & Runtime label encoding and feature scaling serialization \\
+\hline
+SLAM Toolbox & Robot (Container) & Graph-based 2D occupancy grid mapping \\
+\hline
+Navigation2 (Nav2) & Robot (Container) & Autonomous waypoint navigation and costmap management \\
+\hline
+micro-ROS & ESP32-S3 Microcontroller & Real-time embedded firmware, UART serial bridge to ROS2 graph \\
+\hline
+Python 3.10 / 3.12 & Both Targets & Core implementation language for all custom cognition nodes \\
+\hline
+\end{tabular}
+\end{table}
+
+This distributed deployment reflects the resource-planning strategy discussed in Section~\ref{sec:ram_planning}. Development convenience and visual monitoring on the workstation are decoupled from the operational stability requirements of the physically deployed robot, with container virtualization providing an immutable software boundary.
+
+\section{System Architecture Overview}
+The system architecture of the autonomous mobile robot is organized into two primary processing domains: a high-level embedded computing unit responsible for vision perception, cognitive intention inference, and spatial decision-making; and a low-level real-time hardware controller managing motor actuation, encoder telemetry, and inertial measurements. These domains communicate over an isolated serial transport to ensure operational reliability.
+
+\subsection{Hardware Platform Specification}
+The physical foundation of the mobile robot is the Yahboom MicroROS-Pi5 differential-drive platform. To fulfill the objective of localized, edge-based computation, the primary computing unit is a Raspberry Pi 5 single-board computer. This edge processor natively executes machine learning inference, computer vision pipelines, and ROS2 middleware communications without offloading computations to external cloud infrastructure.
+
+Low-level hardware management, pulse-width modulation (PWM) motor control, and power routing are delegated to a dedicated robotics expansion board powered by an ESP32-S3 microcontroller. This board serves as a deterministic hardware bridge, interfacing directly with the four DC drive motors, quadrature Hall-effect wheel encoders, and an onboard MPU6050 6-axis Inertial Measurement Unit (IMU). The microcontroller continuously calculates wheel odometry and inertial orientations, streaming aggregated telemetry to the Raspberry Pi over a high-speed serial bus. 
+
+Environmental spatial scanning is performed by an MS200 2D Time-of-Flight (ToF) LiDAR sensor mounted horizontally at the robot's geometric center, providing 360-degree planar distance scans at 12.5~Hz. Optical data for intention recognition is captured via a 2MP USB monocular camera mounted on a 2-DOF pan-tilt servo gimbal, providing frontal visual coverage of the human operator. Figure~\ref{fig:hardware_connection} illustrates the physical hardware interconnection and power distribution topology.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{hardware_design.png}
+\caption{Hardware System Interconnection and Power Topology}
+\label{fig:hardware_connection}
+\end{figure}
+
+\subsection{Software Framework and Deployment Strategy}
+\label{sec:software_framework}
+The high-level software architecture is built natively on the Robot Operating System 2 (ROS2 Humble Hawksbill) \cite{macenski2022}. ROS2 was selected for its standardized Data Distribution Service (DDS) messaging layer, supporting low-latency inter-node communication and configurable Quality of Service (QoS) profiles. The software uses a multi-tiered language structure: cognitive perception and state-machine nodes are developed in Python to leverage mature machine learning libraries, whereas low-level motor control loops run compiled C++ firmware on the ESP32-S3.
+
+Because the ESP32-S3 microcontroller operates a real-time FreeRTOS kernel rather than a full Linux operating system, it runs a dedicated micro-ROS client node. This client communicates over a high-speed serial UART link operating at 921,600 baud to a micro-ROS agent hosted on the Raspberry Pi 5. The agent seamlessly translates low-level micro-ROS messages into standard ROS2 DDS topics, integrating the microcontroller directly into the robot's ROS2 graph.
+
+To ensure software reproducibility and prevent library conflicts, the high-level application stack is packaged into three isolated Docker containers deployed on the Raspberry Pi 5:
+\begin{enumerate}
+    \item \textbf{\texttt{yahboom\_base}:} Interfaces with physical peripherals, manages serial communication, and publishes raw LiDAR scans (\texttt{/scan}) and IMU data (\texttt{/imu}).
+    \item \textbf{\texttt{micro\_ros\_agent}:} Operates the micro-ROS serial bridge daemon, bidirectionalizing motor velocity commands (\texttt{/cmd\_vel}) and raw wheel odometry (\texttt{/odom\_raw}).
+    \item \textbf{\texttt{yahboom\_gesture}:} Houses the custom vision perception, spatial zone filtering, geometric feature extraction, and centralized decision-making nodes developed in this study.
+\end{enumerate}
+
+All three containers execute in Docker's \texttt{host} networking mode, sharing the Linux network namespace directly without virtual bridge overhead. This configuration allows ROS2 DDS discovery to function seamlessly across container boundaries over a shared domain identifier (\texttt{ROS\_DOMAIN\_ID=0}). Automated startup on power cycling is managed by an OS-level systemd service (\texttt{cognition.service}), enabling autonomous headless operation upon battery connection. Secure administrative access is maintained via SSH over Wi-Fi, while RViz2 runs remotely on an engineering workstation for real-time spatial monitoring. Figure~\ref{fig:docker_deployment} illustrates this multi-container deployment architecture.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{fig_docker_deployment.png}
+\caption{Containerized Multi-Node Deployment Architecture (Docker Host Mode)}
+\label{fig:docker_deployment}
+\end{figure}
+
+\subsection{Hardware Resource Planning and Memory Diagnostics}
+\label{sec:ram_planning}
+The initial hardware configuration for the Raspberry Pi 5 was provisioned with 2GB of LPDDR4X RAM, based on preliminary assumptions that the individual perception components would maintain low memory footprints. However, during integration testing of the SLAM subsystem—specifically when executing SLAM Toolbox concurrently with YOLOv8n, MediaPipe HandLandmarker, and the micro-ROS agent—the operating system experienced catastrophic allocation failures (\texttt{std::bad\_alloc}). These failures manifested as abrupt node terminations (\texttt{Aborted}) and intermittent dropping of the \texttt{/scan} and \texttt{/camera/image\_raw} message streams.
+
+System diagnostic investigation traced this instability directly to the Linux Out-Of-Memory (OOM) killer. The combined memory working set of the YOLOv8 neural network (1.2~GB), MediaPipe perception runtime (450~MB), SLAM occupancy solver (650~MB), and containerized ROS2 daemons exceeded the physical 2GB boundary under active load. When physical RAM and swap space were fully exhausted, the Linux kernel terminated high-memory processes without warning to preserve kernel stability.
+
+This empirical finding necessitated an immediate hardware upgrade to the Raspberry Pi 5 8GB RAM variant. The increased memory capacity permanently eliminated OOM aborts, allowing concurrent execution of the complete perception pipeline, SLAM mapping, and micro-ROS communications with over 3.8~GB of remaining headroom. This diagnostic experience directly informed the Quality-of-Service memory buffer constraints detailed in Section~\ref{sec:ros2_middleware}.
+
+\section{Data Acquisition and Dataset Preparation}
+To guarantee that the gesture classifier achieved robust generalization during physical deployment, a custom dataset was collected directly through the robot's onboard monocular camera. Training models on public generic datasets often introduces domain shift errors, where differing camera focal lengths, lens distortions, and mounting heights degrade live classification accuracy. Direct onboard data collection eliminated this domain discrepancy.
+
+\subsection{Recording Conditions and Class Balancing}
+\label{sec:recording_conditions}
+The dataset was curated across the six defined operational commands: STOP, GO, LEFT, RIGHT, BACK, and FOLLOW. To ensure the model learned invariant anatomical configurations rather than memorizing environmental backgrounds, data collection was conducted across three distinct indoor testing environments under natural daylight and artificial fluorescent lighting conditions.
+
+To eliminate algorithmic class bias during neural network optimization, the dataset was strictly balanced. Exactly 1,000 discrete frames were recorded for each of the six gesture classes, producing a balanced dataset of 6,000 labeled instances. During collection sessions, operators performed controlled micro-variations (wrist roll, pitch, and yaw within a $\pm 15^\circ$ envelope) to ensure model resilience against imperfect human gesture execution.
+
+\subsection{Preprocessing and Train-Test Splitting}
+Raw camera frames were preprocessed through the inference pipeline before feature storage. Frames passed through the YOLOv8n spatial filter to isolate candidate operators, followed by MediaPipe HandLandmarker to extract the 21 anatomical landmarks. Frames where landmark tracking confidence fell below 0.60 were discarded and re-collected. The extracted landmark coordinates were then transformed into 19 scale-invariant geometric features.
+
+The finalized 6,000-sample feature dataset was randomly shuffled and split using standard machine learning partitioning: 70\% (4,200 samples) allocated for model training, 15\% (900 samples) reserved for validation during training iterations, and 15\% (900 samples) completely isolated as an unseen test benchmark. Table~\ref{tab:appendix_class_distribution} and Table~\ref{tab:appendix_split} summarize the dataset distribution and partitioning parameters.
+
+\begin{table}[H]
+\centering
+\caption{Gesture Dataset Class Distribution}
+\label{tab:appendix_class_distribution}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Gesture Class} & \textbf{Recorded Samples} & \textbf{Proportion of Dataset} \\
+\hline
+STOP & 1,000 & 16.67\% \\
+\hline
+FOLLOW & 1,000 & 16.67\% \\
+\hline
+GO & 1,000 & 16.67\% \\
+\hline
+LEFT & 1,000 & 16.67\% \\
+\hline
+RIGHT & 1,000 & 16.67\% \\
+\hline
+BACK & 1,000 & 16.67\% \\
+\hline
+\textbf{Total} & \textbf{6,000} & \textbf{100.0\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Dataset Partitioning Ratios}
+\label{tab:appendix_split}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Data Split} & \textbf{Sample Count} & \textbf{Percentage} \\
+\hline
+Training Set & 4,200 & 70.0\% \\
+\hline
+Validation Set & 900 & 15.0\% \\
+\hline
+Unseen Test Set & 900 & 15.0\% \\
+\hline
+\textbf{Total} & \textbf{6,000} & \textbf{100.0\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Perception and Intention Recognition Pipeline}
+The vision perception pipeline was designed as a sequential hierarchical filter to isolate, track, and classify human intentions from optical camera streams. The pipeline executes four sequential stages: spatial person detection, hand landmark tracking, scale-invariant geometric feature engineering, and neural classification.
+
+\subsection{Spatial Zone Person Detection}
+The initial stage of the visual pipeline utilizes the YOLOv8n (nano) deep learning object detection model \cite{yolov8_ultralytics}. During preliminary physical trials, an operational vulnerability was identified: downstream skeletal tracking frameworks indiscriminately extracted hand landmarks from any person visible in the camera frame. In populated indoor settings, non-participating bystanders walking in the background triggered unintended gesture classifications, leading to erratic vehicle movements.
+
+To resolve bystander interference, a geometric spatial-zone filter was implemented over raw YOLOv8n detections. The camera frame ($640 \times 480$ pixels) was programmatically segmented into a central active acceptance zone spanning 45\% of the frame width (288~px) and 65\% of the frame height (312~px), centered at $(C_x, C_y) = (320, 240)$. The detection node calculates the centroid coordinates $(B_x, B_y)$ of all candidate ``person'' bounding boxes:
+
+\begin{equation}
+B_x = x_{\text{min}} + \frac{w}{2}, \quad B_y = y_{\text{min}} + \frac{h}{2}
+\end{equation}
+
+Any detection whose centroid falls outside the central zone boundaries is immediately filtered out. When multiple individuals occupy the active acceptance zone, the system selects the candidate with the largest bounding box area, prioritizing the closest operator. Once an operator issues a validated gesture command, the decision node grants a 3.0-second tracking lock on that subject, during which newly detected candidates are ignored. Figure~\ref{fig:spatial_zone} illustrates this spatial acceptance zone filtering logic.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{fig_spatial_zone.png}
+\caption{Spatial Acceptance Zone Filtering and Operator Disambiguation}
+\label{fig:spatial_zone}
+\end{figure}
+
+\subsection{Vision-Based Hand Tracking}
+Once an operator is isolated within the spatial acceptance zone, the pipeline engages the MediaPipe HandLandmarker framework \cite{lugaresi2019mediapipe}. This two-stage pipeline employs an initial palm detector to locate the hand bounding region, followed by a hand landmark model that predicts the 3D coordinates of 21 distinct anatomical landmarks.
+
+The 21 anatomical landmarks encompass the wrist root ($P_0$), metacarpophalangeal (MCP) knuckle joints, proximal interphalangeal (PIP) joints, distal interphalangeal (DIP) joints, and terminal fingertips ($P_4, P_8, P_{12}, P_{16}, P_{20}$). MediaPipe outputs these landmarks as normalized coordinates $(x, y, z)$. While these coordinates provide high topological fidelity, feeding unnormalized coordinates directly into a classifier introduces extreme variance when the operator moves relative to the camera. Consequently, raw coordinates serve strictly as intermediate inputs for geometric feature engineering.
+
+\subsection{Geometric Feature Engineering}
+To ensure the classification model remains invariant to operator distance and hand orientation, the raw spatial landmarks are transformed into a 19-dimensional array of engineered geometric features. 
+
+Instead of absolute pixel positions, the system computes scale-invariant angles and palm-normalized Euclidean distances. The wrist landmark ($P_0$) is established as the local structural origin. Euclidean distances from the wrist to each fingertip are computed using the 3D distance equation:
+
+\begin{equation}
+D_i = \sqrt{(x_i - x_0)^2 + (y_i - y_0)^2 + (z_i - z_0)^2}, \quad i \in \{4, 8, 12, 16, 20\}
+\end{equation}
+
+To achieve scale invariance, these Euclidean distances are mathematically normalized against the operator's palm width ($W_{\text{palm}}$), defined as the Euclidean distance between the index MCP joint ($P_5$) and the pinky MCP joint ($P_{17}$):
+
+\begin{equation}
+W_{\text{palm}} = \|P_5 - P_{17}\|_2
+\end{equation}
+\begin{equation}
+D_{\text{norm}, i} = \frac{D_i}{W_{\text{palm}}}
+\end{equation}
+
+Finger flexion (curl) is quantified by calculating the 3D angle between the proximal segment ($\vec{v}_1 = P_{\text{PIP}} - P_{\text{MCP}}$) and the distal segment ($\vec{v}_2 = P_{\text{TIP}} - P_{\text{PIP}}$) for each digit:
+
+\begin{equation}
+\theta_{\text{curl}} = \arccos\left(\frac{\vec{v}_1 \cdot \vec{v}_2}{\|\vec{v}_1\| \|\vec{v}_2\|}\right)
+\end{equation}
+
+Table~\ref{tab:geometric_features} details the nineteen engineered geometric features. This 1D array of 19 normalized values serves as the direct input vector for the gesture classifier.
+
+\begin{table}[H]
+\centering
+\caption{Engineered Geometric Features (19 Total)}
+\label{tab:geometric_features}
+\begin{tabular}{|c|l|l|}
+\hline
+\textbf{\#} & \textbf{Feature Designation} & \textbf{Mathematical Description} \\
+\hline
+1 & Thumb curl angle & 3D angle between thumb MCP--IP and IP--TIP segments \\
+\hline
+2 & Index curl angle & 3D angle between index MCP--PIP and PIP--TIP segments \\
+\hline
+3 & Middle curl angle & 3D angle between middle MCP--PIP and PIP--TIP segments \\
+\hline
+4 & Ring curl angle & 3D angle between ring MCP--PIP and PIP--TIP segments \\
+\hline
+5 & Pinky curl angle & 3D angle between pinky MCP--PIP and PIP--TIP segments \\
+\hline
+6 & Thumb--Index spread & Angular separation between thumb tip and index tip vectors from wrist \\
+\hline
+7 & Index--Middle spread & Angular separation between index tip and middle tip vectors from wrist \\
+\hline
+8 & Middle--Ring spread & Angular separation between middle tip and ring tip vectors from wrist \\
+\hline
+9 & Thumb tip distance & Euclidean distance from wrist ($P_0$) to thumb tip ($P_4$), normalized by $W_{\text{palm}}$ \\
+\hline
+10 & Index tip distance & Euclidean distance from wrist ($P_0$) to index tip ($P_8$), normalized by $W_{\text{palm}}$ \\
+\hline
+11 & Middle tip distance & Euclidean distance from wrist ($P_0$) to middle tip ($P_{12}$), normalized by $W_{\text{palm}}$ \\
+\hline
+12 & Ring tip distance & Euclidean distance from wrist ($P_0$) to ring tip ($P_{16}$), normalized by $W_{\text{palm}}$ \\
+\hline
+13 & Pinky tip distance & Euclidean distance from wrist ($P_0$) to pinky tip ($P_{20}$), normalized by $W_{\text{palm}}$ \\
+\hline
+14 & Palm orientation angle & 2D angle of the middle-MCP ($P_9$) to wrist ($P_0$) vector vs. vertical gravity axis \\
+\hline
+15 & Index pointing angle & 2D planar direction angle of the index finger pointing vector \\
+\hline
+16 & Thumb pointing angle & 2D planar direction angle of the thumb pointing vector \\
+\hline
+17 & Index--Thumb angle & 3D vector angle between index tip and thumb tip from wrist origin \\
+\hline
+18 & Thumb--Index separation & Euclidean separation between thumb tip ($P_4$) and index tip ($P_8$), normalized \\
+\hline
+19 & Thumb relative height & Relative depth coordinate ($z$-axis displacement) of thumb tip vs. wrist \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Gesture Classification Model}
+\label{sec:gesture_classification_model}
+An initial prototype of the gesture classification stage employed heuristic rule-based thresholding on the engineered geometric features. While functional for distinct gestures, fixed thresholds proved brittle in physical deployment; small natural variations in hand orientation or individual biomechanics pushed features across hardcoded boundaries, requiring constant recalibration. This motivated the development of a trained Multilayer Perceptron (MLP) neural network capable of learning robust decision boundaries directly from data.
+
+The finalized MLP classifier features an input layer of 19 units, a first hidden dense layer of 64 neurons with Rectified Linear Unit (ReLU) activation, a second hidden layer of 32 neurons with ReLU activation, and an output layer of 6 units with Softmax activation corresponding to the operational vocabulary: STOP, GO, LEFT, RIGHT, BACK, and FOLLOW. 
+
+The trained model was exported to the Open Neural Network Exchange (ONNX) format (\texttt{gesture\_model.onnx}) and loaded into \texttt{gesture\_node} using ONNX Runtime (\texttt{onnxruntime.InferenceSession}). Model inference executes in approximately 1.2~ms on the Raspberry Pi 5 CPU. A separate serialized label encoder (\texttt{label\_encoder\_pi.pkl}) maps model integer predictions back to human-readable strings. The complete feature extraction and neural inference pipeline is illustrated in Figure~\ref{fig:feature_pipeline}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{fig_feature_pipeline.png}
+\caption{Landmark Transformation and Geometric Feature Extraction Pipeline}
+\label{fig:feature_pipeline}
+\end{figure}
+
+\subsection{Human Movement Prediction (LSTM Path Predictor)}
+\label{sec:lstm_predictor}
+In addition to static hand gestures, a secondary perception channel was implemented to infer continuous human movement intentions over time. Spatial pose landmarks extracted via MediaPipe Pose are fed into a Long Short-Term Memory (LSTM) recurrent neural network trained to forecast the operator's short-horizon trajectory. The model observes an 8-frame history of bounding box centroids and predicts the person's future lateral position ($X_{\text{pred}}$) 5 frames ahead.
+
+The LSTM network comprises an input layer matching the coordinate history dimensions, two recurrent LSTM layers with 64 hidden units each, and a dense output projection layer. The model was trained across 152 empirical motion sequences, minimizing Mean Squared Error (MSE) loss. Training convergence is shown in Figure~\ref{fig:lstm_loss}, and representative trajectory predictions are displayed in Figure~\ref{fig:lstm_examples}. The trained model was exported to ONNX format, sustaining low-latency inference on the Raspberry Pi 5.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{path_predictor_loss.png}
+\caption{LSTM Path Predictor Training and Validation Loss Convergence}
+\label{fig:lstm_loss}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{path_prediction_examples.png}
+\caption{LSTM Short-Horizon Path Predictions: Ground Truth vs. Forecasted Centroids}
+\label{fig:lstm_examples}
+\end{figure}
+
+\section{Centralized Decision-Making and Control}
+The translation of perception streams into safe physical motion commands is coordinated by a centralized control node (\texttt{brain\_node}). This node acts as a deterministic state machine, fusing gesture classifications with kinematic motion detections to publish target velocities to the motor controller via the \texttt{/cmd\_vel} topic.
+
+\subsection{Brain Node State Machine Architecture}
+The \texttt{brain\_node} operates asynchronously from the visual inference threads, executing a deterministic control loop at 10~Hz managed by a ROS2 timer callback (\texttt{create\_timer}). The state machine transitions between four discrete operating states: \texttt{IDLE}, \texttt{WAITING\_CONFIRMATION}, \texttt{LOCKED}, and \texttt{EXECUTING}. This discrete state structure prevents erratic velocity jumping between single camera frames.
+
+\subsection{Temporal Buffering and Subject Locking Logic}
+\label{sec:temporal_buffering}
+To prevent the robot from responding to transient single-frame misclassifications caused by motion blur, two independent safeguards are enforced:
+\begin{enumerate}
+    \item \textbf{Confidence Thresholding:} The \texttt{gesture\_node} rejects any prediction where model softmax confidence is below 0.65.
+    \item \textbf{Rolling Majority-Vote Buffer:} The \texttt{brain\_node} maintains a 5-frame rolling FIFO buffer of incoming gesture labels. A gesture is confirmed only when at least 3 of the 5 buffered frames contain identical classifications.
+\end{enumerate}
+
+Upon command validation, the node initiates a 3.0-second operator lock. During this period, the system maintains target velocities and ignores new gestures or secondary persons entering the frame, preventing bystander disruption. Furthermore, \texttt{brain\_node} hosts a custom \texttt{/brain\_node/emergency\_stop} ROS2 service, enabling instantaneous software preemption to a zero-velocity halt state regardless of current buffer status. Figure~\ref{fig:brain_state_machine} diagrams the complete UML state machine.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{fig_brain_state_machine.png}
+\caption{UML State Machine: Brain Node Control Logic and Preemption Architecture}
+\label{fig:brain_state_machine}
+\end{figure}
+
+\subsection{Reactive Person Tracking via Visual Servoing}
+When the operator issues a confirmed \texttt{FOLLOW} command, the robot enters an active visual servoing state. The algorithm computes the horizontal error ($e_x$) between the operator's bounding box centroid ($B_x$) and the camera frame optical center ($C_x = 0.5$ in normalized coordinates):
+
+\begin{equation}
+e_x = C_x - B_x
+\end{equation}
+
+A proportional controller translates this alignment error into target angular steering velocity ($v_\omega$):
+
+\begin{equation}
+v_\omega = -K_p \times e_x, \quad K_p = 1.5
+\end{equation}
+
+Simultaneously, the operator's normalized bounding box width ($W_{\text{person}}$) is monitored to gauge physical proximity. If $W_{\text{person}} \le 0.40$, the robot commands a safe forward translation ($v_x = 0.20$~m/s) while steering to center the operator. If $W_{\text{person}} > 0.40$ (indicating the operator is closer than 0.8~m), forward translation is halted ($v_x = 0.0$~m/s) to maintain a safe separation buffer in accordance with collaborative safety guidelines.
+
+\section{ROS2 Middleware Integration and Topic Interfaces}
+\label{sec:ros2_middleware}
+Communication across perception, cognition, and hardware abstraction nodes is managed by the ROS2 DDS middleware. Quality of Service (QoS) profiles were specifically configured to balance high-bandwidth visual telemetry with deterministic motor control delivery.
+
+\subsection{ROS2 Domain Isolation and Discovery}
+During initial system integration, an inter-node communication fault was identified where vendor hardware drivers operated on \texttt{ROS\_DOMAIN\_ID=0} while custom cognition nodes defaulted to \texttt{ROS\_DOMAIN\_ID=20}. Because ROS2 DDS nodes on separate domain IDs are mathematically isolated from discovery, the \texttt{brain\_node} was unable to receive gesture telemetry, resulting in static zero-velocity output. Aligning all Docker containers and launch environments to a unified, explicit \texttt{ROS\_DOMAIN\_ID=0} resolved the issue, establishing reliable cross-container discovery.
+
+\subsection{Quality of Service (QoS) Profiles}
+High-frequency visual and laser streams require low transmission latency. The monocular camera node publishes JPEG-compressed video to \texttt{/camera/image\_raw/compressed} at 20~Hz, while the MS200 LiDAR publishes planar scans to \texttt{/scan} at 12.5~Hz. These sensor topics use a ``Best Effort'' QoS policy with a queue depth of 1, instructing DDS to discard old packets if processing lags, ensuring AI models always evaluate current physical observations.
+
+Conversely, cognitive commands and motor velocities require absolute delivery guarantees. The \texttt{/cognition/gesture} topic (custom \texttt{cognition\_interfaces/Gesture} message) and \texttt{/cmd\_vel} topic (\texttt{geometry\_msgs/Twist}) utilize a ``Reliable'' QoS profile with transient local durability. This guarantees message arrival at the micro-ROS agent, preventing missed halt commands.
+
+\section{Mapping and Autonomous Navigation Integration}
+
+\subsection{SLAM Toolbox Configuration and Reliability Corrections}
+\label{sec:slam_reliability_fixes}
+Simultaneous Localization and Mapping was implemented using ROS2 SLAM Toolbox in online asynchronous mode. The solver ingests planar scans from the MS200 LiDAR and wheel odometry from the ESP32-S3 to generate a 2D occupancy grid map at 5~cm cell resolution.
+
+During physical mapping trials, two distinct engineering faults were diagnosed and corrected:
+\begin{enumerate}
+    \item \textbf{Transform Race Condition:} Preliminary mapping logs revealed a 100\% laser scan drop rate in SLAM Toolbox's message filter. Diagnostic tracing identified a transform conflict: a vendor static transform publisher broadcasted the \texttt{odom} $\to$ \texttt{base\_footprint} transform concurrently with the robot's Extended Kalman Filter (EKF). Removing the redundant static publisher and establishing the EKF as the sole transform authority eliminated the race condition, reducing scan drop rates to nominal levels (12--18\%).
+    \item \textbf{Rotational Drift Resolution:} Subsequent mapping drives exhibited rotational distortion (starburst artifacts). Sensor inspection revealed that the EKF odometry configuration had yaw fusion disabled, leaving orientation reliant solely on uncorrected gyroscopic integration. Enabling yaw orientation fusion in the EKF stabilized heading calculations, allowing the robot to execute full 720-degree rotations with clean wraparound and producing coherent, closed-loop room maps.
+\end{enumerate}
+
+\subsection{Navigation2 (Nav2) Architecture}
+To support waypoint path planning, the ROS2 Navigation2 (Nav2) stack was integrated into the software graph. Nav2 incorporates the Adaptive Monte Carlo Localization (AMCL) algorithm for probabilistic localization against the SLAM map, alongside global (NavFn) and local (DWB) costmap planners. While software integration was completed, full autonomous execution under populated physical trials was constrained by embedded resource ceilings, the diagnostics of which are documented in Chapter 4.
+
+\section{ROS2 Node Graph and Topic Registry}
+Table~\ref{tab:node_graph} summarizes the deployed ROS2 nodes, topics, and custom interfaces verified on the mobile robot platform.
+
+\begin{table}[H]
+\centering
+\caption{Deployed ROS2 Node Graph, Topic Topology, and Service Registry}
+\label{tab:node_graph}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Category} & \textbf{Node / Interface Name} & \textbf{Operational Function} \\
+\hline
+Cognition Nodes & \texttt{camera\_pub} & Acquires USB video; publishes compressed frames at 20 Hz \\
+& \texttt{person\_detection\_node} & Runs YOLOv8n and spatial filter; publishes \texttt{/cognition/detection} \\
+& \texttt{gesture\_node} & Runs MediaPipe and MLP; publishes \texttt{/cognition/gesture} \\
+& \texttt{brain\_node} & Central state machine; fuses intention streams; publishes \texttt{/cmd\_vel} \\
+\hline
+Hardware Nodes & \texttt{micro\_ros\_agent} & Bridges serial UART (921,600 baud) between ESP32-S3 and ROS2 \\
+& \texttt{laser\_republisher} & Interfaces MS200 LiDAR; publishes \texttt{/scan} at 12.5 Hz \\
+& \texttt{joy\_node}, \texttt{joy\_ctrl} & Teleoperation manual override during SLAM mapping \\
+\hline
+Custom Messages & \texttt{cognition\_interfaces/Gesture} & Header, int32 gesture\_id, string label, float32 confidence \\
+& \texttt{cognition\_interfaces/Detection} & Header, float32 cx, cy, width, height, string motion\_state, float32 predicted\_x \\
+\hline
+Custom Service & \texttt{/brain\_node/emergency\_stop} & \texttt{std\_srvs/Trigger}; forces immediate zero-velocity halt \\
+\hline
+Control Topics & \texttt{/cmd\_vel} & \texttt{geometry\_msgs/Twist}; target linear ($v_x$) and angular ($v_\omega$) speeds \\
+& \texttt{/odom\_raw} & \texttt{nav\_msgs/Odometry}; raw wheel encoder odometry from ESP32 \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+\section{Engineering Standards and Regulatory Compliance}
+\label{sec:engineering_standards}
+In accordance with Faculty of Engineering requirements, the developed robotic system was designed to conform to established international robotics and safety standards:
+
+\begin{itemize}
+    \item \textbf{ISO 15066:2016 (Robots and Robotic Devices --- Collaborative Robots):} Governs human-robot collaborative operations. Specifically, the system implements Clause 5.5.4 (Speed and Separation Monitoring) via its visual servoing proximity checks and the mandatory emergency halt state when an operator enters the minimum protective separation distance ($< 0.8$~m).
+    \item \textbf{ISO 12100:2010 (Safety of Machinery --- General Principles for Design):} Addresses risk reduction principles. The robot incorporates software-level emergency stop preemption (\texttt{/brain\_node/emergency\_stop}) and hardware-level joystick override (priority preemption) to guarantee immediate operator intervention.
+    \item \textbf{ROS REP-103 (Standard Units of Measure and Coordinate Conventions):} All linear dimensions are represented in meters, angular values in radians, velocities in m/s and rad/s, and coordinate frames follow the right-handed Cartesian convention ($X$-forward, $Y$-left, $Z$-up).
+    \item \textbf{ROS REP-105 (Coordinate Frames for Mobile Platforms):} Enforces standardized coordinate tree transformations: $\text{map} \to \text{odom} \to \text{base\_footprint} \to \text{base\_link} \to \text{camera\_link} / \text{laser}$.
+    \item \textbf{OMG DDS v1.4 QoS Standards:} Partitions high-frequency loss-tolerant sensor streams (Best Effort, depth=1) from safety-critical deterministic control commands (Reliable, transient local).
+\end{itemize}

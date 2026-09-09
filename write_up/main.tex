@@ -1,0 +1,44 @@
+\documentclass[12pt,a4paper]{report}
+
+% ================= GCTU FACULTY OF ENGINEERING MARGINS =================
+% Top: 2.5 cm; Bottom: 2.5 cm; Left: 4.0 cm (for binding); Right: 2.5 cm
+\usepackage[top=2.5cm, bottom=2.5cm, left=4.0cm, right=2.5cm]{geometry}
+
+% ================= TYPOGRAPHY & SPACING =================
+\usepackage{setspace}
+\onehalfspacing % 1.5 line spacing per handbook
+
+% Paragraphing: First line must NOT be indented; paragraphs line-spaced
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+
+% ================= CORE PACKAGES =================
+\usepackage{graphicx}
+\graphicspath{{figures/}{../docs_and_figures/}{../maps/}{../test_pics/}}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs,array,ragged2e,longtable,pdflscape,float}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% Table caption above, figure caption below (Handbook Section 2.3)
+\usepackage[tableposition=top,figureposition=bottom]{caption}
+
+\begin{document}
+
+% ================= MAIN BODY CHAPTERS =================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\include{chapters/ch1_introduction}
+\include{chapters/ch2_literature_review}
+\include{chapters/ch3_methodology}
+\include{chapters/ch4_results}
+\include{chapters/ch5_conclusion}
+
+% ================= REFERENCES =================
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

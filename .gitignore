@@ -1,0 +1,54 @@
+# ==========================================
+# Large Artifacts & Backups (Prevent Git Bloat)
+# ==========================================
+archives/
+test_vids/
+chat_exports/
+bags/
+logs/
+
+# ==========================================
+# Python & Bytecode
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ==========================================
+# LaTeX Compilation Artifacts (in write_up/)
+# ==========================================
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+write_up/*.aux
+write_up/*.bbl
+write_up/*.blg
+write_up/*.log
+write_up/*.out
+write_up/*.toc
+write_up/*.lof
+write_up/*.lot
+write_up/*.synctex.gz
+
+# ==========================================
+# Operating System & IDE Temporary Files
+# ==========================================
+.DS_Store
+Thumbs.db
+*.swp
+*~
