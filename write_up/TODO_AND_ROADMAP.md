@@ -81,3 +81,30 @@
 - [ ] Paragraph rule: No first-line indentation (`\parindent 0pt`), minimum 3 sentences per paragraph, clear paragraph spacing (`\parskip 1em`).
 - [ ] Captions: Tables on top, Figures below; linked to chapter numbers.
 - [ ] Page length: Aim for comprehensive coverage meeting the degree minimum page standard.
+
+---
+
+## 4. Pool of Engineering Battle Scars (Inventory to Select From)
+*Practical engineering hurdles, diagnostics, and solutions to weave in naturally where appropriate:*
+1. **The 2GB to 8GB RAM Upgrade (OOM Killer):** The initial 2GB Raspberry Pi 5 ran out of memory when running MediaPipe, camera capture, and ROS 2 nodes simultaneously; Linux kernel OOM killer terminated the vision process. Upgrading to 8GB provided the necessary headroom for smooth multi-node execution.
+2. **EKF Yaw Sensor Fusion Race Condition:** In the `robot_localization` EKF node, fusing yaw velocity from differential drive wheel encoders caused transform race conditions and starburst map distortion during SLAM. Resolved by disabling yaw fusion in the EKF and letting LiDAR scan-matching handle heading.
+3. **2-DOF Gimbal Sign Inversion & Servo Clamping:** During physical bench tests, panning had an inverted sign causing the camera to pan away from the human operator, and the STM32 board clamped angles below 0°. Solved with zero-centric recalibration and clamping fixes.
+4. **Physical Cable Tension & Servo Stall:** Camera and servo USB ribbon cables caused physical drag on the pan/tilt mechanism, stalling the servos. Fixed through cable rerouting and strain relief.
+5. **Perspective Scale Variance (Distance Domain Shift):** Raw pixel coordinates of hand landmarks caused classification to fail whenever the operator stood further away. Solved by calculating 19 scale-invariant geometric feature ratios (palm distance normalization and joint angles).
+6. **Bystander Interference in Shared Spaces:** In crowded rooms, bystanders moving in the background caused false gesture triggers. Solved with a central spatial acceptance zone filter (center bounding box) and a rolling majority-vote temporal buffer.
+7. **Open-Loop Gesture vs. Obstacle Collision:** A robot executing gestures blindly could crash into walls or furniture. Solved by linking LiDAR costmap inflation with an automatic reactive safety stop if an obstacle is within 0.35 m.
+
+---
+
+## 5. Model Names & Naming Polish (To-Do Later)
+- [ ] Review and standardize neural network and model nomenclature across chapters during final polish.
+
+---
+
+## 6. Advanced Mathematical Formulations (Kept in Reserve / To-Do Later)
+*Mathematical derivations kept in reserve on the to-do list so the main write-up remains friendly, accessible, and not overly dense:*
+- [ ] Vector palm-width normalization equations ($D_{\text{norm}, i} = D_i / W_{\text{palm}}$).
+- [ ] 3D cosine finger curl joint angle equations ($\theta_{\text{curl}} = \arccos\left(\frac{\vec{v}_1 \cdot \vec{v}_2}{\|\vec{v}_1\| \|\vec{v}_2\|}\right)$).
+- [ ] Formal bounding box centroid calculation ($B_x = x_{\text{min}} + w/2$, $B_y = y_{\text{min}} + h/2$).
+- [ ] Discrete temporal majority-vote mathematical definition ($\sum_{k=1}^N \mathbb{I}(g_k = g) \ge \tau$).
+- [ ] EKF state vector and covariance equations for sensor fusion.
