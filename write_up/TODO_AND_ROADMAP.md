@@ -59,10 +59,14 @@
 
 ### [x] Chapter 5: Conclusion and Recommendation (COMPLETED)
 - [x] Review Summary of the Study against original specific objectives.
-- [x] Reiterate key contributions: edge-only inference, 99.38% test accuracy, 96.67% physical accuracy, 132 ms latency budget without GPU/cloud.
-- [x] Articulate limitations honestly (small participant pool, lighting sensitivity, Nav2 autonomous navigation constraints, unintegrated face recognition node).
-- [x] Expand actionable engineering recommendations (closed-loop PID for visual servoing, active gimbal tracking, serialized SLAM state saving, industrial safety interlocks).
-- [x] Ensure all paragraphs contain at least three sentences with no first-line indentation.
+- [x] Reiterate key contributions: edge-only inference, 99.38% test accuracy, 96.67% physical accuracy across 180 trials, 132 ms latency budget without GPU/cloud.
+- [x] Articulate limitations honestly: small participant pool (180 trials), MicroSD I/O logging constraints (absence of high-bandwidth `rosbag2`), Nav2 autonomous validation scope (1.5 m linear goal vs. multi-room navigation), SLAM state serialization limits, container dependency/compute limits for onboard facial recognition, and kinematic decoupling of active gimbal during chassis visual servoing.
+- [x] Eliminated phantom references to uncreated `test_logger_node.py`.
+- [x] Expand actionable engineering recommendations into a **Dual-Mode Operational Architecture**:
+  - *Mode 1 (Unmapped Environments):* Human-lead collaborative mapping ("Follow-to-Map" SLAM) and autonomous frontier exploration with reactive LiDAR safety bubble.
+  - *Mode 2 (Mapped Environments):* Nav2 semantic waypoint navigation and socially-aware dynamic costmaps fusing LSTM human trajectory prediction.
+  - *Hardware & Perception Extensions:* Kinematic gimbal-chassis TF2 coupling, edge NPU acceleration (Hailo-8) for concurrent ArcFace/YOLOv8, and PCIe NVMe logging.
+- [x] Verify that 100% of body paragraphs contain at least three sentences with zero first-line indentation (`scripts/verify_writeup.py` PASS).
 
 ---
 
