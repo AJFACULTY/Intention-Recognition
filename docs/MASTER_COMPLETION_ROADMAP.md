@@ -67,13 +67,6 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
-│ MILESTONE 8.6: Thesis Write-Up Audit — Visual Figures & Chapters 1-2 [ACTIVE REVIEW]    │
-│ • One-by-one verification of 18 figures (12 generated + 6 hardware photos) & captions   │
-│ • Paragraph-by-paragraph audit of Chapter 1 (Introduction) & ERQ 1-4 grounding          │
-│ • Critical review of Chapter 2 (Literature Review, Theoretical Models, Table 2.1)       │
-└────────────────────────────────────────┬────────────────────────────────────────────────┘
-                                         │
-┌────────────────────────────────────────▼────────────────────────────────────────────────┐
 │ MILESTONE 9: Multi-Waypoint Autonomous Navigation [ON DECK — ROBOT CHARGING]            │
 │ • Dedicated Nav2 action client (scripts/navigate_waypoints.py) across calibrated metric │
 │ • Dispatches 2-to-3 waypoint patrol across room map                                     │
@@ -288,25 +281,6 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 
 ---
 
-## 8.6. Milestone 8.6: Thesis Write-Up Audit — Visual Figures & Chapters 1-2 Deep Dive [ACTIVE REVIEW]
-
-### Task 8.6.1: One-by-One Visual Figure & Interpretation Audit
-- **Target Files:** All 18 figures in [write_up/figures/](file:///home/j/ros2_cognition_ws/write_up/figures/) across [write_up/chapters/ch3_methodology.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch3_methodology.tex) and [write_up/chapters/ch4_results.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch4_results.tex).
-- **Master Checklist:** Defined in [write_up/TODO_AND_ROADMAP.md](file:///home/j/ros2_cognition_ws/write_up/TODO_AND_ROADMAP.md) (§2.1).
-- **Scope:** Sequential review of 12 computationally generated figures (system architecture, mechatronics, Docker topology, spatial acceptance zone, 19-D feature pipeline, LSTM training loss, kinematic predictions, UML state machine, SLAM occupancy grids, per-class accuracy bar chart, and confusion matrix) plus 6 physical hardware photographs. Each figure is checked for visual fidelity, LaTeX caption accuracy, rigorous in-text interpretation, and empirical data alignment.
-
-### Task 8.6.2: Chapter 1 (Introduction) One-by-One Section Audit
-- **Target File:** [write_up/chapters/ch1_introduction.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch1_introduction.tex).
-- **Master Checklist:** Defined in [write_up/TODO_AND_ROADMAP.md](file:///home/j/ros2_cognition_ws/write_up/TODO_AND_ROADMAP.md) (§2.2).
-- **Scope:** Paragraph-by-paragraph walkthrough of Sections 1.1 through 1.7 covering Background, Problem Statement, Objectives (General + 5 Specific), 4 Engineering Research Questions (ERQs 1-4), Scope, Significance, and Document Organization.
-
-### Task 8.6.3: Chapter 2 (Literature Review) One-by-One Section Audit
-- **Target File:** [write_up/chapters/ch2_literature_review.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch2_literature_review.tex).
-- **Master Checklist:** Defined in [write_up/TODO_AND_ROADMAP.md](file:///home/j/ros2_cognition_ws/write_up/TODO_AND_ROADMAP.md) (§2.3).
-- **Scope:** Walkthrough of Sections 2.0 through 2.4 covering Theoretical Foundations (HRI cognitive models, kinematics, multimodal fusion, ISO collaborative safety), 3 In-Depth Core Works (Tsitos et al., Mahmud et al., Li & Zhang et al.), Synthesis and 3 Critical Gaps, Comparative Summary Table 2.1, and IEEE bibliography cross-verification.
-
----
-
 ## 9. Milestone 9: Multi-Waypoint Autonomous Navigation [MODERATE WIN #4]
 
 ### Task 9.1: Multi-Goal Waypoint Navigation Script
@@ -330,4 +304,24 @@ Once the robot battery completes its recharge cycle on the 12.6V balance charger
 | **Phase 4** | **Nav2 Autonomous Navigation & Dynamic Obstacle Avoidance** | Robot Nav2 autonomously tracking 2.0m waypoint path; operator steps directly into robot's path | Costmap updates with human obstacle via RPLiDAR. Robot smoothly slows down / recalculates path around human, or pauses. Operator interacts with gesture `STOP`/`GO` to resume. | No collisions. Nav2 path replans or yields cleanly. |
 | **Phase 5** | **Safety Preemption (`twist_mux`)** | Robot actively moving under gesture or Nav2 command; operator pushes physical joystick stick | Joystick command (Priority 100) instantly overrides autonomous motion. Releasing joystick smoothly returns control after 0.5s timeout. | Preemption latency $< 50\text{ ms}$. Zero command fighting or wheel shuddering. |
 | **Phase 6** | **Resource & Thermal Benchmark** | All nodes active simultaneously (Nav2 + SLAM/AMCL + YOLOv8 + MediaPipe + Face ID + Gimbal + Brain) | Monitor CPU, RAM, and thermals via `top` and `vcgencmd measure_temp`. | Combined Pi 5 CPU $< 85\%$. Temperature $< 72^\circ\text{C}$ (no thermal throttling). Battery voltage stable $> 11.1\text{V}$. |
+
+---
+
+## 11. Milestone 11: Academic Write-Up Comprehensive Audit & Systematic Figure Interpretation [ACTIVE]
+
+### Task 11.1: Chapter 1 (Introduction) & Chapter 2 (Literature Review) In-Depth Technical Audit
+- **Chapter 1 Focus:** Verify Background, Problem Statement, Engineering Research Questions (ERQs 1-4), Objectives, Scope, and GCTU handbook compliance (paragraph sentence count $\ge 3$, zero indent, no retail laptop branding).
+- **Chapter 2 Focus:** Verify theoretical grounding (HRI, human intention, kinematic estimation, multimodal sensor fusion), deep-dive critique of benchmark studies (Tsitos et al., Mahmud et al., Li & Zhang et al.), Table 2.1 matrix, vision vs. sEMG sensor discussion, and 100% citation alignment with `references.bib`.
+
+### Task 11.2: Systematic Figure-by-Figure Textual Interpretation & Caption Audit
+- Sequentially review all 18 figures (12 generated diagrams/plots/maps + 6 physical bench photos) across Chapters 3 and 4:
+  - **Figs 3.1–3.6:** Physical mechatronic hardware bench photos and component callouts.
+  - **Figs 3.7–3.9:** System architecture, hardware power/signal schematic, and multi-container Docker deployment topology.
+  - **Figs 3.10–3.11:** Camera FOV spatial acceptance zone and 4-stage 19-D geometric feature extraction pipeline.
+  - **Figs 3.12–3.13:** Trajectory LSTM training MSE loss convergence curve and 6-panel multi-step kinematic predictions.
+  - **Fig 3.14:** Supervisory brain node UML state machine and LiDAR (<0.36m) emergency halt preemption.
+  - **Fig 3.15:** SLAM platform calibration maps (distorted hourglass run vs. Ceres scan-matching clean metric map).
+  - **Figs 4.1–4.2:** Quantitative per-class accuracy bar chart and normalized MLP gesture confusion matrix.
+- Ensure each figure's visual rendering matches its caption, in-text citation, and detailed analytical discussion in the text.
+
 
