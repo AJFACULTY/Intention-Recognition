@@ -68,9 +68,157 @@
   - *Hardware & Perception Extensions:* Kinematic gimbal-chassis TF2 coupling, edge NPU acceleration (Hailo-8) for concurrent ArcFace/YOLOv8, and PCIe NVMe logging.
 - [x] Verify that 100% of body paragraphs contain at least three sentences with zero first-line indentation (`scripts/verify_writeup.py` PASS).
 
+## 2. In-Depth Chapter & Visual Figure Review Checklists (Active Review Phase)
+
+### 2.1 One-by-One Visual Figure & In-Text Interpretation Audit
+*Detailed review protocol for all 18 figures (12 generated + 6 hardware photographs) to ensure visual clarity, caption accuracy, rigorous in-text interpretation, and empirical data alignment:*
+
+- [ ] **Figure 3.1 (`assembled_robot_real.jpg` - §3.2.1):** Assembled Mobile Robot Platform.
+  - [ ] Audit image sharpness, crop, and hardware visibility (chassis, LiDAR, 2-DOF gimbal, wheels).
+  - [ ] Review LaTeX caption, figure placement, and cross-reference labels (`\label{fig:physical_robot}`).
+  - [ ] Verify surrounding in-text description matches physical BOM specifications and dimensions.
+- [ ] **Figure 3.2 (`raspberry_pi_5.jpg` - §3.2.2):** Raspberry Pi 5 Single-Board Computer.
+  - [ ] Check macro photograph clarity and annotation of compute interfaces (USB 3.0, PCIe, GPIO).
+  - [ ] Review paragraph detailing the ARM Cortex-A76 processor, 8GB LPDDR4X RAM, and cooling solution.
+  - [ ] Ensure strict adherence to non-commercial branding (no retail laptop/consumer PC comparisons).
+- [ ] **Figure 3.3 (`microros_control_board.jpg` - §3.2.3):** Yahboom micro-ROS ESP32-S3 Expansion Board.
+  - [ ] Verify image shows motor terminal blocks, UART port, and onboard power regulation circuitry.
+  - [ ] Check text explanation of real-time micro-ROS client firmware, FreeRTOS tasks, and 921,600 baud UART bridge.
+- [ ] **Figure 3.4 (`ms200_lidar.jpg` - §3.2.4):** MS200 2D Time-of-Flight LiDAR Scanner.
+  - [ ] Verify photographic detail of 360° rotating turret and optical transceiver window.
+  - [ ] Check text description of 12.5 Hz scan frequency, 0.12 m–12.0 m ranging, and millimeter precision.
+- [ ] **Figure 3.5 (`camera_gimbal.png` - §3.2.5):** 2-DOF Active Pan/Tilt Camera Gimbal Assembly.
+  - [ ] Verify image quality showing horizontal (S1) and vertical (S2) micro-servos and monocular camera.
+  - [ ] Review description of angular travel ranges ($\pm 45^\circ$ pan, $-20^\circ$ to $+35^\circ$ tilt) and visual servoing capability.
+- [ ] **Figure 3.6 (`robot_chassis_wiring.jpg` - §3.2.6):** Internal Chassis Wiring & Power Routing.
+  - [ ] Audit photo showing battery bay, step-down buck converter, and high-current motor lead separation.
+  - [ ] Review text explaining inductive kickback isolation and separate logic (5V/5A) vs motor (7.4V/12.6V) power rails.
+- [ ] **Figure 3.7 (`system_architecture.png` - §3.4):** System Architecture & End-to-End Cognitive Flow.
+  - [ ] Verify 6-tier block diagram rendering (sensing, vision gating, MLP classification, brain FSM, DDS, micro-ROS).
+  - [ ] Check ROS2 topic names (`/camera/image_raw`, `/scan`, `/cognition/gesture`, `/cmd_vel`) and latency budgets.
+  - [ ] Review text explaining asynchronous emergency LiDAR preemption interlock (< 0.36 m) bypassing high-level FSM.
+- [ ] **Figure 3.8 (`hardware_design.png` - §3.4):** Mechatronic Hardware Signal Flow & Power Distribution.
+  - [ ] Check electrical schematic readability, connector pinouts, UART lines, and PWM signal paths.
+  - [ ] Review in-text explanation of power bus decoupling (LM2596 buck converter) protecting the Raspberry Pi 5.
+- [ ] **Figure 3.9 (`fig_docker_deployment.png` - §3.5):** Containerized Multi-Node Docker Deployment Topology.
+  - [ ] Audit container boundaries (`yahboom_base`, `micro_ros_agent`, `yahboom_gesture`) and `--net=host` networking.
+  - [ ] Check depiction of remote engineering workstation (`x86_64 Host Workstation`) over Wi-Fi DDS (`ROS_DOMAIN_ID=0`).
+  - [ ] Review text explaining how Docker isolates Ubuntu 24.04 dependencies and prevents ROS2 Python conflicts.
+- [ ] **Figure 3.10 (`fig_spatial_zone.png` - §3.7.1):** Camera FOV Spatial Acceptance Zone & Bystander Rejection.
+  - [ ] Verify coordinate layout ($640 \times 480$), central $45\% \times 65\%$ zone, optical origin $(320, 240)$, and tracking error $e_x$.
+  - [ ] Check visual differentiation between accepted operator (centroid inside zone) and rejected bystander (outside zone).
+  - [ ] Review mathematical formulation of spatial gating and its role in answering ERQ 3.
+- [ ] **Figure 3.11 (`fig_feature_pipeline.png` - §3.7.3):** 4-Stage Hand Landmark Geometric Feature Pipeline.
+  - [ ] Audit 4 stages: MediaPipe 21 landmarks $\to$ 19-D geometric invariants $\to$ vector encoding $\to$ MLP classification.
+  - [ ] Verify formula callouts (curl angles, fingertip spreads, palm-normalized Euclidean distances $D_{\text{norm}}$).
+  - [ ] Review narrative explaining scale/distance invariance and why this design solves perspective domain shift (ERQ 2).
+- [ ] **Figure 3.12 (`path_predictor_loss.png` - §3.7.4):** LSTM Path Predictor Training Loss Curve.
+  - [ ] Check axis labels (Epochs 0–150 vs MSE Loss), grid alignment, and descent from $0.082$ to $<0.0015$.
+  - [ ] Review text discussing convergence rate, Adam optimization hyperparameters, and absence of overfitting.
+- [ ] **Figure 3.13 (`path_prediction_examples.png` - §3.7.4):** Kinematic Multi-Step Trajectory Prediction Benchmarks.
+  - [ ] Verify $2 \times 3$ grid clarity: 10 observed history points (blue) vs 5 true points (green) vs 5 LSTM predictions (red).
+  - [ ] Review interpretation of Average Displacement Error (ADE = 25.8 px) and Final Displacement Error (FDE = 32.4 px).
+  - [ ] Confirm alignment with Chapter 4 discussion of proactive collision avoidance during continuous motion.
+- [ ] **Figure 3.14 (`fig_brain_state_machine.png` - §3.8):** UML Brain Node Finite State Machine & Safety Logic.
+  - [ ] Verify 5 states: `IDLE`, `WAITING_CONFIRMATION`, `LOCKED_AND_EXECUTING`, `FOLLOW_MODE`, `EMERGENCY_HALT`.
+  - [ ] Check transition rules: 5-frame consensus ($3/5$ agreement), 3.0s command lock, visual servoing steering ($v_\omega = -1.5 e_x$).
+  - [ ] Review text detailing compliance with ISO 15066 collaborative robot safety standards.
+- [ ] **Figure 3.15(a) (`room_map_20260810_0452.png` - §3.9):** Initial Distorted SLAM Mapping Run.
+  - [ ] Audit subfigure visual quality showing "hourglass" rotational drift defect and overlapping wall ghosting.
+  - [ ] Review in-text diagnostic explanation: Extended Kalman Filter disabled yaw fusion and transform race conditions.
+- [ ] **Figure 3.15(b) (`room_map_clean.png` - §3.9):** Final Calibrated Metric SLAM Map.
+  - [ ] Check subfigure rendering showing sharp, perpendicular, closed room walls at 5 cm grid resolution.
+  - [ ] Review text explaining resolution via wheel odometry yaw fusion and Ceres scan-matching optimization.
+- [ ] **Figure 4.1 (`per_class_accuracy_chart.png` - §4.3.2):** Per-Class Classification Accuracy Bar Chart.
+  - [ ] Verify bar values across all 6 classes (`RIGHT`: 99.8%, `STOP`: 99.7%, `BACK`: 99.5%, `GO`: 99.4%, `LEFT`: 99.1%, `FOLLOW`: 99.1%).
+  - [ ] Review comparative discussion contrasting offline test accuracy (99.38%) with physical bench trials (96.67%, Table 4.1).
+  - [ ] Check explanation of `STOP` gesture variation due to oblique palm angle compression ($> 25^\circ$).
+- [ ] **Figure 4.2 (`MLP_Confusion_Matrix.png` - §4.4):** Normalized Confusion Matrix of the 6-Class Gesture Classifier.
+  - [ ] Audit $6 \times 6$ matrix labels (`BACK`, `FOLLOW`, `GO`, `LEFT`, `RIGHT`, `STOP`) and colorbar intensity scale.
+  - [ ] Review text interpreting strong diagonal dominance and near-zero off-diagonal cross-contamination.
+  - [ ] Verify alignment with Table 4.5 precision/recall metrics ($F_1$-scores: 0.990 to 0.998).
+
 ---
 
-## 2. Preliminary Pages & Front Matter (To Be Finalized After Chapters)
+### 2.2 Chapter 1 (Introduction) One-by-One Section Review Checklist
+*Paragraph-by-paragraph audit of Chapter 1 to ensure theoretical depth, research question alignment, and strict adherence to formatting rules:*
+
+- [ ] **Section 1.1: Background of the Study**
+  - [ ] Verify opening paragraphs contextualize collaborative mobile robotics in industrial, healthcare, and domestic spaces.
+  - [ ] Audit transition from traditional physical guards to non-contact vision-based human-robot interaction (HRI).
+  - [ ] Review the discussion on edge computing advantages (privacy preservation, low latency, bandwidth independence).
+  - [ ] Confirm minimum 3 sentences per paragraph and no first-line indentation throughout.
+- [ ] **Section 1.2: Problem Statement**
+  - [ ] Verify formulation of the three primary engineering hurdles:
+    - [ ] 1. Edge compute bottlenecks (high CPU/memory overhead of deep learning models on embedded processors).
+    - [ ] 2. Perspective domain shift (scale and orientation variance degrading raw landmark classifiers across distances).
+    - [ ] 3. Multi-person ambiguity (accidental gesture triggering and runaway tracking caused by bystanders).
+  - [ ] Ensure clear link between the identified engineering gaps and the proposed multi-tier solution.
+- [ ] **Section 1.3: Objectives of the Study**
+  - [ ] **General Objective:** Verify clarity of overall goal (low-cost, edge-native intention recognition on mobile robot).
+  - [ ] **Specific Objective 1:** Design and integrate low-cost differential drive chassis with Raspberry Pi 5 and micro-ROS.
+  - [ ] **Specific Objective 2:** Develop spatial-gated edge vision pipeline combining YOLOv8n and MediaPipe hand tracking.
+  - [ ] **Specific Objective 3:** Engineer 19-D invariant geometric feature extractor and train lightweight MLP classifier.
+  - [ ] **Specific Objective 4:** Construct supervisory finite state machine (`brain_node`) with priority safety preemption.
+  - [ ] **Specific Objective 5:** Empirically benchmark throughput, latency budgets, mapping, and physical command execution.
+- [ ] **Section 1.4: Engineering Research Questions (ERQs)**
+  - [ ] **ERQ 1 (Edge Feasibility & Latency Budget):** Confirm hypothesis on $<150$ ms end-to-end latency without GPU/cloud.
+  - [ ] **ERQ 2 (Feature Invariance & Generalization):** Confirm hypothesis on eliminating scale variance across distance.
+  - [ ] **ERQ 3 (Multi-Person Workspace Disambiguation):** Confirm hypothesis on spatial gating and majority-vote buffering.
+  - [ ] **ERQ 4 (Intention-to-Action Middleware Coupling & Safety):** Confirm hypothesis on ISO 15066 collaborative safety.
+  - [ ] Verify that every ERQ is cross-referenced to its empirical validation sections in Chapters 3 and 4.
+- [ ] **Section 1.5: Scope of the Study**
+  - [ ] Review indoor laboratory environment constraints (ambient lighting, structured and semi-structured obstacles).
+  - [ ] Audit operational boundaries (interaction distance: 0.8 m to 3.0 m; camera FOV: 640x480 @ 20 FPS).
+  - [ ] Confirm explicit declaration of hardware boundaries (Raspberry Pi 5 edge compute, no offboard GPU server).
+- [ ] **Section 1.6: Significance of the Study**
+  - [ ] Review academic contributions to edge-native human intention recognition and robotics literature.
+  - [ ] Review industrial and societal impact (affordable collaborative robotics for SMEs, logistics, and assistive living).
+  - [ ] Confirm emphasis on safety standard compliance (ISO 15066 / ISO 12100).
+- [ ] **Section 1.7: Organization of the Study**
+  - [ ] Audit structural outline summarizing Chapters 2 through 5.
+  - [ ] Ensure seamless narrative bridge leading into the Chapter 2 Literature Review.
+
+---
+
+### 2.3 Chapter 2 (Literature Review) One-by-One Section Review Checklist
+*Exhaustive review of theoretical grounding, related works, synthesis, and comparative analysis in Chapter 2:*
+
+- [ ] **Section 2.0: Overview & Conceptual Framework**
+  - [ ] Review framing of human-robot collaborative interaction as a coupled perceptual-cognitive-actuation problem.
+  - [ ] Verify discussion of sensory modalities (vision, LiDAR, depth, wearable sensors).
+- [ ] **Section 2.1: Theoretical Review**
+  - [ ] **HRI Cognitive Models:** Audit explanation of shared mental models, anticipatory action, and intent recognition.
+  - [ ] **Kinematic Motion Estimation:** Verify mathematical formulation of velocity vectors and bounding box dynamics.
+  - [ ] **Multimodal Sensor Fusion:** Review discussion of complementary optical (camera) and range (LiDAR) data streams.
+  - [ ] **Safety Norms & Collaborative Standards:** Verify theoretical treatment of ISO 15066:2016 speed and separation monitoring.
+- [ ] **Section 2.2: Review of Related Works (Three Core Works)**
+  - [ ] **Review 1 (Tsitos et al. - Upper-Limb Kinematics):**
+    - [ ] Audit analysis of kinematic prediction methodology and laboratory findings.
+    - [ ] Verify critique of identified limitations: heavy workstation reliance, absence of mobile base integration.
+  - [ ] **Review 2 (Mahmud et al. - 3D Skeletal Tracking & Adaptive Gesture):**
+    - [ ] Audit review of RGB-D camera requirements and deep neural network classification.
+    - [ ] Verify critique of identified limitations: high compute overhead, lack of edge optimization, scale sensitivity.
+  - [ ] **Review 3 (Li & Zhang et al. - Intention-Aware Navigation & Costmaps):**
+    - [ ] Audit analysis of dynamic costmap inflation and pedestrian path forecasting.
+    - [ ] Verify critique of identified limitations: simulated validation only, absence of physical gesture interlocks.
+- [ ] **Section 2.3: Synthesis of Reviewed Literature & Gap Analysis**
+  - [ ] Audit structured synthesis articulating the critical research gaps:
+    - [ ] Gap 1: Compute disconnect (heavy deep learning models requiring discrete desktop GPUs).
+    - [ ] Gap 2: Spatial ambiguity (inability of existing systems to handle multiple humans in shared workspaces).
+    - [ ] Gap 3: Open-loop mobile coupling (gestures disconnected from reactive physical obstacle avoidance).
+  - [ ] Confirm how the proposed thesis methodology directly bridges each identified gap.
+- [ ] **Section 2.4: Comparative Summary Table (Table 2.1)**
+  - [ ] Audit Table 2.1 rows across all reviewed works (Tsitos et al., Mahmud et al., Li & Zhang, Yu et al., Laplaza et al., Liang & Zheng, Muhtadin et al., This Work).
+  - [ ] Check comparison dimensions: Sensing Modality, Classification Engine, Edge Feasibility, Safety Interlock, Physical Mobile Grounding.
+  - [ ] Review dedicated subsection comparing camera-based non-contact tracking with wearable/sEMG sensors (Zafar et al.).
+- [ ] **Citation & Bibliography Audit**
+  - [ ] Verify 100% of in-text `\cite{...}` keys in Chapter 1 and Chapter 2 exist in `write_up/references.bib`.
+  - [ ] Confirm IEEE citation format compliance and author name/year accuracy.
+
+---
+
+## 3. Preliminary Pages & Front Matter (To Be Finalized After Chapters)
 - [ ] GCTU Title Page formatted per Appendix A of GCTU Handbook.
 - [ ] Declaration & Certification Page formatted per Appendix B (Supervisor & HOD signature lines).
 - [ ] Abstract: Exactly one single paragraph between 150 and 250 words.

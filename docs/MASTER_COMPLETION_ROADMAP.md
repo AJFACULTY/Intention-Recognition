@@ -67,6 +67,13 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 8.6: Thesis Write-Up Audit — Visual Figures & Chapters 1-2 [ACTIVE REVIEW]    │
+│ • One-by-one verification of 18 figures (12 generated + 6 hardware photos) & captions   │
+│ • Paragraph-by-paragraph audit of Chapter 1 (Introduction) & ERQ 1-4 grounding          │
+│ • Critical review of Chapter 2 (Literature Review, Theoretical Models, Table 2.1)       │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
 │ MILESTONE 9: Multi-Waypoint Autonomous Navigation [ON DECK — ROBOT CHARGING]            │
 │ • Dedicated Nav2 action client (scripts/navigate_waypoints.py) across calibrated metric │
 │ • Dispatches 2-to-3 waypoint patrol across room map                                     │
@@ -278,6 +285,25 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 - **Target Files:** [scripts/run_all_local_verifications.py](file:///home/j/ros2_cognition_ws/scripts/run_all_local_verifications.py), [scripts/sync_to_bot.sh](file:///home/j/ros2_cognition_ws/scripts/sync_to_bot.sh).
 - **Status:** **COMPLETED & VERIFIED (100% GREEN PASS).**
 - **Details:** All 5 test suites pass cleanly in 18.10s. Created executable `sync_to_bot.sh` for one-click deployment to the robot's Docker container once charging completes.
+
+---
+
+## 8.6. Milestone 8.6: Thesis Write-Up Audit — Visual Figures & Chapters 1-2 Deep Dive [ACTIVE REVIEW]
+
+### Task 8.6.1: One-by-One Visual Figure & Interpretation Audit
+- **Target Files:** All 18 figures in [write_up/figures/](file:///home/j/ros2_cognition_ws/write_up/figures/) across [write_up/chapters/ch3_methodology.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch3_methodology.tex) and [write_up/chapters/ch4_results.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch4_results.tex).
+- **Master Checklist:** Defined in [write_up/TODO_AND_ROADMAP.md](file:///home/j/ros2_cognition_ws/write_up/TODO_AND_ROADMAP.md) (§2.1).
+- **Scope:** Sequential review of 12 computationally generated figures (system architecture, mechatronics, Docker topology, spatial acceptance zone, 19-D feature pipeline, LSTM training loss, kinematic predictions, UML state machine, SLAM occupancy grids, per-class accuracy bar chart, and confusion matrix) plus 6 physical hardware photographs. Each figure is checked for visual fidelity, LaTeX caption accuracy, rigorous in-text interpretation, and empirical data alignment.
+
+### Task 8.6.2: Chapter 1 (Introduction) One-by-One Section Audit
+- **Target File:** [write_up/chapters/ch1_introduction.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch1_introduction.tex).
+- **Master Checklist:** Defined in [write_up/TODO_AND_ROADMAP.md](file:///home/j/ros2_cognition_ws/write_up/TODO_AND_ROADMAP.md) (§2.2).
+- **Scope:** Paragraph-by-paragraph walkthrough of Sections 1.1 through 1.7 covering Background, Problem Statement, Objectives (General + 5 Specific), 4 Engineering Research Questions (ERQs 1-4), Scope, Significance, and Document Organization.
+
+### Task 8.6.3: Chapter 2 (Literature Review) One-by-One Section Audit
+- **Target File:** [write_up/chapters/ch2_literature_review.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch2_literature_review.tex).
+- **Master Checklist:** Defined in [write_up/TODO_AND_ROADMAP.md](file:///home/j/ros2_cognition_ws/write_up/TODO_AND_ROADMAP.md) (§2.3).
+- **Scope:** Walkthrough of Sections 2.0 through 2.4 covering Theoretical Foundations (HRI cognitive models, kinematics, multimodal fusion, ISO collaborative safety), 3 In-Depth Core Works (Tsitos et al., Mahmud et al., Li & Zhang et al.), Synthesis and 3 Critical Gaps, Comparative Summary Table 2.1, and IEEE bibliography cross-verification.
 
 ---
 
