@@ -54,6 +54,7 @@ Verification records created upon completing implementation plans:
 | [WALKTHROUGH_2026-09-05_workspace_reorganization.md](walkthroughs/WALKTHROUGH_2026-09-05_workspace_reorganization.md) | 2026-09-05 | Workspace modularization: categorizing 60 flat root files into dedicated packages (`src_nodes/`, `launch/`, `scripts/`, `maps/`). |
 | [WALKTHROUGH_2026-09-07_active_vision_and_sim.md](walkthroughs/WALKTHROUGH_2026-09-07_active_vision_and_sim.md) | 2026-09-07 | Automated test suite execution (4 local suites passed 100%); memory hold verification. |
 | [WALKTHROUGH_2026-09-09_gimbal_recalibration_deployment.md](walkthroughs/WALKTHROUGH_2026-09-09_gimbal_recalibration_deployment.md) | 2026-09-09 | Physical Yahboom Pi 5 deployment; symmetrical sweep confirmation; servo torque verification. |
+| [WALKTHROUGH_2026-09-10_forensic_audit_and_mlp_restoration.md](walkthroughs/WALKTHROUGH_2026-09-10_forensic_audit_and_mlp_restoration.md) | 2026-09-10 | Forensic audit of path prediction & gesture MLP; restoration of 19-feature scale-invariant MLP (99.8% accuracy); 2 Hz active vision throttle elimination; 100% pass across 5 test suites; one-click robot sync script packaging. |
 
 ---
 

@@ -149,8 +149,8 @@ class TestActiveVisionLogic(unittest.TestCase):
         search_pan_2 = self.node.current_pan
         self.assertTrue(abs(search_pan_2 - self.node.pan_home) >= 0.0)
 
-        # 6. Simulate search duration timeout (> 12.0s)
-        self.node.search_start_time = time.time() - 13.0
+        # 6. Simulate search duration timeout (> search_duration)
+        self.node.search_start_time = time.time() - (self.node.search_duration + 1.0)
         self.node.control_loop()
         self.assertEqual(self.node.state, ActiveVisionNode.STATE_REVERT)
 

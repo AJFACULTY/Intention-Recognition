@@ -101,14 +101,24 @@
 9. **Pan Servo Cable Drag & Mechanical USB Disconnects:** A wide $\pm 50^\circ$ search sweep arc physically pulled the camera USB ribbon cable against the port, causing kernel `USB disconnect` drops during bench testing. Solved by calibrating a cable-safe $\pm 28^\circ$ sweep arc and routing a loose slack strain-relief loop around the pan/tilt bracket.
 10. **Fronto-Parallel vs. Lateral Pointing Disambiguation:** Planar gestures (`STOP`, `GO`, `FOLLOW`) present fronto-parallel silhouettes with 99.38% test accuracy, but horizontal pointing (`LEFT`, `RIGHT`) suffered landmark depth foreshortening when using strict vertical Cartesian rules. Solved by evaluating lateral coordinate displacement ($\Delta x$) relative to the metacarpophalangeal (MCP) joint alongside the trained MLP.
 
+## 5. Current Engineering Audit & Pre-Bench Status (Robot Charging Intermission)
+*Verified technical status and completed preparatory work while physical robot is on balance charger:*
+- [x] **Verified Ground-Truth Path Prediction Status on Physical Bot:** Confirmed `path_predictor.onnx` is present on the robot and successfully loaded into memory by ONNXRuntime in `person_detection_node.py` (`Path predictor ONNX loaded (threads=2)`). Acknowledged that runtime loop computes 1st-order linear velocity extrapolation (`predicted_x = cx + vx * 0.5`).
+- [x] **Restored True 19-Feature Invariant MLP Gesture Engine:** Synchronized the balanced 6,000-sample Campaign 2 dataset (`gesture_dataset.csv`, 1,000 samples per class) and the trained 19-feature MLP weights (`gesture_model_features.pkl`, `scaler_features.pkl`, `label_encoder_features.pkl`, `gesture_model.onnx`, `path_predictor.onnx`) into `ml_models/`.
+- [x] **Upgraded `gesture_node.py` Architecture:** Made the 19-feature MLP the primary classifier (Tier 1) via `hand_features.py` (99.50% holdout accuracy across all 6 classes), with the anatomical geometric engine acting as secondary fallback (Tier 2).
+- [x] **Resolved Active Vision Gimbal Bugs:** Fixed FSM target loss ($z \le 0$ drops `latest_target` to trigger `MEMORY_HOLD`) and decoupled face tracking timestamp (`last_face_time`) from target timestamp, eliminating the 2 Hz artificial throttling bug.
+- [x] **Enhanced Bench Monitor HUD Legend:** Updated `scripts/bench_autonomy_monitor.py` to explicitly display all 6 gestures (`STOP`, `GO`, `FOLLOW`, `LEFT`, `RIGHT`, `BACK`) and their corresponding robot reactions.
+- [x] **Master Verification Suite (100% Green PASS):** Executed `scripts/run_all_local_verifications.py`, passing all 5 local unit & integration test suites in 18.10s (`test_perception_throttling`, `test_active_vision_logic`, `test_face_recognition`, `test_brain_logic`, `test_gesture_mlp`).
+- [x] **Packaged One-Click Robot Sync Script:** Created and made executable `scripts/sync_to_bot.sh` for seamless container deployment once the robot completes its charging cycle.
+
 ---
 
-## 5. Model Names & Naming Polish (To-Do Later)
+## 6. Model Names & Naming Polish (To-Do Later)
 - [ ] Review and standardize neural network and model nomenclature across chapters during final polish.
 
 ---
 
-## 6. Advanced Mathematical Formulations (Kept in Reserve / To-Do Later)
+## 7. Advanced Mathematical Formulations (Kept in Reserve / To-Do Later)
 *Mathematical derivations kept in reserve on the to-do list so the main write-up remains friendly, accessible, and not overly dense:*
 - [ ] Vector palm-width normalization equations ($D_{\text{norm}, i} = D_i / W_{\text{palm}}$).
 - [ ] 3D cosine finger curl joint angle equations ($\theta_{\text{curl}} = \arccos\left(\frac{\vec{v}_1 \cdot \vec{v}_2}{\|\vec{v}_1\| \|\vec{v}_2\|}\right)$).

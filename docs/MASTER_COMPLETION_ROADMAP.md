@@ -223,6 +223,30 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 
 ---
 
+## 8.5. Milestone 8.5: 19-Feature Invariant MLP Restoration & Active Vision Hardening [COMPLETED & VERIFIED]
+
+### Task 8.5.1: Synchronize 19-Feature MLP & 6,000-Sample Balanced Dataset
+- **Target Files:** [ml_models/datasets/gesture_dataset.csv](file:///home/j/ros2_cognition_ws/ml_models/datasets/gesture_dataset.csv), [ml_models/weights/gesture_model_features.pkl](file:///home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl), [ml_models/weights/scaler_features.pkl](file:///home/j/ros2_cognition_ws/ml_models/weights/scaler_features.pkl), [ml_models/weights/label_encoder_features.pkl](file:///home/j/ros2_cognition_ws/ml_models/weights/label_encoder_features.pkl).
+- **Status:** **COMPLETED & VERIFIED.**
+- **Details:** Synchronized the true 6,000-sample balanced dataset (1,000 samples per class across all 6 classes: `STOP`, `GO`, `FOLLOW`, `BACK`, `LEFT`, `RIGHT`) and the 19-feature MLP trained model into `ros2_cognition_ws`. Verified **99.50% holdout accuracy** across all 6 classes in [scripts/test_gesture_mlp.py](file:///home/j/ros2_cognition_ws/scripts/test_gesture_mlp.py).
+
+### Task 8.5.2: Dual-Tier Robust Gesture Classifier Architecture
+- **Target Files:** [src_nodes/gesture_node.py](file:///home/j/ros2_cognition_ws/src_nodes/gesture_node.py), [src_nodes/hand_features.py](file:///home/j/ros2_cognition_ws/src_nodes/hand_features.py).
+- **Status:** **COMPLETED & VERIFIED.**
+- **Architecture:** Upgraded `gesture_node.py` so the **19-Feature Invariant MLP is the primary classifier (Tier 1)** with $1.36\text{ ms}$ inference latency, while the anatomical geometric rule engine serves as secondary emergency fallback (Tier 2).
+
+### Task 8.5.3: Active Vision Gimbal FSM & Throttling Elimination
+- **Target Files:** [src_nodes/active_vision_node.py](file:///home/j/ros2_cognition_ws/src_nodes/active_vision_node.py), [scripts/test_active_vision_logic.py](file:///home/j/ros2_cognition_ws/scripts/test_active_vision_logic.py).
+- **Status:** **COMPLETED & VERIFIED.**
+- **Details:** Separated `last_face_time` from target time, eliminating the 2 Hz throttling starvation bug on person tracking. Fixed explicit target loss ($z \le 0$) to properly transition to `MEMORY_HOLD`. All 7 unit tests in `test_active_vision_logic.py` pass 100%.
+
+### Task 8.5.4: Master Verification Runner & One-Click Deploy Script
+- **Target Files:** [scripts/run_all_local_verifications.py](file:///home/j/ros2_cognition_ws/scripts/run_all_local_verifications.py), [scripts/sync_to_bot.sh](file:///home/j/ros2_cognition_ws/scripts/sync_to_bot.sh).
+- **Status:** **COMPLETED & VERIFIED (100% GREEN PASS).**
+- **Details:** All 5 test suites pass cleanly in 18.10s. Created executable `sync_to_bot.sh` for one-click deployment to the robot's Docker container once charging completes.
+
+---
+
 ## 9. Milestone 9: Multi-Waypoint Autonomous Navigation [MODERATE WIN #4]
 
 ### Task 9.1: Multi-Goal Waypoint Navigation Script

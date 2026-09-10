@@ -111,11 +111,14 @@ class ActiveVisionNode(Node):
         self.tilt_pub = self.create_publisher(Int32, "/servo_s2", 10)
         self.state_pub = self.create_publisher(String, "/cognition/gimbal_state", 10)
 
+        # Face target time for dedicated priority tracking
+        self.last_face_time = 0.0
+
         # Subscribers
         self.sub_target = self.create_subscription(
             Point,
             self.target_topic,
-            self.target_callback,
+            self.face_target_callback,
             10,
         )
 
@@ -162,6 +165,12 @@ class ActiveVisionNode(Node):
             f"Deadband: {self.deadband} | Control Rate: {self.control_rate} Hz (Smooth Glide Enabled)"
         )
 
+    def face_target_callback(self, msg: Point):
+        """Dedicated callback for /cognition/face_target to track face priority."""
+        if msg.z > 0.0:
+            self.last_face_time = time.time()
+        self.target_callback(msg)
+
     def target_callback(self, msg: Point):
         """
         Receives normalized target coordinates:
@@ -184,16 +193,30 @@ class ActiveVisionNode(Node):
             if self.state not in (self.STATE_TRACKING, self.STATE_MEMORY_HOLD):
                 self.get_logger().info(f"Target acquired (confidence: {msg.z:.2f}). Transition to TRACKING.")
             self.state = self.STATE_TRACKING
-        # Note: Do not clear target on z <= 0; allow target_timeout (1.5s) to handle loss naturally
+        else:
+            # Explicit target loss signaled (z <= 0) -> immediately drop latest_target for FSM MEMORY_HOLD
+            self.latest_target = None
 
     def hand_callback(self, msg: Point):
         """
         Ingests Hand Target message from MediaPipe Gesture Node:
-        Allows the camera to tilt UP and dynamically follow raised hands during gesturing.
+        Gently blends vertical tilt to accommodate raised hands without yanking pan off the torso.
         """
         if msg.z > 0.45:
             self.last_hand_time = time.time()
-            self.target_callback(msg)
+            # If face is actively tracking (<0.5s), do not disrupt lock
+            if (time.time() - getattr(self, 'last_face_time', 0.0)) < 0.5:
+                return
+
+            if self.latest_target is not None:
+                # Soft vertical bias: preserve pan horizontal centering, gently adjust tilt
+                blended = Point()
+                blended.x = self.latest_target.x
+                blended.y = float(0.35 * msg.y + 0.65 * self.latest_target.y)
+                blended.z = float(msg.z)
+                self.target_callback(blended)
+            else:
+                self.target_callback(msg)
 
     def detection_callback(self, msg):
         """
@@ -206,7 +229,7 @@ class ActiveVisionNode(Node):
             return
 
         # Prioritize dedicated face target if recently active (<0.5s)
-        if self.latest_target is not None and (time.time() - self.last_target_time) < 0.5:
+        if (time.time() - getattr(self, 'last_face_time', 0.0)) < 0.5:
             return
 
         if getattr(msg, 'label', '') == 'person' and getattr(msg, 'confidence', 0.0) >= 0.35:

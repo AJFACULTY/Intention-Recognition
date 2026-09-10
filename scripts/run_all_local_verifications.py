@@ -36,6 +36,11 @@ SUITES = [
         "script": "/home/j/ros2_cognition_ws/scripts/test_brain_logic.py",
         "python": "/home/j/ros2_venv/bin/python3",
     },
+    {
+        "name": "19-Feature MLP Gesture Recognition & Dataset Integrity",
+        "script": "/home/j/ros2_cognition_ws/scripts/test_gesture_mlp.py",
+        "python": "/home/j/ros2_venv/bin/python3",
+    },
 ]
 
 
