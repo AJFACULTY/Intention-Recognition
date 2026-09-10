@@ -1,67 +1,152 @@
 #!/usr/bin/env python3
+"""
+nav2.launch.py  -- Nav2 AMCL localisation stack (pre-built map required)
+
+FIX (2026-08-12): Now starts the sensor/transform chain (laser_tf,
+scan_republisher, odom_imu_republisher, EKF) alongside Nav2's own nodes.
+Previously this launch file only started Nav2 itself -- with no scan
+data or odom_frame->base_footprint transform being published, AMCL and
+both costmaps had nothing to localize or plan against. This mirrors
+slam_real.launch.py's chain exactly, minus slam_toolbox (AMCL replaces
+that role: localizing against a pre-built map instead of building one).
+
+Also fixed in nav2_params.yaml (not this file): 3x /scan_fixed
+references corrected to /scan_downsampled (the real topic name), and
+bt_navigator's odom_topic corrected from raw /odom_raw to the fused
+/odometry/filtered.
+
+Found via 6_check_nav2_config_consistency.sh audit, 2026-08-12.
+"""
 import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import TimerAction, ExecuteProcess
 from launch_ros.actions import Node
 
+
 def generate_launch_description():
-    params   = os.path.expanduser('~/cognition_ws/src/cognition_simulation/config/nav2_params.yaml')
-    map_yaml = os.path.expanduser('~/maps/sim_room.yaml')
-    sim_time = {'use_sim_time': True}
+    share = get_package_share_directory('cognition_simulation')
+    params = '/root/cognition_ws/src/cognition_simulation/config/nav2_params.yaml'
+    map_yaml = '/root/cognition_ws/maps_new/room_map_20260812_0826.yaml'
+    sim_time = {'use_sim_time': False}
+
+    # --- Sensor / transform chain (same as slam_real.launch.py, minus slam_toolbox) ---
+
+    laser_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='laser_tf',
+        arguments=['0', '0', '0.079', '0', '0', '0', 'base_footprint', 'laser_frame'],
+        output='screen'
+    )
+
+    scan_restamper = Node(
+        package='cognition_simulation',
+        executable='scan_republisher',
+        name='scan_republisher',
+        output='screen'
+    )
+
+    odom_imu_restamper = Node(
+        package='cognition_simulation',
+        executable='odom_imu_republisher',
+        name='odom_imu_republisher',
+        output='screen'
+    )
+
+    ekf = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,
+            'frequency': 12.5,
+            'sensor_timeout': 0.1,
+            'two_d_mode': True,
+            'publish_tf': True,
+            'odom_frame': 'odom_frame',
+            'base_link_frame': 'base_footprint',
+            'world_frame': 'odom_frame',
+            'odom0': '/odom_raw_restamped',
+            'odom0_config': [True, True, False, False, False, True, True, True, False, False, False, False, False, False, False],
+            'odom0_differential': False,
+            'odom0_relative': False,
+            'imu0': '/imu_restamped',
+            'imu0_config': [False, False, False, False, False, False, False, False, False, True, True, True, True, True, True],
+            'imu0_differential': False,
+            'imu0_remove_gravitational_acceleration': True,
+        }]
+    )
+
+    # --- Nav2 stack, delayed to let the sensor chain establish first ---
 
     map_server = Node(
         package='nav2_map_server', executable='map_server',
         name='map_server', output='screen',
-        parameters=[{'yaml_filename': map_yaml, 'use_sim_time': True}])
+        parameters=[{'yaml_filename': map_yaml, 'use_sim_time': False}])
 
-    amcl = Node(
+    amcl = TimerAction(period=4.0, actions=[Node(
         package='nav2_amcl', executable='amcl',
         name='amcl', output='screen',
-        parameters=[params, sim_time])
+        parameters=[params, sim_time])])
 
-    planner = Node(
+    planner = TimerAction(period=5.0, actions=[Node(
         package='nav2_planner', executable='planner_server',
         name='planner_server', output='screen',
-        parameters=[params, sim_time])
+        parameters=[params, sim_time])])
 
-    controller = Node(
+    controller = TimerAction(period=5.0, actions=[Node(
         package='nav2_controller', executable='controller_server',
         name='controller_server', output='screen',
-        parameters=[params, sim_time])
+        parameters=[params, sim_time])])
 
-    behaviors = Node(
+    behaviors = TimerAction(period=5.0, actions=[Node(
         package='nav2_behaviors', executable='behavior_server',
-        name='recoveries_server', output='screen',
-        parameters=[params, sim_time])
+        name='behavior_server', output='screen',
+        parameters=[params, sim_time])])
 
-    bt_navigator = Node(
+    bt_navigator = TimerAction(period=5.0, actions=[Node(
         package='nav2_bt_navigator', executable='bt_navigator',
         name='bt_navigator', output='screen',
-        parameters=[params, sim_time])
+        parameters=[params, sim_time])])
 
-    waypoint = Node(
+    waypoint = TimerAction(period=5.0, actions=[Node(
         package='nav2_waypoint_follower', executable='waypoint_follower',
         name='waypoint_follower', output='screen',
-        parameters=[params, sim_time])
+        parameters=[params, sim_time])])
 
-    lifecycle_manager = Node(
+    lifecycle_manager = TimerAction(period=6.0, actions=[Node(
         package='nav2_lifecycle_manager', executable='lifecycle_manager',
         name='lifecycle_manager_navigation', output='screen',
         parameters=[{
-            'use_sim_time': True,
+            'use_sim_time': False,
             'autostart': True,
             'bond_timeout': 4.0,
             'node_names': [
-                'map_server',
-                'amcl',
-                'planner_server',
-                'controller_server',
-                'recoveries_server',
-                'bt_navigator',
-                'waypoint_follower',
+                'map_server', 'amcl',
+                'planner_server', 'controller_server',
+                'behavior_server', 'bt_navigator', 'waypoint_follower',
             ],
-        }])
+        }])])
+
+    initial_pose_cmd = TimerAction(
+        period=10.0,
+        actions=[ExecuteProcess(
+            cmd=[
+                'ros2', 'topic', 'pub', '--once', '/initialpose',
+                'geometry_msgs/msg/PoseWithCovarianceStamped',
+                ('{header: {frame_id: map}, pose: {pose: {position: '
+                 '{x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}, '
+                 'covariance: [0.25,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,'
+                 '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.068]}}'),
+            ],
+            output='screen'
+        )])
 
     return LaunchDescription([
+        laser_tf, scan_restamper, odom_imu_restamper, ekf,
         map_server, amcl, planner, controller,
         behaviors, bt_navigator, waypoint, lifecycle_manager,
+        initial_pose_cmd,
     ])
