@@ -11,36 +11,70 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │ MILESTONE 1: Physical Nav2 Unblocking & Safety Multiplexing [COMPLETED & VERIFIED]     │
-│ • Fix use_sim_time: False in nav2.launch.py [VERIFIED]                                  │
+│ • Fix use_sim_time: False in nav2.launch.py [VERIFIED LIVE]                             │
 │ • Install & configure twist_mux priority arbitrator [VERIFIED LIVE]                     │
 │ • Physical 1.5m straight autonomous drive [VERIFIED LIVE WITH VIDEO]                    │
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
-
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
-│ MILESTONE 2: Embedded Vision Optimization on Raspberry Pi 5                             │
-│ • Throttle camera publisher to 10 FPS; add inference frame-skipping                     │
-│ • Reduce vision CPU load from 300% to <90%; eliminate thermal throttling                │
+│ MILESTONE 2: Embedded Vision Optimization on Raspberry Pi 5 [COMPLETED & VERIFIED]      │
+│ • Throttle camera publisher to 20 Hz; eliminate select() timeout buffer starvation      │
+│ • Reduce vision CPU load; eliminate thermal throttling and starvation                   │
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
-│ MILESTONE 3: Active 2-DOF Gimbal FOV Tracking & Face ID Integration                     │
-│ • Deploy active_vision_node.py for closed-loop pan/tilt target centering                │
-│ • Wrap InsightFace ArcFace into ROS 2 node (/cognition/face_identity)                   │
-│ • Implement active search state machine when operator exits FOV                         │
+│ MILESTONE 3: Active 2-DOF Gimbal FOV Tracking & Face ID Integration [COMPLETED]         │
+│ • Deploy active_vision_node.py for closed-loop pan/tilt visual servoing                 │
+│ • Integrate InsightFace ArcFace into ROS 2 node (/cognition/face_target)                │
+│ • Symmetrical sinusoidal search state machine when operator exits FOV                   │
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
-│ MILESTONE 4: Simulation Pipeline Hardening (Dev Laptop)                                 │
+│ MILESTONE 4: Simulation Pipeline Hardening (Dev Laptop) [COMPLETED & VERIFIED]          │
 │ • Deploy headless simulation launch (pi5_sim_headless.launch.py)                        │
 │ • Parameterize URDF mesh file paths using package share                                 │
 │ • Verify closed-loop autonomous navigation in Gazebo without memory thrashing           │
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
-│ MILESTONE 5: Integrated Multi-Modal Cognition & Behavioral Autonomy                     │
-│ • Connect face authorization -> gesture command -> trajectory prediction -> Nav2 goal   │
-│ • End-to-end field verification in physical test room                                   │
+│ MILESTONE 5: Integrated Multi-Modal Autonomy & Decision Wiring [COMPLETED & VERIFIED]   │
+│ • Connect face authorization -> gesture command -> brain decision -> twist_mux routing  │
+│ • End-to-end multi-modal logic verified via test_brain_logic.py (6/6 tests OK)         │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 6: Real-Time Dashboards & Visual Instrumentation [COMPLETED & VERIFIED]       │
+│ • Real-time web browser HUD (WebSocket port 9090) & headless terminal monitor           │
+│ • Live camera spatial zone snapshot utility (test_pics/robot_live_spatial_zone.jpg)     │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 7: Non-Saturating Telemetry & Bag Recording Infrastructure [COMPLETED]        │
+│ • Lightweight ROS 2 bag recorder (scripts/record_autonomy_bag.sh) <150 KB/s write rate  │
+│ • Verified live 20s bag on Pi: /home/pi/bags/telemetry_20260910_120023/                 │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 8: SLAM Map Serialization & Graph Saving [COMPLETED & VERIFIED]               │
+│ • Non-linear pose-graph solver state serialized via SaveMap service (maps/*.posegraph)  │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 8.5: 19-Feature Invariant MLP Restoration & Gimbal Hardening [COMPLETED]      │
+│ • Restored true 19-feature MLP & 6,000-sample balanced dataset (99.50% holdout accuracy)│
+│ • Fixed active vision 2 Hz throttling bug & FSM target loss; 5/5 test suites PASS (100%)│
+│ • Packaged one-click deployment script (scripts/sync_to_bot.sh)                         │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 9: Multi-Waypoint Autonomous Navigation [ON DECK — ROBOT CHARGING]            │
+│ • Dedicated Nav2 action client (scripts/navigate_waypoints.py) across calibrated metric │
+│ • Dispatches 2-to-3 waypoint patrol across room map                                     │
+└────────────────────────────────────────┬────────────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼────────────────────────────────────────────────┐
+│ MILESTONE 10: Master 6-Phase Live Hardware Verification Gate [ON DECK — ROBOT CHARGING] │
+│ • Full hardware bench validation: Active Gimbal -> Face ID -> 6 Gestures -> Nav2 Patrol │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
