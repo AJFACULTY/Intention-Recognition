@@ -457,7 +457,25 @@ During physical mapping trials, two significant engineering anomalies were ident
     \item \textbf{Rotational Drift Resolution:} Subsequent mapping drives exhibited a distorted, double-lobed ``starburst'' map shape whenever the robot executed turns. Diagnostic inspection revealed that the EKF's configuration had yaw fusion turned off, relying entirely on raw uncorrected gyroscopic integration that drifted rapidly during cornering. A 720-degree physical rotation test of the raw sensor stream confirmed the underlying hardware was accurate, pointing directly to a software fusion omission. Activating yaw fusion in the EKF resolved the rotational drift, enabling the robot to perform multi-turn indoor mapping with clean, overlapping wall alignments.
 \end{enumerate}
 
-Following these two crucial corrections, physical mapping runs produced sharp, geometrically consistent floor plans free of warping or ghost walls. These verified maps provided the spatial foundation for autonomous navigation planning. The resulting occupancy grid accurately preserved wall straightness and open corridor geometry, demonstrating that the sensor fusion pipeline was fully stabilized.
+Following these two crucial corrections, physical mapping runs produced sharp, geometrically consistent floor plans free of warping or ghost walls, as compared in Figure~\ref{fig:slam_calibration_maps}. The initial mapping attempt exhibited the severe ``hourglass'' rotational drift shown in Figure~\ref{fig:slam_calibration_maps}(a), where uncorrected IMU yaw caused room boundaries to rotate by 30$^\circ$ to 45$^\circ$ after turns. Activating wheel odometry yaw fusion in the EKF resolved this rotational drift, enabling SLAM Toolbox on the third mapping attempt to produce the geometrically accurate, parallel-walled metric map shown in Figure~\ref{fig:slam_calibration_maps}(b).
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{room_map_20260810_0452.png}
+    \caption*{(a) Initial Run: ``Hourglass'' Rotational Drift Defect}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{room_map_clean.png}
+    \caption*{(b) Final Run (3rd Attempt): Clean Metric Map}
+\end{minipage}
+\caption{Comparison of Physical SLAM Occupancy Grid Maps During Platform Calibration: (a) Initial mapping attempt exhibiting the ``hourglass'' rotational drift defect due to uncorrected IMU yaw; (b) Final clean metric map (third mapping attempt) achieved after enabling wheel odometry yaw fusion in the EKF.}
+\label{fig:slam_calibration_maps}
+\end{figure}
+
 
 \subsection{Navigation2 (Nav2) Integration}
 To enable point-to-point autonomous mobility, the industry-standard Navigation2 (Nav2) framework \cite{macenski2020marathon2} was integrated into the software deployment stack. Nav2 utilizes the Adaptive Monte Carlo Localization (AMCL) algorithm to cross-reference real-time laser scans against the pre-built floor plan, while building dynamic costmaps to route around unexpected obstacles. While the integration of these navigation nodes succeeded at the software configuration level, physical deployment of the complete autonomous path planner was constrained by memory allocation limits during live map generation. A complete diagnostic evaluation of these embedded hardware thresholds is detailed in Chapter 4.
