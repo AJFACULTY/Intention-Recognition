@@ -105,6 +105,24 @@
 
 ---
 
+## 1.6. Overleaf Online Thesis Synchronization Checklist
+*Tasks required to synchronize local Git and LaTeX improvements with the primary Overleaf cloud project:*
+- [ ] **Upload Figure 4.3:** Upload `write_up/figures/nav_run_trajectory_empirical.png` to the `figures/` folder on Overleaf.
+- [ ] **Sync Chapter 4:** Replace `chapters/ch4_results.tex` on Overleaf with the updated local version containing the empirical navigation benchmark (§4.5.2) and telemetry metrics.
+- [ ] **Sync Chapter 5:** Replace `chapters/ch5_conclusion.tex` on Overleaf with the refined limitation text acknowledging the successful lightweight ROS 2 bag telemetry validation.
+- [ ] **Verify Overleaf Compilation:** Recompile full document on Overleaf to confirm zero compilation errors, zero missing figure warnings, and clean table floats.
+
+---
+
+## 1.6. Overleaf Online Thesis Synchronization Checklist
+*Tasks required to synchronize local Git and LaTeX improvements with the primary Overleaf cloud project:*
+- [ ] **Upload Figure 4.3:** Upload `write_up/figures/nav_run_trajectory_empirical.png` to the `figures/` folder on Overleaf.
+- [ ] **Sync Chapter 4:** Replace `chapters/ch4_results.tex` on Overleaf with the updated local version containing the empirical navigation benchmark (§4.5.2) and telemetry metrics.
+- [ ] **Sync Chapter 5:** Replace `chapters/ch5_conclusion.tex` on Overleaf with the refined limitation text acknowledging the successful lightweight ROS 2 bag telemetry validation.
+- [ ] **Verify Overleaf Compilation:** Recompile full document on Overleaf to confirm zero compilation errors, zero missing figure warnings, and clean table floats.
+
+---
+
 ## 2. Preliminary Pages & Front Matter (To Be Finalized After Chapters)
 - [ ] GCTU Title Page formatted per Appendix A of GCTU Handbook.
 - [ ] Declaration & Certification Page formatted per Appendix B (Supervisor & HOD signature lines).

@@ -67,9 +67,10 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
-│ MILESTONE 9: Multi-Waypoint Autonomous Navigation [ON DECK — ROBOT CHARGING]            │
-│ • Dedicated Nav2 action client (scripts/navigate_waypoints.py) across calibrated metric │
-│ • Dispatches 2-to-3 waypoint patrol across room map                                     │
+│ MILESTONE 9: Physical Autonomous Navigation & Telemetry Validation [COMPLETED]           │
+│ • Live physical Nav2 action run: 1.27 m displacement, 0.236 m/s speed, SUCCEEDED status │
+│ • Empirical rosbag decoded (307 odom, 345 LiDAR) & publication trajectory plot generated │
+│ • Section 4.5.2 & Figure 4.3 integrated into thesis write-up (GCTU compliant)           │
 └────────────────────────────────────────┬────────────────────────────────────────────────┘
                                          │
 ┌────────────────────────────────────────▼────────────────────────────────────────────────┐
@@ -290,14 +291,33 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 
 ---
 
-## 9. Milestone 9: Multi-Waypoint Autonomous Navigation [MODERATE WIN #4]
+## 9. Milestone 9: Physical Autonomous Navigation & Telemetry Validation [COMPLETED & EMPIRICALLY VERIFIED]
 
-### Task 9.1: Multi-Goal Waypoint Navigation Script
+### Task 9.1: Live Physical Autonomous Navigation Benchmark
+- **Status:** **COMPLETED & EMPIRICALLY VERIFIED (September 10, 2026).**
+- **Verification Details:**
+  - **Live Nav2 Action Execution:** Action goal dispatched to `/navigate_to_pose` with tightened tolerance $\le 0.10\,\text{m}$ across pre-built metric room map.
+  - **Action Server Status:** `Goal finished with status: SUCCEEDED`.
+  - **Empirical Rosbag Telemetry:** Decoded 307 raw wheel odometry messages and 345 planar LiDAR scans from `/home/pi/bags/nav_run_20260910_192920` (< 200 KB/s non-saturating write rate).
+  - **Physical Performance:**
+    - Execution Duration: $27.54\,\text{s}$.
+    - Net Displacement: $1.269\,\text{m}$ (conforming to goal tolerance).
+    - Peak Linear Speed: $0.236\,\text{m/s}$ (strictly respecting $0.25\,\text{m/s}$ software velocity clamp).
+    - Peak Angular Velocity: $97.5^\circ/\text{s}$ ($1.70\,\text{rad/s}$).
+    - Costmap Obstacle Clearance: Dynamic rightward arc (heading deviation $-40.5^\circ$) successfully steered around table obstacles into the clear corridor.
+  - **Publication Plot & Thesis Integration:** Generated high-resolution 3-panel figure ([write_up/figures/nav_run_trajectory_empirical.png](file:///home/j/ros2_cognition_ws/write_up/figures/nav_run_trajectory_empirical.png)) and integrated into [write_up/chapters/ch4_results.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch4_results.tex) (§4.5.2) and [write_up/chapters/ch5_conclusion.tex](file:///home/j/ros2_cognition_ws/write_up/chapters/ch5_conclusion.tex).
+  - **Video Evidence:** Confirmed via test recordings [test_vids/video_2026-09-10_18-24-32.mp4](file:///home/j/ros2_cognition_ws/test_vids/video_2026-09-10_18-24-32.mp4) (obstacle halt) and [test_vids/doc_2026-09-10_18-31-27.mp4](file:///home/j/ros2_cognition_ws/test_vids/doc_2026-09-10_18-31-27.mp4) (smooth run to goal).
+
+### Task 9.2: Overleaf Online Thesis Synchronization
+- **Status:** **PENDING USER SYNC.**
+- **Target Actions:**
+  - Upload `write_up/figures/nav_run_trajectory_empirical.png` to `figures/` on Overleaf.
+  - Update `chapters/ch4_results.tex` and `chapters/ch5_conclusion.tex` on Overleaf.
+  - Verify zero LaTeX errors and clean document rendering.
+
+### Task 9.3: Multi-Goal Waypoint Navigation Script (Future Extension)
 - **Target File:** `scripts/navigate_waypoints.py`.
-- **Functionality:**
-  - Implements a dedicated Nav2 action client utilizing `NavigateThroughPoses` or sequential `NavigateToPose`.
-  - Dispatches a 2-to-3 waypoint route across the calibrated metric map ([maps/room_map_clean.png](file:///home/j/ros2_cognition_ws/maps/room_map_clean.png)), commanding the robot to transit from Home $(0, 0) \to \text{Waypoint 1 } (1.2, 0.0) \to \text{Waypoint 2 } (1.2, 0.8) \to \text{Home } (0, 0)$.
-  - Proves multi-point global autonomous mobility beyond the verified 1.5 m single straight-line goal.
+- **Functionality:** Dispatches 2-to-3 waypoint patrol across the room map for extended multi-room topological routing.
 
 ---
 
