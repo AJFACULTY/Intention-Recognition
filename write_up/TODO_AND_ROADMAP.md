@@ -101,6 +101,7 @@
 - [ ] **Figure 3.15 (`room_map_20260810_0452.png` & `room_map_clean.png`):** Platform Calibration SLAM Maps Comparison — Verify text comparing Subfigure (a) "hourglass" rotational drift defect against Subfigure (b) Ceres scan-matching calibrated clean map in §3.9.
 - [ ] **Figure 4.1 (`per_class_accuracy_chart.png`):** Per-Class Gesture Classification Accuracy Bar Chart — Verify per-class test set percentages (99.1% to 99.8%) and comparative discussion against physical interaction trials in §4.3.2.
 - [ ] **Figure 4.2 (`MLP_Confusion_Matrix.png`):** Normalized MLP Gesture Confusion Matrix — Verify true vs predicted label matrix, off-diagonal error analysis, and hand tilt angle discussion in §4.4.
+- [ ] **Figure 4.3 (`nav_run_trajectory_empirical.png`):** Empirical Physical Navigation Benchmark Trajectory & Kinematics — Verify 3-panel plot interpretation (2D spatial path, heading deviation $-40.5^\circ$ costmap clearance arc, and $0.236\,\text{m/s}$ velocity cruise/deceleration) in §4.5.
 
 ---
 
