@@ -58,9 +58,9 @@ class ActiveVisionNode(Node):
         # Target Topic, Timeout & Search
         self.declare_parameter("target_topic", "/cognition/face_target")
         self.declare_parameter("target_timeout", 1.5)  # Seconds of target loss before search
-        self.declare_parameter("search_duration", 12.0)# Seconds to search before reverting
-        self.declare_parameter("search_amplitude", 30.0) # Symmetrical sinusoidal sweep (+/- 30 deg)
-        self.declare_parameter("search_freq", 0.2)     # Sweep frequency (0.2 Hz = 5s smooth cycle)
+        self.declare_parameter("search_duration", 30.0)# Seconds to search before reverting (30s)
+        self.declare_parameter("search_amplitude", 28.0) # Safe cable-friendly sweep (+/- 28 deg arc)
+        self.declare_parameter("search_freq", 0.10)    # Sweep frequency (0.10 Hz = 10s smooth wide cycle)
 
         # Read parameters
         self.target_topic = str(self.get_parameter("target_topic").value)
@@ -104,6 +104,7 @@ class ActiveVisionNode(Node):
         self.search_start_time = 0.0
         self.latest_target = None
         self.last_go_time = 0.0
+        self.node_start_time = time.time()
 
         # Publishers
         self.pan_pub = self.create_publisher(Int32, "/servo_s1", 10)
@@ -183,10 +184,7 @@ class ActiveVisionNode(Node):
             if self.state not in (self.STATE_TRACKING, self.STATE_MEMORY_HOLD):
                 self.get_logger().info(f"Target acquired (confidence: {msg.z:.2f}). Transition to TRACKING.")
             self.state = self.STATE_TRACKING
-        else:
-            # Target loss signaled explicitly
-            self.latest_target = None
-            self.has_filtered_target = False
+        # Note: Do not clear target on z <= 0; allow target_timeout (1.5s) to handle loss naturally
 
     def hand_callback(self, msg: Point):
         """
@@ -211,14 +209,14 @@ class ActiveVisionNode(Node):
         if self.latest_target is not None and (time.time() - self.last_target_time) < 0.5:
             return
 
-        if getattr(msg, 'label', '') == 'person' and getattr(msg, 'confidence', 0.0) > 0.45:
+        if getattr(msg, 'label', '') == 'person' and getattr(msg, 'confidence', 0.0) >= 0.35:
             point = Point()
             point.x = float((msg.center_x - 0.5) * 2.0)
             point.y = float((msg.center_y - 0.5) * 2.0)
             point.z = float(msg.confidence)
             self.target_callback(point)
         else:
-            if (time.time() - self.last_target_time) > 1.0:
+            if (time.time() - self.last_target_time) > 1.5:
                 self.latest_target = None
 
     def gesture_callback(self, msg):
@@ -294,6 +292,19 @@ class ActiveVisionNode(Node):
                     self.state = self.STATE_IDLE
                     self.get_logger().info("Gimbal restored to neutral HOME pose. State: IDLE.")
 
+        elif self.state == self.STATE_IDLE:
+            if is_target_fresh:
+                self.get_logger().info("Target acquired from IDLE. Transition to TRACKING.")
+                self.state = self.STATE_TRACKING
+                self.integral_pan = 0.0
+                self.integral_tilt = 0.0
+            elif (now - getattr(self, 'node_start_time', now)) > 5.0 and (now - self.last_target_time) > 5.0:
+                self.get_logger().info("No subject in forward view. Initiating autonomous room search sweep.")
+                self.state = self.STATE_SEARCH
+                self.search_start_time = now
+                self.integral_pan = 0.0
+                self.integral_tilt = 0.0
+
         # -------------------------------------------------------------
         # CONTROLLER EXECUTION PER STATE
         # -------------------------------------------------------------
@@ -360,8 +371,9 @@ class ActiveVisionNode(Node):
         # -------------------------------------------------------------
         # SLEW-RATE LIMITING (Anti-Blur) & MECHANICAL CLAMPING
         # -------------------------------------------------------------
-        pan_step = self.clamp(target_pan - self.current_pan, -self.max_slew_deg, self.max_slew_deg)
-        tilt_step = self.clamp(target_tilt - self.current_tilt, -self.max_slew_deg, self.max_slew_deg)
+        slew_limit = 2.0 if self.state == self.STATE_SEARCH else self.max_slew_deg
+        pan_step = self.clamp(target_pan - self.current_pan, -slew_limit, slew_limit)
+        tilt_step = self.clamp(target_tilt - self.current_tilt, -slew_limit, slew_limit)
 
         self.current_pan = self.clamp(self.current_pan + pan_step, self.pan_min, self.pan_max)
         self.current_tilt = self.clamp(self.current_tilt + tilt_step, self.tilt_min, self.tilt_max)

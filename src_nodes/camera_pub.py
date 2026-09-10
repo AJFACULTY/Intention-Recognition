@@ -11,6 +11,7 @@ Features:
 - Publishes standard sensor_msgs/CompressedImage to /camera/image_raw/compressed
 """
 
+import os
 import time
 import cv2
 import numpy as np
@@ -53,16 +54,18 @@ class CameraPublisher(Node):
 
     def _open_device(self, idx):
         """Attempts to open a camera device index with V4L2 and MJPG codec."""
-        # Try V4L2 backend first
-        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+        dev_path = f"/dev/video{idx}"
+        if not os.path.exists(dev_path):
+            return None
+        # Open standard capture backend matching the verified 1-second test
+        cap = cv2.VideoCapture(idx)
         if not cap.isOpened():
-            cap = cv2.VideoCapture(idx)
+            cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
 
         if cap.isOpened():
             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.cap_w)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.cap_h)
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             # Test read
             for _ in range(3):
@@ -93,18 +96,21 @@ class CameraPublisher(Node):
             else:
                 self.get_logger().warn(f"Configured camera index {self.target_idx} failed, falling back to auto-probe.")
 
-        # Auto-probe candidates: 1, 0, 2, 3 (probe 1 first since USB 3.0 Sonix re-enumerates to 1)
-        candidates = [1, 0, 2, 3]
+        # Auto-probe candidates: probe 0 first (standard primary UVC video capture stream), then 1, 2, 3
+        candidates = [0, 1, 2, 3]
         for idx in candidates:
+            dev_path = f"/dev/video{idx}"
+            if not os.path.exists(dev_path):
+                continue
             cap = self._open_device(idx)
             if cap is not None:
                 self.cap = cap
                 self.active_idx = idx
-                self.get_logger().info(f"Auto-detected active camera at index {self.active_idx} (/dev/video{self.active_idx})")
+                self.get_logger().info(f"Auto-detected active camera at index {self.active_idx} ({dev_path})")
                 self.consecutive_failures = 0
                 return
 
-        self.get_logger().error("No working camera device found on indices [1, 0, 2, 3]!")
+        self.get_logger().error(f"No working camera device found on indices {candidates}!")
 
     def publish_frame(self):
         if self.cap is None or not self.cap.isOpened():

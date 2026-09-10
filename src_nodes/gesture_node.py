@@ -174,12 +174,17 @@ class GestureNode(Node):
             return GESTURE_GO, "GO", 0.95
 
         # 4. LEFT / RIGHT: Single index finger pointing laterally or forward
-        if index_up and not middle_up and not ring_up and not pinky_up:
+        # Calculate lateral and longitudinal extension of index finger relative to MCP
+        d_index_ext = math.hypot(landmarks[8].x - landmarks[5].x, landmarks[8].y - landmarks[5].y)
+        d_index_mcp = math.hypot(landmarks[6].x - landmarks[5].x, landmarks[6].y - landmarks[5].y)
+        index_pointing = index_up or (d_index_ext > 1.35 * d_index_mcp)
+
+        if index_pointing and not middle_up and not ring_up and not pinky_up:
             dx = landmarks[8].x - landmarks[5].x
-            if dx < -0.04:
-                return GESTURE_LEFT, "LEFT", 0.94
-            elif dx > 0.04:
-                return GESTURE_RIGHT, "RIGHT", 0.94
+            if dx < -0.035:
+                return GESTURE_LEFT, "LEFT", 0.95
+            elif dx > 0.035:
+                return GESTURE_RIGHT, "RIGHT", 0.95
             else:
                 return GESTURE_GO, "GO", 0.92  # Pointing up/forward
 

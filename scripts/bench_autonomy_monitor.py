@@ -78,8 +78,8 @@ class BenchAutonomyMonitor(Node):
     def display_hud(self):
         now = time.time()
         # Check freshness
-        person_present = (self.last_detection is not None) and (now - self.last_detection_time < 1.0)
-        gesture_fresh = (self.last_gesture is not None) and (now - self.last_gesture_time < 1.2)
+        person_present = (self.last_detection is not None) and (now - self.last_detection_time < 2.5)
+        gesture_active = (self.last_gesture is not None) and (now - self.last_gesture_time < 3.5)
 
         # Format Battery
         if self.battery_pct is not None:
@@ -91,27 +91,38 @@ class BenchAutonomyMonitor(Node):
         # Format Person Detection
         if person_present:
             det = self.last_detection
-            person_str = f"\033[92mYES\033[0m (Conf: {det.confidence:.2f} | Centroid: [{det.center_x:.2f}, {det.center_y:.2f}])"
+            person_str = f"\033[92mYES (LOCKED)\033[0m (Conf: {det.confidence:.2f} | Centroid: [{det.center_x:.2f}, {det.center_y:.2f}])"
+        elif self.last_detection is not None:
+            time_ago = now - self.last_detection_time
+            person_str = f"\033[93mLOST ({time_ago:.1f}s ago)\033[0m — Gimbal Searching FOV"
         else:
             person_str = "\033[93mSEARCHING...\033[0m (No person in frame)"
 
         # Format Gesture
-        if gesture_fresh and self.last_gesture.gesture_id >= 0:
+        if gesture_active and self.last_gesture.gesture_id >= 0:
             g = self.last_gesture
             label = g.gesture_label.upper()
             color = "\033[92m" if label in ("GO", "FOLLOW") else "\033[91m" if label == "STOP" else "\033[94m"
-            gesture_str = f"{color}{label}\033[0m (ID: {g.gesture_id}, Conf: {g.confidence:.2f})"
-        elif gesture_fresh and self.last_gesture.gesture_label == "TOO_FAR":
+            gesture_str = f"{color}▶ {label}\033[0m (Conf: {g.confidence:.2f}) [CONFIRMED]"
+        elif self.last_gesture is not None and self.last_gesture.gesture_id >= 0:
+            g = self.last_gesture
+            label = g.gesture_label.upper()
+            time_ago = now - self.last_gesture_time
+            gesture_str = f"\033[90mLAST: {label} ({time_ago:.1f}s ago) — AWAITING NEXT GESTURE\033[0m"
+        elif gesture_active and self.last_gesture.gesture_label == "TOO_FAR":
             gesture_str = "\033[93mHAND DETECTED (MOVE CLOSER)\033[0m"
         else:
             gesture_str = "\033[90mWAITING FOR HAND GESTURE\033[0m"
 
-        # Format Chassis Motion
-        if abs(self.cmd_linear) > 0.01:
-            wheel_str = f"\033[92mSPINNING FORWARD ({self.cmd_linear:+.2f} m/s)\033[0m"
-        elif abs(self.cmd_angular) > 0.01:
-            turn = "LEFT" if self.cmd_angular > 0 else "RIGHT"
-            wheel_str = f"\033[94mTURNING {turn} ({self.cmd_angular:+.2f} rad/s)\033[0m"
+        # Format Chassis Motion (support either /cmd_vel or /cmd_vel_gesture)
+        active_linear = self.final_linear if abs(self.final_linear) > 0.005 else self.cmd_linear
+        active_angular = self.final_angular if abs(self.final_angular) > 0.005 else self.cmd_angular
+
+        if abs(active_linear) > 0.01:
+            wheel_str = f"\033[92mSPINNING FORWARD ({active_linear:+.2f} m/s)\033[0m"
+        elif abs(active_angular) > 0.01:
+            turn = "LEFT" if active_angular > 0 else "RIGHT"
+            wheel_str = f"\033[94mTURNING {turn} ({active_angular:+.2f} rad/s)\033[0m"
         else:
             wheel_str = "\033[90mPARKED / HALTED (0.00 m/s)\033[0m"
 
@@ -128,7 +139,7 @@ class BenchAutonomyMonitor(Node):
             f"  [1] PERSON DETECTION   : {person_str}\033[K",
             f"  [2] ACTIVE GIMBAL      : Pan = {self.current_pan:3d}° | Tilt = {self.current_tilt:3d}° | State: {state_color}{self.gimbal_state}\033[0m\033[K",
             f"  [3] HAND GESTURE       : {gesture_str}\033[K",
-            f"  [4] BRAIN /cmd_vel     : Linear = {self.cmd_linear:+.2f} m/s | Angular = {self.cmd_angular:+.2f} rad/s\033[K",
+            f"  [4] BRAIN /cmd_vel     : Linear = {active_linear:+.2f} m/s | Angular = {active_angular:+.2f} rad/s\033[K",
             f"  [5] CHASSIS ACTUATION  : {wheel_str}\033[K",
             "--------------------------------------------------------------------------------\033[K",
             "  GESTURE CONTROLS FOR OPERATOR:\033[K",

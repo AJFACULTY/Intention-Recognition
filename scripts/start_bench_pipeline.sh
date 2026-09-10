@@ -36,11 +36,11 @@ docker exec yahboom_gesture bash -c "
 "
 sleep 1
 
-# Hardware Safety Check: Verify physical USB camera device presence (/dev/video0 or /dev/video1)
+# Hardware Safety Check: Verify physical USB camera device presence on host
 if [ ! -e /dev/video0 ] && [ ! -e /dev/video1 ]; then
     echo ""
     echo "=================================================================="
-    echo "  [ERROR] USB CAMERA DISCONNECTED! (No /dev/video0 or /dev/video1 found)"
+    echo "  [ERROR] USB CAMERA DISCONNECTED! (No /dev/video0 or /dev/video1 found on host)"
     echo "=================================================================="
     echo "  The camera USB cable has come unplugged from the Raspberry Pi."
     echo "  Please plug the USB camera into a USB port on the Pi and re-run:"
@@ -48,6 +48,14 @@ if [ ! -e /dev/video0 ] && [ ! -e /dev/video1 ]; then
     echo "=================================================================="
     echo ""
     exit 1
+fi
+
+# Verify container has working access to camera device; restart container if device node is stale from USB disconnect
+CAM_TEST=$(docker exec yahboom_gesture python3 -c "import cv2; c=cv2.VideoCapture(0); ret=c.isOpened(); c.release(); print(1 if ret else 0)" 2>/dev/null || echo 0)
+if [ "$CAM_TEST" != "1" ]; then
+    echo "[!] Camera not opening in container (stale device node from USB reconnect). Refreshing container..."
+    docker restart yahboom_gesture >/dev/null 2>&1
+    sleep 2
 fi
 
 # 2. Launch Background Pipeline Nodes inside container
@@ -103,6 +111,8 @@ echo "=================================================================="
 echo ""
 
 # 3. Launch live interactive HUD monitor in foreground
+echo ">> Priming neural perception models (3s)..."
+sleep 3
 echo ">> Launching Live Autonomous Dashboard Monitor (Press Ctrl+C to exit)..."
 docker exec -i yahboom_gesture bash -c "
     $ROS_ENV

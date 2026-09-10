@@ -97,6 +97,9 @@
 5. **Perspective Scale Variance (Distance Domain Shift):** Raw pixel coordinates of hand landmarks caused classification to fail whenever the operator stood further away. Solved by calculating 19 scale-invariant geometric feature ratios (palm distance normalization and joint angles).
 6. **Bystander Interference in Shared Spaces:** In crowded rooms, bystanders moving in the background caused false gesture triggers. Solved with a central spatial acceptance zone filter (center bounding box) and a rolling majority-vote temporal buffer.
 7. **Open-Loop Gesture vs. Obstacle Collision:** A robot executing gestures blindly could crash into walls or furniture. Solved by linking LiDAR costmap inflation with an automatic reactive safety stop if an obstacle is within 0.35 m.
+8. **OpenCV V4L2 Buffer Starvation (`select() timeout`):** In `camera_pub.py`, configuring `CAP_PROP_BUFFERSIZE = 1` starved the Linux UVC kernel ring-buffer, causing OpenCV `cap_v4l.cpp` to block for 10.0 seconds per frame. Solved by removing the manual buffer restriction, restoring a deterministic 20.006 Hz capture rate (std dev $0.00008\text{ s}$).
+9. **Pan Servo Cable Drag & Mechanical USB Disconnects:** A wide $\pm 50^\circ$ search sweep arc physically pulled the camera USB ribbon cable against the port, causing kernel `USB disconnect` drops during bench testing. Solved by calibrating a cable-safe $\pm 28^\circ$ sweep arc and routing a loose slack strain-relief loop around the pan/tilt bracket.
+10. **Fronto-Parallel vs. Lateral Pointing Disambiguation:** Planar gestures (`STOP`, `GO`, `FOLLOW`) present fronto-parallel silhouettes with 99.38% test accuracy, but horizontal pointing (`LEFT`, `RIGHT`) suffered landmark depth foreshortening when using strict vertical Cartesian rules. Solved by evaluating lateral coordinate displacement ($\Delta x$) relative to the metacarpophalangeal (MCP) joint alongside the trained MLP.
 
 ---
 

@@ -269,9 +269,28 @@ python3 face_id_lib.py --enroll "Operator_Name"
 ```
 *Look directly at the camera for 3 seconds. The script extracts clean 512-d ArcFace embeddings and saves them to `authorized_faces.json`.*
 
-### 6.5. Live Video Stream Web Dashboard
-View the live camera feed and detections from any browser on the same Wi-Fi network:
-- Open: `http://10.147.122.136:8080/stream?topic=/camera/image_raw/compressed`
+### 6.5. Live Autonomy Dashboards & Telemetry Recording
+
+#### A. Interactive Curses Terminal HUD Monitor
+Monitor real-time vision bounding boxes, pan/tilt servo angles, gesture confidence, and velocity commands directly in your terminal:
+```bash
+python3 scripts/bench_autonomy_monitor.py
+```
+
+#### B. Full Web Operations Dashboard
+Launch the unified ROS bridge and web video server to open the interactive operator dashboard:
+```bash
+bash scripts/launch_dashboard.sh
+```
+- Browser opens: `file:///home/j/ros2_cognition_ws/cognition_dashboard/web/index.html`
+- Direct MJPEG stream: `http://10.147.122.136:8080/stream?topic=/camera/image_raw/compressed`
+
+#### C. Lightweight Hardware Telemetry Recording (Rosbag2)
+Record numerical topics without saturating the MicroSD card:
+```bash
+bash scripts/record_autonomy_bag.sh
+```
+*Captures `/cognition/gesture`, `/cmd_vel`, `/odom_raw`, `/scan`, and `/tf` into timestamped bag archives for verification analysis.*
 
 
 ---

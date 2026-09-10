@@ -129,7 +129,7 @@ class BrainNode(Node):
             self.get_logger().error(f"Error parsing face identity JSON: {e}")
 
     def detection_callback(self, msg: Detection):
-        if msg.label == 'person' and msg.confidence > 0.45:
+        if msg.label == 'person' and msg.confidence >= 0.35:
             self.person_detected = True
             self.person_center_x = msg.center_x
             self.person_width = msg.width
@@ -137,12 +137,14 @@ class BrainNode(Node):
             if self.locked_on:
                 self.lock_time = time.monotonic()
         else:
-            # Clear person flag only after 1.0s grace period to tolerate frame skips
-            if self.last_seen_time is None or (time.monotonic() - self.last_seen_time) > 1.0:
+            # Clear person flag only after 2.0s grace period to tolerate frame skips and head turns
+            if self.last_seen_time is None or (time.monotonic() - self.last_seen_time) > 2.0:
                 self.person_detected = False
 
     def gesture_callback(self, msg: Gesture):
-        if not self.person_detected:
+        is_stop_gesture = (msg.gesture_id == GESTURE_STOP or msg.gesture_label == "STOP")
+        # Allow gesture if person detected, OR if emergency STOP, OR if high-confidence gesture (>= 0.85)
+        if not self.person_detected and not is_stop_gesture and msg.confidence < 0.85:
             return
 
         # Check Biometric Authorization Gate

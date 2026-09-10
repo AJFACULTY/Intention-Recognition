@@ -195,10 +195,6 @@ class FaceRecognitionNode(Node):
         faces = get_faces(self.app, frame)
 
         if not faces:
-            target = Point(x=0.0, y=0.0, z=-1.0)
-            self.target_pub.publish(target)
-            self.last_target_point = target
-
             if self.enable_debug:
                 self.publish_debug_frame(frame)
             return

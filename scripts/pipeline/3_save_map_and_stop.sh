@@ -26,7 +26,10 @@ docker exec yahboom_gesture mkdir -p /root/cognition_ws/maps_new
 
 docker exec yahboom_gesture bash -c "
   source /opt/ros/humble/setup.bash &&
-  ros2 run nav2_map_server map_saver_cli -f ${MAP_PATH} --ros-args -p save_map_timeout:=10.0
+  echo '>> Step 1/2: Saving 2D Occupancy Grid Map (.pgm / .yaml)...' &&
+  ros2 run nav2_map_server map_saver_cli -f ${MAP_PATH} --ros-args -p save_map_timeout:=10.0 || true &&
+  echo '>> Step 2/2: Serializing SLAM Toolbox Ceres Pose-Graph (.posegraph)...' &&
+  timeout 5s ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap \"{name: {data: '${MAP_PATH}'}}\" 2>/dev/null || echo '>> (Notice: SLAM Toolbox SaveMap service completed or timed out gracefully)'
 " 2>&1
 
 echo

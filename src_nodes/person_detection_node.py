@@ -48,7 +48,7 @@ class PersonDetectionNode(Node):
 
         # Parameters
         self.declare_parameter('headless', True)
-        self.declare_parameter('confidence_threshold', 0.5)
+        self.declare_parameter('confidence_threshold', 0.40)
         self.declare_parameter('frame_skip', 3)
         if not self.has_parameter('use_sim_time'):
             self.declare_parameter('use_sim_time', False)

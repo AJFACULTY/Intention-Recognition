@@ -177,9 +177,66 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 
 ---
 
-## 7. Master System Verification Matrix (Physical Hardware Gate)
+## 6. Milestone 6: Real-Time Dashboards & Visual Instrumentation [COMPLETED & VERIFIED]
 
-Once the robot battery completes its recharge cycle on the 12.6V balance charger, execute the 6-Phase Master Test Matrix:
+### Task 6.1: Operator Web Dashboard Verification & Launch Integration [COMPLETED]
+- **Target Files:** [cognition_dashboard/web/index.html](file:///home/j/ros2_cognition_ws/cognition_dashboard/web/index.html), [launch/dashboard.launch.py](file:///home/j/ros2_cognition_ws/launch/dashboard.launch.py), [scripts/launch_dashboard.sh](file:///home/j/ros2_cognition_ws/scripts/launch_dashboard.sh).
+- **Functionality:** Serves real-time interactive browser HUD displaying live gesture classifications across all 6 trained classes (`GO`, `STOP`, `FOLLOW`, `BACK`, `LEFT`, `RIGHT`), bounding box telemetry, active acceptance zone boundary, gimbal pan/tilt angles, and `/cmd_vel` gauges via `rosbridge_server` (WebSocket port 9090).
+
+### Task 6.2: Terminal Autonomy Monitor (Headless Low-Overhead HUD) [COMPLETED & VERIFIED LIVE]
+- **Target File:** [scripts/bench_autonomy_monitor.py](file:///home/j/ros2_cognition_ws/scripts/bench_autonomy_monitor.py).
+- **Status:** **VERIFIED LIVE ON PHYSICAL RASPBERRY PI 5.**
+- **Verification Details:** Deployed and verified on physical hardware. Displays real-time 10 Hz telemetry for person tracking, gimbal servo angles (`pan`, `tilt`, `gimbal_state`), 3.5-second persistent gesture hold with historical context (`LAST: GESTURE (X.Xs ago)`), and dual `/cmd_vel` / `/cmd_vel_gesture` velocity monitoring with zero GPU overhead.
+
+### Task 6.3: Live Camera Spatial Zone Snapshot Utility [COMPLETED & VERIFIED LIVE]
+- **Target File:** [scripts/capture_spatial_zone_snapshot.py](file:///home/j/ros2_cognition_ws/scripts/capture_spatial_zone_snapshot.py).
+- **Status:** **VERIFIED LIVE ON PHYSICAL RASPBERRY PI 5.**
+- **Verification Details:** Captured live empirical snapshot from `/dev/video0` on physical robot hardware, saving [test_pics/robot_live_spatial_zone.jpg](file:///home/j/ros2_cognition_ws/test_pics/robot_live_spatial_zone.jpg) and [write_up/figures/robot_live_spatial_zone.jpg](file:///home/j/ros2_cognition_ws/write_up/figures/robot_live_spatial_zone.jpg) with overlaid $45\% \times 65\%$ interaction zone boundary.
+
+---
+
+## 7. Milestone 7: Non-Saturating Telemetry & Bag Recording Infrastructure [COMPLETED & VERIFIED]
+
+### Task 7.1: Lightweight ROS 2 Telemetry Bag Recorder [COMPLETED & VERIFIED LIVE]
+- **Target File:** [scripts/record_autonomy_bag.sh](file:///home/j/ros2_cognition_ws/scripts/record_autonomy_bag.sh).
+- **Status:** **VERIFIED LIVE ON PHYSICAL RASPBERRY PI 5 (September 10, 2026).**
+- **Architecture & Design:**
+  - Prevents MicroSD bus write saturation by deliberately excluding heavy raw video frames and recording only compact scalar telemetry topics:
+    - `/cognition/gesture` (`cognition_interfaces/msg/Gesture`)
+    - `/cognition/detection` (`cognition_interfaces/msg/Detection`)
+    - `/cmd_vel`, `/cmd_vel_gesture`, `/cmd_vel_nav`, `/cmd_vel_joy` (`geometry_msgs/msg/Twist`)
+    - `/odom_raw` (`nav_msgs/msg/Odometry`)
+    - `/imu` (`sensor_msgs/msg/Imu`)
+    - `/scan` (`sensor_msgs/msg/LaserScan` @ 12.6 Hz)
+    - `/tf` and `/tf_static` (`tf2_msgs/msg/TFMessage`)
+  - Sustained write rate: $< 150\text{ KB/s}$ (preserving MicroSD card lifespan and zero disk I/O bottlenecks).
+  - **Empirical Proof:** Recorded live 20-second mission bag on robot at `/home/pi/bags/telemetry_20260910_120023/telemetry_20260910_120023_0.db3` with zero dropped messages.
+
+---
+
+## 8. Milestone 8: SLAM Map Serialization & Graph Saving [COMPLETED & VERIFIED]
+
+### Task 8.1: Serialize SLAM Toolbox Ceres Graph (.posegraph) [COMPLETED]
+- **Target Files:** [scripts/pipeline/3_save_map_and_stop.sh](file:///home/j/ros2_cognition_ws/scripts/pipeline/3_save_map_and_stop.sh).
+- **Status:** **VERIFIED.**
+- **Functionality:** Serializes underlying non-linear pose-graph solver state via `SaveMap` service call (`maps/room_session.posegraph`), preserving all LiDAR scan constraints and covariance matrices for future session re-loading and incremental mapping alongside standard `.pgm` and `.yaml` occupancy grids.
+
+---
+
+## 9. Milestone 9: Multi-Waypoint Autonomous Navigation [MODERATE WIN #4]
+
+### Task 9.1: Multi-Goal Waypoint Navigation Script
+- **Target File:** `scripts/navigate_waypoints.py`.
+- **Functionality:**
+  - Implements a dedicated Nav2 action client utilizing `NavigateThroughPoses` or sequential `NavigateToPose`.
+  - Dispatches a 2-to-3 waypoint route across the calibrated metric map ([maps/room_map_clean.png](file:///home/j/ros2_cognition_ws/maps/room_map_clean.png)), commanding the robot to transit from Home $(0, 0) \to \text{Waypoint 1 } (1.2, 0.0) \to \text{Waypoint 2 } (1.2, 0.8) \to \text{Home } (0, 0)$.
+  - Proves multi-point global autonomous mobility beyond the verified 1.5 m single straight-line goal.
+
+---
+
+## 10. Milestone 10: Master 6-Phase Live Hardware Verification Gate
+
+Once the robot battery completes its recharge cycle on the 12.6V balance charger, execute the 6-Phase Master Test Matrix while recording concurrent telemetry via `scripts/record_autonomy_bag.sh` and monitoring live state on the dashboard:
 
 | Phase | Subsystem Under Test | Stimulus & Action | Expected Observable Behavior | Pass/Fail Criteria |
 |:---:|---|---|---|:---:|
@@ -189,3 +246,4 @@ Once the robot battery completes its recharge cycle on the 12.6V balance charger
 | **Phase 4** | **Nav2 Autonomous Navigation & Dynamic Obstacle Avoidance** | Robot Nav2 autonomously tracking 2.0m waypoint path; operator steps directly into robot's path | Costmap updates with human obstacle via RPLiDAR. Robot smoothly slows down / recalculates path around human, or pauses. Operator interacts with gesture `STOP`/`GO` to resume. | No collisions. Nav2 path replans or yields cleanly. |
 | **Phase 5** | **Safety Preemption (`twist_mux`)** | Robot actively moving under gesture or Nav2 command; operator pushes physical joystick stick | Joystick command (Priority 100) instantly overrides autonomous motion. Releasing joystick smoothly returns control after 0.5s timeout. | Preemption latency $< 50\text{ ms}$. Zero command fighting or wheel shuddering. |
 | **Phase 6** | **Resource & Thermal Benchmark** | All nodes active simultaneously (Nav2 + SLAM/AMCL + YOLOv8 + MediaPipe + Face ID + Gimbal + Brain) | Monitor CPU, RAM, and thermals via `top` and `vcgencmd measure_temp`. | Combined Pi 5 CPU $< 85\%$. Temperature $< 72^\circ\text{C}$ (no thermal throttling). Battery voltage stable $> 11.1\text{V}$. |
+
