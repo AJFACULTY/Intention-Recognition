@@ -279,6 +279,15 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
 - **Status:** **COMPLETED & VERIFIED (100% GREEN PASS).**
 - **Details:** All 5 test suites pass cleanly in 18.10s. Created executable `sync_to_bot.sh` for one-click deployment to the robot's Docker container once charging completes.
 
+### Task 8.5.5: Physical Robot Sync, Smoke Test & FOLLOW Gesture Tuning [ACTIVE]
+- **Target Files:** [scripts/sync_to_bot.sh](file:///home/j/ros2_cognition_ws/scripts/sync_to_bot.sh), [src_nodes/brain_node.py](file:///home/j/ros2_cognition_ws/src_nodes/brain_node.py), [scripts/bench_autonomy_monitor.py](file:///home/j/ros2_cognition_ws/scripts/bench_autonomy_monitor.py).
+- **Status:** **SYNC & SMOKE TEST VERIFIED LIVE (September 10, 2026).**
+- **Verification Details:** Executed `./scripts/sync_to_bot.sh 10.27.122.135` transferring all models and nodes into running `yahboom_gesture` container. Launched `bash ~/start_bench_pipeline.sh` on robot; verified clean startup of all 5 nodes, battery at 80% (Healthy), active gimbal sinusoidal search, and clean Ctrl+C shutdown.
+- **Pending Refinements:**
+  - FOLLOW gesture visual servoing: Tune proportional steering gain ($v_\omega = -K_p \cdot e_x$) and social distance holding to prevent overshoot.
+  - Gimbal-chassis coordination: Couple gimbal pan offset with chassis turn commands so the base aligns with the target.
+  - Fix HUD ANSI escape redraws in `bench_autonomy_monitor.py` to prevent scrolling header output in non-standard terminals.
+
 ---
 
 ## 9. Milestone 9: Multi-Waypoint Autonomous Navigation [MODERATE WIN #4]

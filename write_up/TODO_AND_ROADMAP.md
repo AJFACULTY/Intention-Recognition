@@ -145,7 +145,15 @@
 - [x] **Enhanced Bench Monitor HUD Legend:** Updated `scripts/bench_autonomy_monitor.py` to explicitly display all 6 gestures (`STOP`, `GO`, `FOLLOW`, `LEFT`, `RIGHT`, `BACK`) and their corresponding robot reactions.
 - [x] **Master Verification Suite (100% Green PASS):** Executed `scripts/run_all_local_verifications.py`, passing all 5 local unit & integration test suites in 18.10s (`test_perception_throttling`, `test_active_vision_logic`, `test_face_recognition`, `test_brain_logic`, `test_gesture_mlp`).
 - [x] **Packaged One-Click Robot Sync Script:** Created and made executable `scripts/sync_to_bot.sh` for seamless container deployment.
-- [ ] **Live Container Sync to Physical Bot:** Execute `./scripts/sync_to_bot.sh` to update `yahboom_gesture` container on the live robot.
+- [x] **Live Container Sync to Physical Bot (COMPLETED):** Executed `./scripts/sync_to_bot.sh 10.27.122.135` (100% transfer and container injection into `yahboom_gesture`).
+- [x] **Live Bench Pipeline Launch Verified:** Launched `bash ~/start_bench_pipeline.sh` on physical robot; verified all 5 autonomy nodes (`camera_pub`, `person_detection`, `active_vision`, `gesture_node`, `brain_node`), battery reporting 79-80% (Healthy), active gimbal search, and clean Ctrl+C signal traps.
+- [ ] **FOLLOW Gesture Logic & Visual Servoing Refinement:**
+  - Audit and tune proportional steering response ($v_\omega = -K_p \cdot e_x$) in `brain_node.py` during `FOLLOW` mode.
+  - Refine social distance holding threshold (smooth deceleration when operator box width $> 0.40$ or LiDAR $< 0.50$ m to prevent overshoot).
+  - Gimbal-chassis tracking coordination: couple gimbal pan angle to chassis heading commands so the chassis turns into the direction the gimbal is looking.
+- [ ] **Bench Autonomy Pipeline Hardening & Display Polish:**
+  - Polish `bench_autonomy_monitor.py` ANSI escape sequence redraws to ensure rock-solid in-place terminal HUD without duplicate header scrolling.
+  - Live qualification of all 6 gestures (`STOP`, `GO`, `FOLLOW`, `LEFT`, `RIGHT`, `BACK`) with operator in active acceptance zone.
 - [ ] **Milestone 9 (Multi-Waypoint Navigation):** Run `scripts/navigate_waypoints.py` on robot.
 - [ ] **Milestone 10 (Master 6-Phase Live Verification Gate):** Execute live hardware verification matrix.
 
