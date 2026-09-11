@@ -107,19 +107,52 @@
 
 ## 1.6. Overleaf Online Thesis Synchronization Checklist
 *Tasks required to synchronize local Git and LaTeX improvements with the primary Overleaf cloud project:*
-- [ ] **Upload Figure 4.3:** Upload `write_up/figures/nav_run_trajectory_empirical.png` to the `figures/` folder on Overleaf.
+- [ ] **Upload All Publication Figures:** Upload all updated figures (`hardware_design.png`, `system_architecture.png`, `fig_spatial_zone.png`, `fig_feature_pipeline.png`, `fig_brain_state_machine.png`, `fig_docker_deployment.png`, `nav_run_trajectory_empirical.png`) to the `figures/` folder on Overleaf.
+- [ ] **Sync Chapter 3:** Replace `chapters/ch3_methodology.tex` on Overleaf with the updated local version containing the real hand landmark pipeline, empirical spatial zone with privacy blur, and formal workstation nomenclature.
 - [ ] **Sync Chapter 4:** Replace `chapters/ch4_results.tex` on Overleaf with the updated local version containing the empirical navigation benchmark (§4.5.2) and telemetry metrics.
 - [ ] **Sync Chapter 5:** Replace `chapters/ch5_conclusion.tex` on Overleaf with the refined limitation text acknowledging the successful lightweight ROS 2 bag telemetry validation.
 - [ ] **Verify Overleaf Compilation:** Recompile full document on Overleaf to confirm zero compilation errors, zero missing figure warnings, and clean table floats.
 
 ---
 
-## 1.6. Overleaf Online Thesis Synchronization Checklist
-*Tasks required to synchronize local Git and LaTeX improvements with the primary Overleaf cloud project:*
-- [ ] **Upload Figure 4.3:** Upload `write_up/figures/nav_run_trajectory_empirical.png` to the `figures/` folder on Overleaf.
-- [ ] **Sync Chapter 4:** Replace `chapters/ch4_results.tex` on Overleaf with the updated local version containing the empirical navigation benchmark (§4.5.2) and telemetry metrics.
-- [ ] **Sync Chapter 5:** Replace `chapters/ch5_conclusion.tex` on Overleaf with the refined limitation text acknowledging the successful lightweight ROS 2 bag telemetry validation.
-- [ ] **Verify Overleaf Compilation:** Recompile full document on Overleaf to confirm zero compilation errors, zero missing figure warnings, and clean table floats.
+## 1.7. Overleaf Reviewer & Supervisor Feedback Action Plan
+*Directly addressing the three critical supervisor/reviewer comments posted on Overleaf:*
+
+### [ ] 1. Literature Result Reporting Analysis & Python Test Logging Script
+- [ ] **Literature Result Reporting Patterns:**
+  - Audit recent peer-reviewed HRI and robotics literature (e.g. IEEE Transactions on Human-Machine Systems, Robotics and Autonomous Systems, Automation in Construction) to extract standard reporting conventions (confusion matrices, latency breakdowns, mean $\pm$ standard deviation, boxplots, success rates under distance and lighting variations).
+- [ ] **Python Live Experiment Logger (`scripts/experiment_logger.py`):**
+  - Develop a dedicated Python/ROS 2 test logging node that subscribes to `/cognition/gesture`, `/camera/image_raw`, `/cmd_vel`, `/scan`, `/odom_raw`, and `/diagnostics`.
+  - Record structured empirical test trials into standard `.csv` files (`experiment_logs/trial_data_<timestamp>.csv`).
+  - Fields logged: `timestamp`, `trial_id`, `operator_id`, `distance_m`, `lighting_condition`, `ground_truth_gesture`, `predicted_gesture`, `model_confidence`, `consensus_votes`, `inference_latency_ms`, `total_pipeline_latency_ms`, `linear_velocity_cmd`, `angular_velocity_cmd`, `min_lidar_distance_m`, `safety_status`.
+
+### [ ] 2. Comprehensive Bibliography & References Overhaul
+- [ ] **Investigate Overleaf Citation Visibility:**
+  - Identify why only two references were appearing in the compiled Overleaf bibliography (ensure BibTeX/biber correctly resolves all keys and citations are called via `\cite{}` rather than plaintext).
+- [ ] **Expand `references.bib`:**
+  - Broaden the bibliography beyond the initial set to include 25+ high-impact peer-reviewed journal and conference publications spanning:
+    - Edge Deep Learning & Real-Time Computer Vision (YOLO, MediaPipe, MobileNet, ONNX).
+    - ROS 2 Architecture, DDS Middleware, and Real-Time Robot Operating Systems.
+    - Human-Robot Interaction (HRI), Touchless Gesture Interfaces, and Ergonomic Cobots.
+    - 2D LiDAR SLAM, Cartographer, Ceres Scan-Matching, and Nav2 Costmaps.
+    - Safety Standards: ISO 15066:2016, ISO 12100:2010, ROS REP-103/105.
+- [ ] **Enrich In-Text Citations Across Chapters 1–5:**
+  - Strategically embed citations throughout Chapters 1, 2, 3, 4, and 5 to demonstrate deep scholarship and contextual grounding.
+
+### [ ] 3. Statistical Analysis of Logged Data (.csv)
+- [ ] **Statistical Processing Script (`scripts/analyze_trial_data.py`):**
+  - Ingest acquired experimental CSV datasets using Python (`pandas`, `scipy.stats`, `numpy`).
+  - Compute central tendency and dispersion metrics: Mean, Median, Standard Deviation, Interquartile Range (IQR), and 95% Confidence Intervals for:
+    - Classification accuracy across 6 gesture classes.
+    - Latency per pipeline stage (capture $\to$ MediaPipe $\to$ MLP $\to$ DDS $\to$ UART $\to$ motor response).
+    - Physical stopping distance upon emergency preemption (< 0.36 m).
+- [ ] **Hypothesis Testing & Inferential Statistics:**
+  - Perform Two-Sample $t$-tests and One-Way ANOVA across operational distances (1.0m, 1.75m, 2.5m) and lighting environments (natural daylight vs. artificial fluorescent).
+  - Verify statistical significance ($p < 0.05$) to prove geometric invariance and spatial zone robustness.
+- [ ] **Publication-Grade Statistical Plots for Chapter 4:**
+  - Generate boxplots with scatter jitter points for latency distributions.
+  - Generate confidence interval plots and error-bar charts comparing accuracy across operating conditions.
+  - Update Chapter 4 text and tables with the derived inferential statistical values.
 
 ---
 

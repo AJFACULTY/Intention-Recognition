@@ -116,7 +116,7 @@ def grab_camera_frame():
 def main():
     parser = argparse.ArgumentParser(description="Capture & overlay robot spatial acceptance zone")
     parser.add_argument("--source", type=str, default=None, help="Source image path if camera is offline")
-    parser.add_argument("--out", type=str, default="test_pics/live_spatial_zone_snapshot.jpg", help="Output path")
+    parser.add_argument("--out", type=str, default="test_pics/robot_live_spatial_zone.jpg", help="Output path")
     args = parser.parse_args()
     
     frame = None
@@ -126,10 +126,10 @@ def main():
     else:
         frame = grab_camera_frame()
         if frame is None:
-            # Fallback to existing bench test picture if hardware camera is not connected
-            fallback = "test_pics/photo_2026-09-08_07-24-44.jpg"
+            # Fallback to onboard robot camera capture if live camera is not connected
+            fallback = "write_up/figures/robot_live_spatial_zone.jpg"
             if os.path.exists(fallback):
-                print(f"[WARN] Live camera not accessible. Using bench test baseline: {fallback}")
+                print(f"[WARN] Live camera not accessible. Using onboard robot frame: {fallback}")
                 frame = cv2.imread(fallback)
             else:
                 print("[ERROR] Neither live camera nor baseline image could be opened.")
@@ -146,7 +146,7 @@ def main():
     print(f"[SUCCESS] Spatial zone verification artifact saved to: {args.out}")
     
     # Also copy to write_up/figures if directory exists
-    writeup_target = os.path.join("write_up", "figures", "live_spatial_zone_snapshot.jpg")
+    writeup_target = os.path.join("write_up", "figures", "robot_live_spatial_zone.jpg")
     if os.path.exists(os.path.dirname(writeup_target)):
         cv2.imwrite(writeup_target, result)
         print(f"[SUCCESS] Mirrored to write-up figures: {writeup_target}")

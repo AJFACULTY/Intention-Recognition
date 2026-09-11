@@ -8,6 +8,11 @@ bags/
 logs/
 scratch/
 write_up/figures/unused/
+write_up/reference_papers/
+write_up/preview_figures/
+*.pt
+*.task
+photo_*.jpg
 *.mp4
 *.mcap
 *.db3

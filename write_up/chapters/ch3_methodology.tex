@@ -188,7 +188,7 @@ All three containers are built upon Yahboom's official base image (\texttt{yahbo
 
 All three containers are launched in Docker's \texttt{host} network mode, allowing them to share the host network stack directly rather than communicating through virtual network bridges. This direct communication allows ROS2's built-in discovery service to link nodes across container boundaries with sub-millisecond latency. Crucially, all containers must share an identical communication channel setting known as the \texttt{ROS\_DOMAIN\_ID}; during early system integration, an elusive communication failure occurred when the base container defaulted to domain 20 while custom nodes ran on domain 0, causing the robot to silently drop commands until all containers were unified to \texttt{ROS\_DOMAIN\_ID=0}.
 
-Finally, to make the robot fully self-sufficient upon battery power-up, all software containers are automatically initialized by an operating system background service (\texttt{cognition.service}). This ensures that the robot immediately begins listening for human gestures the moment the physical power switch is flipped, without requiring manual keyboard input. During testing, the robot operates headlessly without a monitor to conserve battery and memory, while developers monitor spatial maps and diagnostic cameras remotely over Wi-Fi using RViz2 on a laptop workstation. Figure~\ref{fig:docker_deployment} illustrates this containerized multi-node deployment architecture.
+Finally, to make the robot fully self-sufficient upon battery power-up, all software containers are automatically initialized by an operating system background service (\texttt{cognition.service}). This ensures that the robot immediately begins listening for human gestures the moment the physical power switch is flipped, without requiring manual keyboard input. During testing, the robot operates headlessly without a monitor to conserve battery and memory, while developers monitor spatial maps and diagnostic cameras remotely over Wi-Fi using RViz2 on an \texttt{x86\_64} engineering host workstation (AMD Ryzen 5, 8GB DDR4 RAM). Figure~\ref{fig:docker_deployment} illustrates this containerized multi-node deployment architecture.
 
 \begin{figure}[H]
 \centering
@@ -276,12 +276,12 @@ The first stage of the pipeline utilized the YOLOv8n (nano variant) object detec
 
 To resolve this interference and enforce operational safety, a spatial zone filter was engineered over the raw YOLOv8n outputs. The camera's field of view was programmatically segmented into an active acceptance zone spanning 45\% of the frame width and 65\% of the frame height, centred on the frame origin. The system evaluated the center coordinates of all detected ``person'' bounding boxes; any detection falling outside this boundary was explicitly ignored. 
 
-To support scenarios with multiple bystanders near the operational zone, the system tracks up to three candidate persons simultaneously for motion-history purposes, but selects a single active operator per frame as the largest (closest) zone-eligible detection. Once this operator produces a validated gesture command (per the 5-frame majority-vote buffer described in Section~\ref{sec:temporal_buffering}), \texttt{brain\_node} grants a 3-second lock on that subject, during which newly appearing candidates are ignored regardless of size or proximity. This logical filtering ensured the robot interacted exclusively with an operator positioned directly in its operational path. Figure~\ref{fig:spatial_zone} illustrates this spatial acceptance zone filtering logic.
+To support scenarios with multiple bystanders near the operational zone, the system tracks up to three candidate persons simultaneously for motion-history purposes, but selects a single active operator per frame as the largest (closest) zone-eligible detection. Once this operator produces a validated gesture command (per the 5-frame majority-vote buffer described in Section~\ref{sec:temporal_buffering}), \texttt{brain\_node} grants a 3-second lock on that subject, during which newly appearing candidates are ignored regardless of size or proximity. This logical filtering ensured the robot interacted exclusively with an operator positioned directly in its operational path. Figure~\ref{fig:spatial_zone} illustrates this empirical spatial receptive zone perception and the accompanying ISO 5807 gating logic, showcasing the robot's onboard camera view with Gaussian bystander privacy blurring alongside the decision flowchart.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.78\textwidth]{fig_spatial_zone.png}
-\caption{Spatial Acceptance Zone Filtering and Operator Disambiguation}
+\includegraphics[width=0.88\textwidth]{fig_spatial_zone.png}
+\caption{Empirical Spatial Receptive Zone Gating and Bystander Suppression Flow}
 \label{fig:spatial_zone}
 \end{figure}
 
@@ -360,12 +360,12 @@ With the spatial data reduced to 19 scale-invariant features, the final stage of
 
 Two rounds of dataset collection and training were conducted. An initial dataset of 3,000 samples (unbalanced across classes) produced a classifier with 99.67\% test accuracy; however, to improve robustness against operator-variation issues, the dataset was subsequently expanded to a balanced 6,000-sample set (1,000 samples per class, described in Section~\ref{sec:recording_conditions}), yielding a final test accuracy of 99.38\%—a marginal reduction attributable to the harder, more balanced classification task rather than a regression in model quality. This slight numerical drop in test accuracy actually yielded a substantially more dependable robot in physical testing, as the balanced model eliminated previous blind spots and avoided accidental favoritism toward simpler hand postures.
 
-The final trained classifier was exported to Open Neural Network Exchange (ONNX) format (\texttt{gesture\_model.onnx}) and loaded via ONNX Runtime (\texttt{onnxruntime.InferenceSession}) inside \texttt{gesture\_node} at runtime, with a separate \texttt{label\_encoder\_pi.pkl} file—loaded via scikit-learn's joblib—handling decoding of the model's integer output back to a gesture label string. ONNX Runtime was used consistently across both learned models in the perception pipeline, providing a uniform inference approach for the gesture classifier and the LSTM path predictor alike. The raw classification output was then published to the ROS2 middleware, where it was intercepted by the centralized decision-making node. Figure~\ref{fig:feature_pipeline} illustrates this feature extraction and classification pipeline.
+The final trained classifier was exported to Open Neural Network Exchange (ONNX) format (\texttt{gesture\_model.onnx}) and loaded via ONNX Runtime (\texttt{onnxruntime.InferenceSession}) inside \texttt{gesture\_node} at runtime, with a separate \texttt{label\_encoder\_pi.pkl} file—loaded via scikit-learn's joblib—handling decoding of the model's integer output back to a gesture label string. ONNX Runtime was used consistently across both learned models in the perception pipeline, providing a uniform inference approach for the gesture classifier and the LSTM path predictor alike. The raw classification output was then published to the ROS2 middleware, where it was intercepted by the centralized decision-making node. Figure~\ref{fig:feature_pipeline} illustrates this complete four-stage pipeline: starting from the 21 MediaPipe anatomical hand landmarks extracted from empirical camera data ($P_0$ through $P_{20}$), progressing through scale and translation invariance transforms, constructing the 19-dimensional invariant geometric feature vector, and terminating in the low-latency Multilayer Perceptron classifier generating discrete action tokens.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.88\textwidth]{fig_feature_pipeline.png}
-\caption{Landmark Transformation and Geometric Feature Extraction Pipeline}
+\caption{Real-Time MediaPipe Feature Engineering and Invariant Neural Classifier Pipeline}
 \label{fig:feature_pipeline}
 \end{figure}
 
@@ -405,12 +405,12 @@ Machine learning models processing live video occasionally produce momentary mis
 
 Once a gesture command successfully passed this majority-vote threshold, the node initiated a 3-second subject lock. During this active execution window, the system locked its attention exclusively onto the confirmed operator, ignoring any new people entering the camera's view or contradictory gestures made by bystanders. This locking mechanism created an orderly, predictable interaction protocol, ensuring that collaborative tasks could be carried out without accidental interruption.
 
-In addition to this gesture-driven state machine, \texttt{brain\_node} provides a dedicated emergency stop service (\texttt{/brain\_node/emergency\_stop}). This software mechanism allows a human supervisor or an automated safety monitor to immediately halt all robot motion, overriding the temporal buffer and state machine in real time. Incorporating this instant override satisfies industrial collaborative safety principles, ensuring that physical locomotion can be aborted at any microsecond. Figure~\ref{fig:brain_state_machine} illustrates the complete state machine architecture and control transitions.
+In addition to this gesture-driven state machine, \texttt{brain\_node} provides a dedicated emergency stop service (\texttt{/brain\_node/emergency\_stop}). This software mechanism allows a human supervisor or an automated safety monitor to immediately halt all robot motion, overriding the temporal buffer and state machine in real time. Incorporating this instant override satisfies industrial collaborative safety principles, ensuring that physical locomotion can be aborted at any microsecond. Figure~\ref{fig:brain_state_machine} illustrates the complete OMG UML 2.5 state machine architecture and control transitions, depicting the five operational states, sliding window consensus filtering, visual servoing follow mode, and the asynchronous LiDAR emergency preemption override.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.88\textwidth]{fig_brain_state_machine.png}
-\caption{UML State Machine: Brain Node Control Logic and Preemption Architecture}
+\caption{OMG UML 2.5 Brain State Machine and Safety Preemption Architecture}
 \label{fig:brain_state_machine}
 \end{figure}
 
