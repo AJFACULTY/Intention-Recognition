@@ -8,6 +8,10 @@ bags/
 logs/
 scratch/
 write_up/figures/unused/
+*.mp4
+*.mcap
+*.db3
+*.bag
 
 # ==========================================
 # ROS2 & Colcon Build Artifacts

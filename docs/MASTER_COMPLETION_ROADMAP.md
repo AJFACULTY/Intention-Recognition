@@ -315,9 +315,14 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
   - Update `chapters/ch4_results.tex` and `chapters/ch5_conclusion.tex` on Overleaf.
   - Verify zero LaTeX errors and clean document rendering.
 
-### Task 9.3: Multi-Goal Waypoint Navigation Script (Future Extension)
-- **Target File:** `scripts/navigate_waypoints.py`.
-- **Functionality:** Dispatches 2-to-3 waypoint patrol across the room map for extended multi-room topological routing.
+### Task 9.3: Multi-Goal Waypoint Navigation & Room Patrol (On Deck Post-Charge)
+- **Status:** **PLANNED & READY FOR DEPLOYMENT (Robot Currently Charging).**
+- **Detailed Sub-Tasks:**
+  - **Task 9.3.1 (`scripts/navigate_waypoints.py`):** Standalone ROS 2 action client CLI supporting `NavigateThroughPoses` and sequential `NavigateToPose` with distance-remaining feedback, ETA calculation, waypoint arrival dwell timers, and graceful Ctrl+C emergency cancellation.
+  - **Task 9.3.2 (`scripts/run_nav2_patrol.sh`):** Automated deployment and telemetry harness. Triggers lightweight non-saturating bag recording (`/tf`, `/odom_raw`, `/odometry/filtered`, `/scan`, `/cmd_vel`, `/amcl_pose`, `/plan`), checks AMCL convergence, and dispatches patrol.
+  - **Task 9.3.3 (`scripts/plot_multi_waypoint_trajectory.py`):** Decodes mission bag files into 3-panel publication plots comparing planned global paths vs executed AMCL trajectories, calculating cross-track error and velocity profiles.
+  - **Task 9.3.4 (Return-to-Home & Room Patrol Route):** Execute physical Return-to-Home $(1.44\,\text{m}, 0.02\,\text{m}) \to (0.00\,\text{m}, 0.00\,\text{m})$ and 3-waypoint corridor loop.
+  - **Task 9.3.5 (Dynamic Obstacle Avoidance Verification):** Validate Nav2 costmap obstacle inflation and local path replanning when an operator steps into the patrol path.
 
 ---
 

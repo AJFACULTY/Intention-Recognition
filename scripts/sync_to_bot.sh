@@ -7,7 +7,7 @@
 
 set -e
 
-ROBOT_HOST="${1:-raspberrypi.local}"
+ROBOT_HOST="${1:-10.27.122.135}"
 ROBOT_USER="pi"
 
 echo "=================================================================="
@@ -28,47 +28,64 @@ echo ">> Robot is reachable."
 echo "[2/4] Transferring verified files to staging area on Pi..."
 ssh "${ROBOT_USER}@${ROBOT_HOST}" "mkdir -p ~/cognition_ws/models"
 
-scp \
-    /home/j/ros2_cognition_ws/src_nodes/gesture_node.py \
-    /home/j/ros2_cognition_ws/src_nodes/hand_features.py \
-    /home/j/ros2_cognition_ws/src_nodes/active_vision_node.py \
-    /home/j/ros2_cognition_ws/scripts/bench_autonomy_monitor.py \
-    "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/"
+    scp \
+        /home/j/ros2_cognition_ws/src_nodes/gesture_node.py \
+        /home/j/ros2_cognition_ws/src_nodes/hand_features.py \
+        /home/j/ros2_cognition_ws/src_nodes/active_vision_node.py \
+        /home/j/ros2_cognition_ws/src_nodes/brain_node.py \
+        /home/j/ros2_cognition_ws/scripts/bench_autonomy_monitor.py \
+        /home/j/ros2_cognition_ws/scripts/mission_manager.py \
+        /home/j/ros2_cognition_ws/scripts/web_map_visualizer.py \
+        /home/j/ros2_cognition_ws/config/nav2_params.yaml \
+        "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/"
 
-scp \
-    /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \
-    /home/j/ros2_cognition_ws/ml_models/weights/scaler_features.pkl \
-    /home/j/ros2_cognition_ws/ml_models/weights/label_encoder_features.pkl \
-    "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/models/"
+    scp \
+        /home/j/ros2_cognition_ws/scripts/start_nav2.sh \
+        "${ROBOT_USER}@${ROBOT_HOST}:~/start_nav2.sh"
+    ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/start_nav2.sh"
 
-# 3. Inject directly into Docker container
-echo "[3/4] Injecting files into 'yahboom_gesture' Docker container..."
-ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
-    CONTAINER=yahboom_gesture
-    DEST_DIR=/root/cognition_ws/src/cognition_perception/cognition_perception
+    scp \
+        /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \
+        /home/j/ros2_cognition_ws/ml_models/weights/scaler_features.pkl \
+        /home/j/ros2_cognition_ws/ml_models/weights/label_encoder_features.pkl \
+        "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/models/"
 
-    # Copy Python nodes
-    docker cp ~/cognition_ws/gesture_node.py \${CONTAINER}:\${DEST_DIR}/gesture_node.py
-    docker cp ~/cognition_ws/hand_features.py \${CONTAINER}:\${DEST_DIR}/hand_features.py
-    docker cp ~/cognition_ws/active_vision_node.py \${CONTAINER}:\${DEST_DIR}/active_vision_node.py
-    docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
+    # 3. Inject directly into Docker container
+    echo "[3/4] Injecting files into 'yahboom_gesture' Docker container..."
+    ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
+        CONTAINER=yahboom_gesture
+        PERCEPT_DIR=/root/cognition_ws/src/cognition_perception/cognition_perception
+        BRAIN_DIR=/root/cognition_ws/src/cognition_brain/cognition_brain
+        CONFIG_DIR=/root/cognition_ws/src/cognition_simulation/config
 
-    # Copy models into package models dir and share dir
-    docker exec \${CONTAINER} mkdir -p \${DEST_DIR}/models
-    docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${DEST_DIR}/models/
-    docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${DEST_DIR}/models/
-    docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${DEST_DIR}/models/
+        # Copy Perception nodes
+        docker cp ~/cognition_ws/gesture_node.py \${CONTAINER}:\${PERCEPT_DIR}/gesture_node.py
+        docker cp ~/cognition_ws/hand_features.py \${CONTAINER}:\${PERCEPT_DIR}/hand_features.py
+        docker cp ~/cognition_ws/active_vision_node.py \${CONTAINER}:\${PERCEPT_DIR}/active_vision_node.py
+        docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
 
-    # Also copy to installed share directory if present
-    SHARE_DIR=/root/cognition_ws/install/cognition_perception/share/cognition_perception/models
-    if docker exec \${CONTAINER} test -d \${SHARE_DIR}; then
-        docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${SHARE_DIR}/
-    fi
+        # Copy Brain Decision node, Mission Manager & Web Map Visualizer
+        docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${BRAIN_DIR}/brain_node.py
+        docker cp ~/cognition_ws/mission_manager.py \${CONTAINER}:/root/cognition_ws/mission_manager.py
+        docker cp ~/cognition_ws/web_map_visualizer.py \${CONTAINER}:/root/cognition_ws/web_map_visualizer.py
+        docker cp ~/cognition_ws/nav2_params.yaml \${CONTAINER}:\${CONFIG_DIR}/nav2_params.yaml
 
-    echo \">> Files successfully copied into Docker container.\"
-'"
+        # Copy models into package models dir and share dir
+        docker exec \${CONTAINER} mkdir -p \${PERCEPT_DIR}/models
+        docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
+        docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
+        docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
+
+        # Also copy to installed share directory if present
+        SHARE_DIR=/root/cognition_ws/install/cognition_perception/share/cognition_perception/models
+        if docker exec \${CONTAINER} test -d \${SHARE_DIR}; then
+            docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${SHARE_DIR}/
+            docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${SHARE_DIR}/
+            docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${SHARE_DIR}/
+        fi
+
+        echo \">> All autonomy, mission, and model files successfully injected into Docker container.\"
+    '"
 
 # 4. Success summary
 echo "[4/4] Verification complete."

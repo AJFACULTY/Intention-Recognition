@@ -166,6 +166,7 @@
 - [x] **Packaged One-Click Robot Sync Script:** Created and made executable `scripts/sync_to_bot.sh` for seamless container deployment.
 - [x] **Live Container Sync to Physical Bot (COMPLETED):** Executed `./scripts/sync_to_bot.sh 10.27.122.135` (100% transfer and container injection into `yahboom_gesture`).
 - [x] **Live Bench Pipeline Launch Verified:** Launched `bash ~/start_bench_pipeline.sh` on physical robot; verified all 5 autonomy nodes (`camera_pub`, `person_detection`, `active_vision`, `gesture_node`, `brain_node`), battery reporting 79-80% (Healthy), active gimbal search, and clean Ctrl+C signal traps.
+- [ ] **Current Hardware State (Battery Recharging):** Robot battery is currently charging on the 12.6V balance charger after physical benchmarks. Offline planning and logic refinement in progress.
 - [ ] **FOLLOW Gesture Logic & Visual Servoing Refinement:**
   - Audit and tune proportional steering response ($v_\omega = -K_p \cdot e_x$) in `brain_node.py` during `FOLLOW` mode.
   - Refine social distance holding threshold (smooth deceleration when operator box width $> 0.40$ or LiDAR $< 0.50$ m to prevent overshoot).
@@ -173,8 +174,13 @@
 - [ ] **Bench Autonomy Pipeline Hardening & Display Polish:**
   - Polish `bench_autonomy_monitor.py` ANSI escape sequence redraws to ensure rock-solid in-place terminal HUD without duplicate header scrolling.
   - Live qualification of all 6 gestures (`STOP`, `GO`, `FOLLOW`, `LEFT`, `RIGHT`, `BACK`) with operator in active acceptance zone.
-- [ ] **Milestone 9 (Multi-Waypoint Navigation):** Run `scripts/navigate_waypoints.py` on robot.
-- [ ] **Milestone 10 (Master 6-Phase Live Verification Gate):** Execute live hardware verification matrix.
+- [ ] **Nav2 Multi-Waypoint & Room Patrol Implementation Plan (On Deck Post-Charge):**
+  - [ ] **Task 9.3.1:** Implement `scripts/navigate_waypoints.py` CLI supporting `NavigateThroughPoses` and sequential `NavigateToPose` with distance-remaining feedback, ETA, and Ctrl+C emergency stop.
+  - [ ] **Task 9.3.2:** Implement `scripts/run_nav2_patrol.sh` with automatic non-saturating bag recorder (`/tf`, `/odom_raw`, `/odometry/filtered`, `/scan`, `/cmd_vel`, `/amcl_pose`, `/plan`).
+  - [ ] **Task 9.3.3:** Implement `scripts/plot_multi_waypoint_trajectory.py` to extract bag telemetry and generate empirical multi-waypoint tracking curves (MAE, cross-track error, velocity profiles).
+  - [ ] **Task 9.3.4:** Execute Return-to-Home mission ($(1.44\,\text{m}, 0.02\,\text{m}) \to (0.00\,\text{m}, 0.00\,\text{m})$) and 3-waypoint room patrol loop.
+  - [ ] **Task 9.3.5:** Validate dynamic obstacle avoidance and costmap clearing when operator steps into patrol path.
+- [ ] **Milestone 10 (Master 6-Phase Live Hardware Verification Gate):** Execute live hardware verification matrix.
 
 ---
 
