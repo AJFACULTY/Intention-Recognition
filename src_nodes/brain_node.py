@@ -269,12 +269,25 @@ class BrainNode(Node):
             if self.person_detected:
                 # Lateral visual centering error: error > 0 => person right => steer right (negative angular z)
                 error = self.person_center_x - 0.5
-                cmd_angular = -error * 1.5
+                
+                # Visual centering deadband (±4% of frame) to eliminate chassis jitter when aligned
+                if abs(error) < 0.04:
+                    cmd_angular = 0.0
+                else:
+                    cmd_angular = -error * 1.5
+                    # Clamp angular velocity within calibrated safe limits
+                    cmd_angular = max(-self.angular_speed, min(self.angular_speed, cmd_angular))
 
-                # Maintain social distance: if person is close (width > 0.45 of frame), hold
-                if self.person_width > 0.45:
+                # Progressive social distance holding:
+                # - Close proximity (> 0.42 frame width): Stop completely
+                # - Mid proximity (0.32 - 0.42 frame width): Smooth 50% deceleration
+                # - Far proximity (<= 0.32 frame width): Full follow cruise speed
+                if self.person_width > 0.42:
                     cmd_linear = 0.0
                     self.get_logger().info(f'CMD: FOLLOW — holding social distance (w={self.person_width:.2f})', throttle_duration_sec=1.5)
+                elif self.person_width > 0.32:
+                    cmd_linear = self.follow_speed * 0.5
+                    self.get_logger().info(f'CMD: FOLLOW — smooth approach damping (v={cmd_linear:.2f}, w={cmd_angular:.2f})', throttle_duration_sec=1.5)
                 else:
                     cmd_linear = self.follow_speed
                     self.get_logger().info(f'CMD: FOLLOW — following person (v={self.follow_speed:.2f}, w={cmd_angular:.2f})', throttle_duration_sec=1.5)

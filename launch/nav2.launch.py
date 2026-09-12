@@ -40,6 +40,14 @@ def generate_launch_description():
         output='screen'
     )
 
+    base_link_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='base_link_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'base_footprint', 'base_link'],
+        output='screen'
+    )
+
     scan_restamper = Node(
         package='cognition_simulation',
         executable='scan_republisher',
@@ -145,7 +153,7 @@ def generate_launch_description():
         )])
 
     return LaunchDescription([
-        laser_tf, scan_restamper, odom_imu_restamper, ekf,
+        laser_tf, base_link_tf, scan_restamper, odom_imu_restamper, ekf,
         map_server, amcl, planner, controller,
         behaviors, bt_navigator, waypoint, lifecycle_manager,
         initial_pose_cmd,

@@ -169,6 +169,15 @@ behavior_server:
       global_frame: odom_frame
       robot_base_frame: base_footprint
 
+bt_navigator:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odometry/filtered
+    transform_tolerance: 0.8
+    default_bt_xml_filename: "navigate_w_replanning_and_recovery.xml"
+
 waypoint_follower:
   ros__parameters:
     use_sim_time: false

@@ -58,6 +58,14 @@ class MapVisualizerNode(Node):
         self.robot_yaw = 0.0
         self.robot_localized = False
         self.last_pose_time = 0.0
+        self.trajectory_history = []  # List of (x, y) visited positions
+
+        # Pre-calibrated mission corridor landmarks (x, y, label)
+        self.corridor_landmarks = [
+            (0.40, 0.00, "WP1: Runway"),
+            (0.70, 0.35, "WP2: Curve"),
+            (0.35, 0.15, "WP3: Mid"),
+        ]
 
         # Nav2 paths & scans
         self.global_plan_points = []
@@ -81,8 +89,15 @@ class MapVisualizerNode(Node):
             reliability=ReliabilityPolicy.BEST_EFFORT
         )
 
+        # Costmap Layer State
+        self.costmap_raw = None
+
+        # Pre-rendered JPEG cache for instantaneous HTTP serving (<1ms)
+        self._cached_jpeg = None
+
         # Subscribers
         self.create_subscription(OccupancyGrid, '/map', self._map_cb, map_qos)
+        self.create_subscription(OccupancyGrid, '/global_costmap/costmap', self._costmap_cb, map_qos)
         self.create_subscription(PoseWithCovarianceStamped, '/amcl_pose', self._amcl_cb, 10)
         self.create_subscription(Path, '/plan', self._plan_cb, 10)
         self.create_subscription(Path, '/local_plan', self._local_plan_cb, 10)
@@ -92,7 +107,28 @@ class MapVisualizerNode(Node):
         # Periodic TF polling timer (10 Hz)
         self.create_timer(0.1, self._poll_tf_pose)
 
+        # Dedicated background render thread (8 Hz) to decouple image encoding from HTTP requests
+        self._render_thread = threading.Thread(target=self._render_loop, daemon=True)
+        self._render_thread.start()
+
         self.get_logger().info('Web Map Visualizer ROS 2 node initialized.')
+
+    def _costmap_cb(self, msg: OccupancyGrid):
+        with self.lock:
+            raw = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
+            self.costmap_raw = cv2.flip(raw, 0)
+
+    def _render_loop(self):
+        while rclpy.ok():
+            try:
+                buf = self._render_canvas_jpeg()
+                if buf:
+                    with self.lock:
+                        self._cached_jpeg = buf
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+            time.sleep(0.12)  # Pre-render frame every 120ms (~8 FPS)
 
     def _map_cb(self, msg: OccupancyGrid):
         with self.lock:
@@ -123,31 +159,42 @@ class MapVisualizerNode(Node):
         py = int(round(self.map_height - 1 - (wy - self.map_origin_y) / self.map_res))
         return px, py
 
+    def _update_pose(self, x: float, y: float, yaw: float):
+        self.robot_x = x
+        self.robot_y = y
+        self.robot_yaw = yaw
+        self.robot_localized = True
+        self.last_pose_time = time.monotonic()
+
+        # Append to trajectory trail if moved > 2 cm
+        if not self.trajectory_history:
+            self.trajectory_history.append((x, y))
+        else:
+            lx, ly = self.trajectory_history[-1]
+            if math.hypot(x - lx, y - ly) >= 0.02:
+                self.trajectory_history.append((x, y))
+                if len(self.trajectory_history) > 3000:
+                    self.trajectory_history.pop(0)
+
     def _poll_tf_pose(self):
         """Polls latest map -> base_footprint transform."""
         try:
             now = rclpy.time.Time()
             t = self.tf_buffer.lookup_transform('map', 'base_footprint', now)
             with self.lock:
-                self.robot_x = t.transform.translation.x
-                self.robot_y = t.transform.translation.y
                 qz = t.transform.rotation.z
                 qw = t.transform.rotation.w
-                self.robot_yaw = 2.0 * math.atan2(qz, qw)
-                self.robot_localized = True
-                self.last_pose_time = time.monotonic()
+                yaw = 2.0 * math.atan2(qz, qw)
+                self._update_pose(t.transform.translation.x, t.transform.translation.y, yaw)
         except TransformException:
             pass
 
     def _amcl_cb(self, msg: PoseWithCovarianceStamped):
         with self.lock:
-            self.robot_x = msg.pose.pose.position.x
-            self.robot_y = msg.pose.pose.position.y
             qz = msg.pose.pose.orientation.z
             qw = msg.pose.pose.orientation.w
-            self.robot_yaw = 2.0 * math.atan2(qz, qw)
-            self.robot_localized = True
-            self.last_pose_time = time.monotonic()
+            yaw = 2.0 * math.atan2(qz, qw)
+            self._update_pose(msg.pose.pose.position.x, msg.pose.pose.position.y, yaw)
 
     def _plan_cb(self, msg: Path):
         pts = []
@@ -190,74 +237,179 @@ class MapVisualizerNode(Node):
             self.lidar_points_map = pts
 
     def render_map_jpeg(self) -> bytes:
+        """Returns the latest pre-rendered JPEG from memory in <1ms without locking."""
+        buf = self._cached_jpeg
+        if buf is not None:
+            return buf
+        return self._render_canvas_jpeg()
+
+    def _render_canvas_jpeg(self) -> bytes:
         """Renders the composite top-down visualizer image and returns JPEG bytes."""
         with self.lock:
             if self.map_img is None:
-                # Placeholder image while waiting for /map
                 blank = np.full((400, 600, 3), 30, dtype=np.uint8)
                 cv2.putText(blank, "Waiting for /map topic from Nav2...", (80, 200),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
                 _, buf = cv2.imencode('.jpg', blank)
                 return buf.tobytes()
 
-            # Base canvas copy
             canvas = self.map_img.copy()
+            costmap_copy = self.costmap_raw.copy() if self.costmap_raw is not None else None
+            rx, ry, ryaw = self.robot_x, self.robot_y, self.robot_yaw
+            loc = self.robot_localized
+            plan_pts = list(self.global_plan_points)
+            local_pts = list(self.local_plan_points)
+            lidar_pts = list(self.lidar_points_map)
+            trail_pts = list(self.trajectory_history)
+            gx, gy = self.goal_x, self.goal_y
+            map_w, map_h, map_res = self.map_width, self.map_height, self.map_res
 
-            # 1. Draw Global Planned Path (Bold Emerald Green)
-            if len(self.global_plan_points) > 1:
-                pixel_plan = [self.world_to_pixel(x, y) for (x, y) in self.global_plan_points]
-                for i in range(len(pixel_plan) - 1):
-                    cv2.line(canvas, pixel_plan[i], pixel_plan[i + 1], (40, 200, 40), 2, cv2.LINE_AA)
+        # All rendering, scaling, and JPEG encoding performed OUTSIDE lock:
+        if costmap_copy is not None and costmap_copy.shape == canvas.shape[:2]:
+            inf_mask = (costmap_copy > 0) & (costmap_copy < 100)
+            if np.any(inf_mask):
+                canvas[inf_mask] = (canvas[inf_mask].astype(np.float32) * 0.72 +
+                                    np.array([210, 150, 240], dtype=np.float32) * 0.28).astype(np.uint8)
 
-            # 2. Draw Local Trajectory / Replanned Path (Bright Cyan)
-            if len(self.local_plan_points) > 1:
-                pixel_local = [self.world_to_pixel(x, y) for (x, y) in self.local_plan_points]
-                for i in range(len(pixel_local) - 1):
-                    cv2.line(canvas, pixel_local[i], pixel_local[i + 1], (255, 230, 0), 2, cv2.LINE_AA)
+        # Scale up base map image for high-resolution rendering
+        scale = 3.5
+        resized = cv2.resize(canvas, (int(map_w * scale), int(map_h * scale)),
+                             interpolation=cv2.INTER_NEAREST)
 
-            # 3. Draw Live 2D LiDAR Points (Vibrant Red)
-            for (ox, oy) in self.lidar_points_map:
-                u, v = self.world_to_pixel(ox, oy)
-                if 0 <= u < self.map_width and 0 <= v < self.map_height:
-                    cv2.circle(canvas, (u, v), 1, (0, 0, 255), -1)
+        def w2p_s(wx: float, wy: float):
+            px = (wx - self.map_origin_x) / self.map_res
+            py = (self.map_height - 1) - (wy - self.map_origin_y) / self.map_res
+            return int(round(px * scale)), int(round(py * scale))
 
-            # 4. Draw Active Target Waypoint Reticle (Bright Gold)
-            if self.goal_x is not None and self.goal_y is not None:
-                gu, gv = self.world_to_pixel(self.goal_x, self.goal_y)
-                cv2.circle(canvas, (gu, gv), 6, (0, 215, 255), 2)
-                cv2.drawMarker(canvas, (gu, gv), (0, 215, 255), cv2.MARKER_CROSS, 10, 2)
+        # 1. Draw Open Waypoint Target Rings (H, 1, 2, 3)
+        def draw_wp_ring(img_out, wx, wy, label, col):
+            rpx, rpy = w2p_s(wx, wy)
+            if 0 <= rpx < img_out.shape[1] and 0 <= rpy < img_out.shape[0]:
+                cv2.circle(img_out, (rpx, rpy), 8, col, 2, cv2.LINE_AA)
+                cv2.circle(img_out, (rpx, rpy), 2, col, -1)
+                cv2.putText(img_out, label, (rpx + 9, rpy + 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1, cv2.LINE_AA)
 
-            # 5. Draw Robot Position & Heading
-            if self.robot_localized:
-                ru, rv = self.world_to_pixel(self.robot_x, self.robot_y)
-                
-                # Robot footprint circle (radius 0.16m)
-                radius_px = max(4, int(0.16 / self.map_res))
-                cv2.circle(canvas, (ru, rv), radius_px, (255, 100, 0), -1) # Blue chassis
-                cv2.circle(canvas, (ru, rv), radius_px, (255, 255, 255), 1)
+        draw_wp_ring(resized, 0.08, 0.05, 'H', (0, 210, 0))       # Home Base (Green)
+        draw_wp_ring(resized, 0.40, 0.00, '1', (200, 100, 240))   # WP1 (Purple)
+        draw_wp_ring(resized, 0.70, 0.35, '2', (200, 100, 240))   # WP2 (Purple)
+        draw_wp_ring(resized, 0.35, 0.15, '3', (200, 100, 240))   # WP3 (Purple)
 
-                # Heading vector arrow (length 0.35m)
-                arrow_len = 0.35
-                hx = self.robot_x + arrow_len * math.cos(self.robot_yaw)
-                hy = self.robot_y + arrow_len * math.sin(self.robot_yaw)
-                hu, hv = self.world_to_pixel(hx, hy)
-                cv2.arrowedLine(canvas, (ru, rv), (hu, hv), (0, 255, 255), 2, tipLength=0.35)
+        # 1b. Draw Corridor Patrol Route Circuit (Dashed Magenta Line)
+        circuit = [(0.08, 0.05), (0.40, 0.00), (0.70, 0.35), (0.35, 0.15), (0.08, 0.05)]
+        for ci in range(len(circuit) - 1):
+            p1 = w2p_s(circuit[ci][0], circuit[ci][1])
+            p2 = w2p_s(circuit[ci + 1][0], circuit[ci + 1][1])
+            cv2.line(resized, p1, p2, (200, 80, 220), 1, cv2.LINE_AA)
 
-            # Scale up image for crisp, detailed browser viewing
-            scale = 3.0
-            resized = cv2.resize(canvas, (int(self.map_width * scale), int(self.map_height * scale)),
-                                 interpolation=cv2.INTER_NEAREST)
+        # 2. Draw Traveled Odometry Trail (Warm Gold Breadcrumbs)
+        if len(trail_pts) > 1:
+            scaled_trail = [w2p_s(tx, ty) for (tx, ty) in trail_pts]
+            pts_arr = np.array([scaled_trail], dtype=np.int32)
+            cv2.polylines(resized, pts_arr, False, (255, 195, 45), 2, cv2.LINE_AA)
 
-            # Overlay telemetry legend header
-            telemetry_str = (
-                f"ROBOT: ({self.robot_x:+.2f}m, {self.robot_y:+.2f}m, {math.degrees(self.robot_yaw):+.1f}deg) | "
-                f"PLAN PTS: {len(self.global_plan_points)} | LIDAR PTS: {len(self.lidar_points_map)}"
-            )
-            cv2.rectangle(resized, (0, 0), (resized.shape[1], 30), (20, 20, 20), -1)
-            cv2.putText(resized, telemetry_str, (15, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (240, 240, 240), 1, cv2.LINE_AA)
+        # 3. Draw Global Planned Path (Bold Luminous Green Ribbon - High Contrast)
+        if len(plan_pts) > 1:
+            scaled_plan = [w2p_s(x, y) for (x, y) in plan_pts]
+            pts_arr = np.array([scaled_plan], dtype=np.int32)
+            cv2.polylines(resized, pts_arr, False, (10, 160, 30), 6, cv2.LINE_AA)  # Glow
+            cv2.polylines(resized, pts_arr, False, (50, 255, 80), 2, cv2.LINE_AA)  # Core
 
-            _, buf = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-            return buf.tobytes()
+        # 4. Draw Local Trajectory / Controller Trajectory (Vivid Cyan)
+        if len(local_pts) > 1:
+            scaled_local = [w2p_s(x, y) for (x, y) in local_pts]
+            pts_arr = np.array([scaled_local], dtype=np.int32)
+            cv2.polylines(resized, pts_arr, False, (255, 230, 0), 2, cv2.LINE_AA)
+
+        # 5. Draw Live 2D LiDAR Points (Vibrant Red Reflections)
+        for (ox, oy) in lidar_pts:
+            u, v = w2p_s(ox, oy)
+            if 0 <= u < resized.shape[1] and 0 <= v < resized.shape[0]:
+                cv2.circle(resized, (u, v), 2, (0, 0, 255), -1)
+
+        # 6. Draw Active Target Waypoint Reticle (Bright Gold Target Bullseye)
+        if gx is not None and gy is not None:
+            gu, gv = w2p_s(gx, gy)
+            cv2.circle(resized, (gu, gv), 12, (0, 215, 255), 2, cv2.LINE_AA)
+            cv2.circle(resized, (gu, gv), 4, (0, 215, 255), -1)
+            cv2.drawMarker(resized, (gu, gv), (0, 215, 255), cv2.MARKER_CROSS, 18, 1)
+
+        # 7. Draw Realistic Yahboom AMR Chassis Footprint & Heading (ALWAYS ON TOP)
+        if loc:
+            ru_s, rv_s = w2p_s(rx, ry)
+            hl = (0.24 / map_res) * scale / 2.0  # half length ~ 8.4 px
+            hw = (0.18 / map_res) * scale / 2.0  # half width ~ 6.3 px
+            cos_a = math.cos(ryaw)
+            sin_a = math.sin(ryaw)
+            
+            # 4 chassis corners rotated by robot yaw: Front-Left, Front-Right, Rear-Right, Rear-Left
+            corners = [
+                (hl, -hw),
+                (hl, hw),
+                (-hl, hw),
+                (-hl, -hw)
+            ]
+            poly_pts = []
+            for dx, dy in corners:
+                px = ru_s + int(round(dx * cos_a - dy * sin_a))
+                py = rv_s - int(round(dx * sin_a + dy * cos_a))
+                poly_pts.append([px, py])
+            
+            poly_arr = np.array([poly_pts], dtype=np.int32)
+            # Chassis body in electric AMR blue with white border
+            cv2.fillPoly(resized, poly_arr, (230, 115, 20))
+            cv2.polylines(resized, poly_arr, True, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            # 4 Drive Wheels (Black rubber pads)
+            for dx, dy in [(hl*0.7, -hw-1), (hl*0.7, hw+1), (-hl*0.7, -hw-1), (-hl*0.7, hw+1)]:
+                wx = ru_s + int(round(dx * cos_a - dy * sin_a))
+                wy = rv_s - int(round(dx * sin_a + dy * cos_a))
+                cv2.circle(resized, (wx, wy), 2, (20, 20, 20), -1)
+
+            # Central RPLiDAR Turret cylinder with active laser core
+            cv2.circle(resized, (ru_s, rv_s), 4, (40, 40, 40), -1)
+            cv2.circle(resized, (ru_s, rv_s), 2, (0, 0, 255), -1)
+
+            # Forward heading laser projection beam (length 0.45m)
+            head_len = (0.45 / map_res) * scale
+            hpx = ru_s + int(round(head_len * cos_a))
+            hpy = rv_s - int(round(head_len * sin_a))
+            cv2.arrowedLine(resized, (ru_s, rv_s), (hpx, hpy), (0, 240, 255), 2, tipLength=0.25)
+
+        # Draw In-Canvas Semi-Transparent HUD Waypoint Directory in bottom-left corner
+        box_x, box_y, box_w, box_h = 15, resized.shape[0] - 110, 220, 95
+        overlay = resized.copy()
+        cv2.rectangle(overlay, (box_x, box_y), (box_x + box_w, box_y + box_h), (20, 24, 30), -1)
+        cv2.rectangle(overlay, (box_x, box_y), (box_x + box_w, box_y + box_h), (60, 70, 85), 1)
+        cv2.addWeighted(overlay, 0.85, resized, 0.15, 0, resized)
+
+        cv2.putText(resized, 'WAYPOINT INDEX', (box_x + 10, box_y + 16),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 220, 255), 1, cv2.LINE_AA)
+
+        dir_items = [
+            ('H', (0, 160, 0), 'HOME: Base (0.08, 0.05)'),
+            ('1', (160, 50, 200), 'WP1: Runway (0.40, 0.00)'),
+            ('2', (160, 50, 200), 'WP2: Curve  (0.70, 0.35)'),
+            ('3', (160, 50, 200), 'WP3: Return (0.35, 0.15)')
+        ]
+        for idx, (lbl, col, desc) in enumerate(dir_items):
+            iy = box_y + 34 + idx * 18
+            cv2.circle(resized, (box_x + 16, iy - 4), 6, col, -1)
+            cv2.circle(resized, (box_x + 16, iy - 4), 6, (255, 255, 255), 1)
+            cv2.putText(resized, desc, (box_x + 28, iy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, (230, 230, 230), 1, cv2.LINE_AA)
+
+        # Overlay telemetry header (compact to guarantee zero truncation)
+        yaw_deg = math.degrees(ryaw)
+        telemetry_str = (
+            f"AMR: ({rx:+.2f}m, {ry:+.2f}m, {yaw_deg:+.0f}deg) | "
+            f"PLAN: {len(plan_pts)} | LIDAR: {len(lidar_pts)}"
+        )
+        cv2.rectangle(resized, (0, 0), (resized.shape[1], 26), (15, 18, 22), -1)
+        cv2.putText(resized, telemetry_str, (12, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (240, 240, 240), 1, cv2.LINE_AA)
+
+        _, buf = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        return buf.tobytes()
 
     def get_telemetry_dict(self):
         with self.lock:
@@ -376,14 +528,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       font-size: 0.85rem;
     }
     .legend-item { display: flex; align-items: center; gap: 8px; }
-    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .pin-badge {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: bold;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.7);
+      flex-shrink: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div>
       <h1>Autonomous AMR Cognition — Nav2 Visualizer</h1>
-      <small style="color: #8b949e;">Physical Robot Host: Yahboom Jetbot / Pi 5 | ROS 2 Humble</small>
+      <small style="color: #8b949e;">Physical Robot Host: Yahboom / Pi 5 | ROS 2 Humble</small>
     </div>
     <span class="badge" id="conn-badge">LIVE DDS STREAM</span>
   </div>
@@ -423,10 +589,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
 
       <div class="card">
+        <h2>Waypoint Directory</h2>
+        <div class="legend">
+          <div class="legend-item"><span class="pin-badge" style="background:#00a000;">H</span> <b>HOME Base:</b> Origin (0.00m, 0.00m)</div>
+          <div class="legend-item"><span class="pin-badge" style="background:#a032c8;">1</span> <b>WP1 Runway:</b> (0.40m, 0.00m)</div>
+          <div class="legend-item"><span class="pin-badge" style="background:#a032c8;">2</span> <b>WP2 Curve:</b> (0.70m, 0.35m)</div>
+          <div class="legend-item"><span class="pin-badge" style="background:#a032c8;">3</span> <b>WP3 Return:</b> (0.35m, 0.15m)</div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>Map Display Legend</h2>
         <div class="legend">
+          <div class="legend-item"><span class="dot" style="background: #c084fc;"></span> <b>Costmap Inflation:</b> Nav2 safety buffer</div>
+          <div class="legend-item"><span class="dot" style="background: #e3b341;"></span> <b>Traveled Trail:</b> Trajectory history</div>
           <div class="legend-item"><span class="dot" style="background: #2ea043;"></span> <b>Planned Path:</b> Global Nav2 route</div>
-          <div class="legend-item"><span class="dot" style="background: #e3b341;"></span> <b>Local Trajectory:</b> Real-time controller</div>
+          <div class="legend-item"><span class="dot" style="background: #00d4ff;"></span> <b>Local Trajectory:</b> Real-time controller</div>
           <div class="legend-item"><span class="dot" style="background: #f85149;"></span> <b>LiDAR Scans:</b> Live obstacle reflections</div>
           <div class="legend-item"><span class="dot" style="background: #1f6feb;"></span> <b>Robot Footprint:</b> Position & Heading arrow</div>
           <div class="legend-item"><span class="dot" style="background: #d29922;"></span> <b>Goal Reticle:</b> Active Target Waypoint</div>
@@ -437,11 +615,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   <script>
     const imgElem = document.getElementById('map-stream');
-    function refreshImage() {
-      imgElem.src = '/map.jpg?t=' + Date.now();
+
+    // Chained image preloading: only requests next frame when previous is loaded (prevents browser request abortion)
+    function streamMap() {
+      const nextImg = new Image();
+      nextImg.onload = function() {
+        imgElem.src = nextImg.src;
+        setTimeout(streamMap, 150); // ~6.6 FPS smooth live streaming
+      };
+      nextImg.onerror = function() {
+        setTimeout(streamMap, 500);
+      };
+      nextImg.src = '/map.jpg?t=' + Date.now();
     }
-    // Refresh map render every 500ms
-    setInterval(refreshImage, 500);
+    streamMap();
 
     function updateTelemetry() {
       fetch('/telemetry')
@@ -457,7 +644,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         })
         .catch(() => {});
     }
-    setInterval(updateTelemetry, 500);
+    setInterval(updateTelemetry, 300);
   </script>
 </body>
 </html>

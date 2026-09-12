@@ -40,25 +40,25 @@ class Waypoint:
 
 
 # Pre-calibrated mission catalog for the verified metric room map (room_map_20260812_0826)
-# Corridor runway is 100% unobstructed from x=0.00m to x=0.45m across a 1.6m wide lateral swath
+# Home Base calibrated to (0.08, 0.05) to clear 15cm costmap wall inflation cushion
 MISSION_CATALOG = {
     "RETURN_HOME": [
-        Waypoint("Home Station (Base)", 0.00, 0.00, 0.0, dwell_sec=2.0),
+        Waypoint("Home Station (Base)", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "RUNWAY_TRANSIT": [
-        Waypoint("Corridor Clear Runway", 0.45, 0.00, 0.0, dwell_sec=3.0),
-        Waypoint("Home Station (Base)", 0.00, 0.00, 0.0, dwell_sec=1.0),
+        Waypoint("Corridor Clear Runway", 0.50, 0.00, 0.0, dwell_sec=3.0),
+        Waypoint("Home Station (Base)", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "CORRIDOR_PATROL": [
         Waypoint("Waypoint 1 (Mid-Corridor)", 0.40, 0.00, 0.0, dwell_sec=3.0),
-        Waypoint("Waypoint 2 (Aisle Curve)", 0.70, 0.35, 20.0, dwell_sec=4.0),
-        Waypoint("Waypoint 3 (Return Leg Midpoint)", 0.35, 0.15, 0.0, dwell_sec=1.0),
-        Waypoint("Home Station (Base)", 0.00, 0.00, 0.0, dwell_sec=2.0),
+        Waypoint("Waypoint 2 (Aisle Curve)", 0.70, 0.35, 0.0, dwell_sec=3.0),
+        Waypoint("Waypoint 3 (Return Leg Midpoint)", 0.35, 0.15, 0.0, dwell_sec=2.0),
+        Waypoint("Home Station (Base)", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "SURVEILLANCE_INSPECTION": [
         Waypoint("Inspection Post Alpha", 0.40, 0.00, 0.0, dwell_sec=5.0),
-        Waypoint("Inspection Post Bravo", 0.65, 0.30, 30.0, dwell_sec=5.0),
-        Waypoint("Home Station (Base)", 0.00, 0.00, 0.0, dwell_sec=2.0),
+        Waypoint("Inspection Post Bravo", 0.70, 0.35, 0.0, dwell_sec=5.0),
+        Waypoint("Home Station (Base)", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
 }
 
@@ -80,6 +80,7 @@ class MissionManagerNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.current_goal_handle = None
+        self._last_dist = 999.0
         self.get_logger().info('Industrial Mission Manager initialized successfully.')
 
     # ── POSE HELPERS ──────────────────────────────────────────────
@@ -98,11 +99,11 @@ class MissionManagerNode(Node):
             yaw = 2.0 * math.atan2(qz, qw)
             return x, y, math.degrees(yaw)
         except TransformException as e:
-            self.get_logger().warn(f'Could not lookup current robot pose: {e}')
+            self.get_logger().warn(f'Could not resolve ground-truth pose via TF: {e}')
             return None
 
     def make_pose_stamped(self, x: float, y: float, yaw_deg: float) -> PoseStamped:
-        """Constructs a PoseStamped message in the map frame."""
+        """Constructs a PoseStamped in the map frame."""
         pose = PoseStamped()
         pose.header.frame_id = 'map'
         pose.header.stamp = self.get_clock().now().to_msg()
@@ -116,23 +117,28 @@ class MissionManagerNode(Node):
         return pose
 
     def emergency_stop(self):
-        """Immediately halts robot motion by commanding zero velocity."""
+        """Halts the robot immediately by zeroing cmd_vel and cancelling active goals."""
+        self.get_logger().warn('EMERGENCY STOP TRIGGERED: Halting chassis.')
+        if self.current_goal_handle is not None:
+            self.current_goal_handle.cancel_goal_async()
+            self.current_goal_handle = None
+
         stop_msg = Twist()
         for _ in range(5):
             self.cmd_vel_pub.publish(stop_msg)
             time.sleep(0.02)
-        self.get_logger().info('EMERGENCY STOP: Sent zero velocity clamp.')
 
-    # ── ACTION EXECUTION ──────────────────────────────────────────
+    # ── ACTION DISPATCHERS ────────────────────────────────────────
 
-    def execute_single_waypoint(self, wp: Waypoint) -> bool:
-        """Dispatches NavigateToPose to a single waypoint with live telemetry feedback."""
+    def execute_waypoint(self, wp: Waypoint, leg_timeout_sec: float = 60.0) -> bool:
+        """Dispatches NavigateToPose for a single waypoint with dwell and telemetry."""
         self.get_logger().info(f'>>> DISPATCHING WAYPOINT: {wp.name} at ({wp.x:.2f}m, {wp.y:.2f}m, {wp.yaw_deg:.1f}°)')
 
         if not self.nav_to_pose_client.wait_for_server(timeout_sec=5.0):
             self.get_logger().error('NavigateToPose action server unavailable!')
             return False
 
+        self._last_dist = 999.0
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = self.make_pose_stamped(wp.x, wp.y, wp.yaw_deg)
 
@@ -150,25 +156,44 @@ class MissionManagerNode(Node):
         self.get_logger().info('Goal accepted by Nav2 controller. Executing transit...')
 
         get_result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, get_result_future)
+        start_wait = time.time()
+        leg_success = False
 
-        status = get_result_future.result().status
+        while rclpy.ok():
+            rclpy.spin_once(self, timeout_sec=0.2)
+            if get_result_future.done():
+                status = get_result_future.result().status
+                if status == GoalStatus.STATUS_SUCCEEDED:
+                    leg_success = True
+                break
+            # Spatial completion check (per Josh Newans / Nav2 best practice)
+            if self._last_dist <= 0.08 and (time.time() - start_wait) > 4.0:
+                self.get_logger().info(f'Waypoint {wp.name} spatially achieved (remaining: {self._last_dist:.2f}m). Proceeding...')
+                leg_success = True
+                goal_handle.cancel_goal_async()
+                break
+            if time.time() - start_wait > leg_timeout_sec:
+                self.get_logger().warn(f'Leg exceeded timeout ({leg_timeout_sec}s). Cancelling...')
+                goal_handle.cancel_goal_async()
+                break
+
         self.current_goal_handle = None
 
-        if status == GoalStatus.STATUS_SUCCEEDED:
+        if leg_success:
             self.get_logger().info(f'✓ REACHED WAYPOINT: {wp.name}')
             if wp.dwell_sec > 0:
                 self.get_logger().info(f'Dwelling at {wp.name} for {wp.dwell_sec:.1f}s (Sensor Survey)...')
                 time.sleep(wp.dwell_sec)
             return True
         else:
-            self.get_logger().warn(f'✗ Failed to reach {wp.name} (Status code: {status})')
+            self.get_logger().warn(f'✗ Failed to reach {wp.name}')
             return False
 
     def _nav_feedback_cb(self, feedback_msg):
         """Displays real-time distance remaining and navigation velocity."""
         fb = feedback_msg.feedback
         dist = fb.distance_remaining
+        self._last_dist = dist
         time_elapsed = fb.navigation_time.sec
         num_recoveries = fb.number_of_recoveries
         print(f'\r  [TRANSIT] Distance Remaining: {dist:.2f} m | Elapsed: {time_elapsed}s | Recoveries: {num_recoveries}   ', end='', flush=True)
@@ -239,7 +264,7 @@ class MissionManagerNode(Node):
         success_count = 0
         for idx, wp in enumerate(waypoints, start=1):
             print(f'\n--- [Leg {idx}/{total_wp}] Target: {wp.name} ---')
-            ok = self.execute_single_waypoint(wp)
+            ok = self.execute_waypoint(wp)
             if ok:
                 success_count += 1
             else:
