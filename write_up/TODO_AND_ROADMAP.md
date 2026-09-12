@@ -154,6 +154,13 @@
   - Generate confidence interval plots and error-bar charts comparing accuracy across operating conditions.
   - Update Chapter 4 text and tables with the derived inferential statistical values.
 
+### [x] 4. Visual Fine-Tuning & Aesthetic Polish of Thesis Figures
+- [x] **Figure Fine-Tuning & Layout Polish:**
+  - Continuously fine-tune font sizes, bounding box padding, line weights, and text clearances across all 6 core publication figures (`hardware_design.png`, `system_architecture.png`, `fig_spatial_zone.png`, `fig_feature_pipeline.png`, `fig_brain_state_machine.png`, `fig_docker_deployment.png`).
+  - Verify that all embedded hardware and telemetry photographs strictly preserve 1:1 native aspect ratio with zero pixel stretch or distortion.
+  - Audit whitespace utilization, container balance, and high-contrast typography across both digital PDF and monochrome print renderings.
+  - Align figure sub-labels, callouts, and captions with the final compiled chapter narratives.
+
 ---
 
 ## 2. Preliminary Pages & Front Matter (To Be Finalized After Chapters)

@@ -25,7 +25,10 @@ WALKTHROUGHS_DIR = os.path.join(HISTORY_DIR, "walkthroughs")
 
 def get_recent_conversations(limit=5):
     """List recent conversation IDs sorted by modification time."""
-    subdirs = [d for d in glob.glob(os.path.join(BRAIN_DIR, "*")) if os.path.isdir(d)]
+    subdirs = [
+        d for d in glob.glob(os.path.join(BRAIN_DIR, "*"))
+        if os.path.isdir(d) and os.path.exists(os.path.join(d, ".system_generated", "logs", "transcript.jsonl"))
+    ]
     subdirs.sort(key=lambda x: os.path.getmtime(x), reverse=True)
     return [os.path.basename(d) for d in subdirs[:limit]]
 

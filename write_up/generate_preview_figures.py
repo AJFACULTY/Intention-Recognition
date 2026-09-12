@@ -581,7 +581,7 @@ def generate_preview_docker_deployment():
     ax.text(18, 89, 'Primary Embedded Computer: Raspberry Pi 5 (8GB RAM)',
             fontsize=10.5, fontweight='bold', ha='left', va='center', color='#1E293B',
             bbox=dict(boxstyle='round,pad=0.35', fc='#E2E8F0', ec='#94A3B8', lw=1))
-    ax.text(93, 89, 'OS: Ubuntu 24.04 LTS | Docker Engine 24.0 | --net=host',
+    ax.text(93, 89, 'Linux Host OS | Containers: Ubuntu 20.04 (ROS 2 Humble) | --net=host',
             fontsize=8.5, ha='right', va='center', color='#64748B', style='italic')
 
     def draw_container(x, y, w, h, bg_c, border_c, title, body, badge_c='#1E293B'):
@@ -615,18 +615,18 @@ def generate_preview_docker_deployment():
     # DDS Shared Memory Bus in Pi 5
     ax.annotate('', xy=(54, 62), xytext=(47, 62), arrowprops=dict(arrowstyle='<->', lw=2.2, color='#2563EB'))
     ax.text(50.5, 65, 'DDS Shared Memory Loopback\n/scan  |  /camera/image_raw',
-            fontsize=7.2, ha='center', va='bottom', color='#1D4ED8', fontweight='bold',
-            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#93C5FD', lw=0.8))
+             fontsize=7.2, ha='center', va='bottom', color='#1D4ED8', fontweight='bold',
+             bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#93C5FD', lw=0.8))
 
     ax.annotate('', xy=(54, 25), xytext=(47, 25), arrowprops=dict(arrowstyle='<->', lw=2.2, color='#D97706'))
     ax.text(50.5, 28, 'micro-ROS Inter-Process Bridge\n/cmd_vel  |  /odom_raw',
-            fontsize=7.2, ha='center', va='bottom', color='#B45309', fontweight='bold',
-            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#FDE68A', lw=0.8))
+             fontsize=7.2, ha='center', va='bottom', color='#B45309', fontweight='bold',
+             bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#FDE68A', lw=0.8))
 
     # Engineering Workstation Box (Host Dev Machine)
     draw_container(101, 10, 30, 82, '#F3E8FF', '#9333EA',
                    'Engineering Host Workstation\n(x86_64 Development PC)',
-                   '• AMD Ryzen 5, 8GB DDR4 RAM\n• Ubuntu 24.04 LTS / ROS2 Humble\n\n• RViz2 Real-Time Visualizer:\n  - /scan (LiDAR 2D point cloud)\n  - /map (SLAM Toolbox grid)\n  - /tf coordinate tree\n  - Camera video live window\n\n• Safety Intervention Tools:\n  - Hardware joystick override (/joy)\n  - Teleoperation emergency stop\n\n• Simulation Verification:\n  - Gazebo Harmonic digital twin\n  - Sim-to-real parameter tuning\n\n• Offline Deep Learning Pipeline:\n  - PyTorch MLP training\n  - ONNX edge model export',
+                   '• AMD Ryzen 5, 8GB DDR4 RAM\n• Ubuntu 24.04 LTS / ROS 2 Jazzy\n\n• RViz2 Real-Time Visualizer:\n  - /scan (LiDAR 2D point cloud)\n  - /map (SLAM Toolbox grid)\n  - /tf coordinate tree\n  - Camera video live window\n\n• Safety Intervention Tools:\n  - Hardware joystick override (/joy)\n  - Teleoperation emergency stop\n\n• Simulation Verification:\n  - Gazebo Harmonic digital twin\n  - Sim-to-real parameter tuning\n\n• Offline Deep Learning Pipeline:\n  - PyTorch MLP training\n  - ONNX edge model export',
                    badge_c='#7E22CE')
 
     # Wi-Fi DDS Bridge

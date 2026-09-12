@@ -57,7 +57,14 @@ def draw_diamond(ax, cx, cy, w, h, fc='#FEF3C7', ec='#D97706', lw=1.5):
 
 
 def draw_stadium(ax, x, y, w, h, fc='#F3E8FF', ec='#9333EA', lw=1.4):
-    box = patches.FancyBboxPatch((x, y), w, h, boxstyle='round,pad=0.2', fc=fc, ec=ec, lw=lw, zorder=3)
+    box = patches.FancyBboxPatch((x, y), w, h, boxstyle='round,pad=0.25,rounding_size=3.5',
+                                 fc=fc, ec=ec, lw=lw, zorder=3)
+    ax.add_patch(box)
+    return box
+
+
+def draw_process(ax, x, y, w, h, fc='#F8FAFC', ec='#64748B', lw=1.4):
+    box = patches.Rectangle((x, y), w, h, fc=fc, ec=ec, lw=lw, zorder=3)
     ax.add_patch(box)
     return box
 
@@ -78,115 +85,115 @@ def draw_uml_state(ax, x, y, w, h, title, actions, border_c='#3B82F6', bg_c='#EF
 # 1. HARDWARE SYSTEM SCHEMATIC (Equal-Width Containers, Zero Distortion, Strict Order)
 # ==============================================================================
 def generate_reengineered_hardware_design(output_path='write_up/preview_figures/preview_hardware_design.png'):
-    fig, ax = plt.subplots(figsize=(10.5, 9.8), dpi=300)
+    fig, ax = plt.subplots(figsize=(10.8, 9.8), dpi=300)
     ax.set_xlim(0, 110)
     ax.set_ylim(-12, 102)
     ax.axis('off')
 
     ax.text(55, 99.5, 'Mechatronic Hardware Architecture & Signal Distribution Flow',
-            fontsize=12.5, fontweight='bold', ha='center', va='top', color='#0F172A')
+            fontsize=13.0, fontweight='bold', ha='center', va='top', color='#0F172A')
 
     # Top Sensors: USB Camera Gimbal & MS200 LiDAR
     embed_photo_clean(ax, 'write_up/figures/camera_gimbal.png', 8, 80, 20, 15, border_c='#0284C7')
-    ax.text(18, 78.5, '2MP USB Camera (2-DOF Gimbal)\n640×480 @ 20 FPS | Wide-Angle',
-            fontsize=7.0, fontweight='bold', ha='center', va='top', color='#0369A1')
+    ax.text(18, 78.5, '2MP Monocular Camera\nActive RGB Video Input',
+            fontsize=7.8, fontweight='bold', ha='center', va='top', color='#0369A1')
 
     embed_photo_clean(ax, 'write_up/figures/ms200_lidar.jpg', 82, 80, 20, 15, border_c='#0284C7')
-    ax.text(92, 78.5, 'MS200 2D ToF LiDAR Sensor\n360° Sweep | 12.5 Hz | 0.12–12 m',
-            fontsize=7.0, fontweight='bold', ha='center', va='top', color='#0369A1')
+    ax.text(92, 78.5, 'MS200 2D ToF LiDAR\n360° Planar Laser Scanner',
+            fontsize=7.8, fontweight='bold', ha='center', va='top', color='#0369A1')
+
+    # Middle top card: 2-DOF Active Vision Gimbal & Servos
+    gimbal_box = patches.FancyBboxPatch((29.5, 79), 51.5, 16.5, boxstyle='round,pad=0.3', fc='#F0FDF4', ec='#16A34A', lw=1.3)
+    ax.add_patch(gimbal_box)
+    ax.text(55, 93.0, '2-DOF Active Vision Gimbal Mount', fontsize=9.0, fontweight='bold', ha='center', va='center', color='#15803D')
+    gimbal_text = (
+        "• Dual SG90 Micro Servos (Pan & Tilt Motion)\n"
+        "• Closed-Loop Visual Servoing Target Tracking\n"
+        "• Hardware PWM Driven directly from Expansion Board"
+    )
+    ax.text(32.0, 89.5, gimbal_text, fontsize=7.4, va='top', color='#14532D', linespacing=1.4)
 
     # Sensor data bus arrows into Pi 5
     ax.annotate('', xy=(18, 66.5), xytext=(18, 73.5), arrowprops=dict(arrowstyle='->', lw=1.6, color='#0284C7'))
-    ax.text(18, 70.0, 'USB 3.0 (/camera/image_raw)', fontsize=6.6, ha='center', va='center',
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#38BDF8', lw=0.8))
+    ax.text(18, 70.0, 'USB 3.0 (/camera/image_raw)', fontsize=7.0, ha='center', va='center',
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#38BDF8', lw=0.8))
 
     ax.annotate('', xy=(92, 66.5), xytext=(92, 73.5), arrowprops=dict(arrowstyle='->', lw=1.6, color='#0284C7'))
-    ax.text(92, 70.0, 'USB Serial (/scan @ 12.5Hz)', fontsize=6.6, ha='center', va='center',
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#38BDF8', lw=0.8))
+    ax.text(92, 70.0, 'USB Serial (/scan)', fontsize=7.0, ha='center', va='center',
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#38BDF8', lw=0.8))
 
-    # Tier 1: Primary Embedded SBC (Raspberry Pi 5) - Width: 96.5, x=7.5 to 104.0
+    # Tier 1: Primary Embedded SBC (Raspberry Pi 5) - Full width
     tier_w = 96.5
     tier_x = 7.5
     pi_box = patches.FancyBboxPatch((tier_x, 46), tier_w, 20, boxstyle='round,pad=0.4', fc='#F0F9FF', ec='#0284C7', lw=1.6)
     ax.add_patch(pi_box)
     embed_photo_clean(ax, 'write_up/figures/raspberry_pi_5.jpg', 9.5, 47.5, 20, 17, border_c='#0284C7')
-    
-    # Right-side Edge Compute Hub badge to balance Tier 1 with Tiers 2 & 3
-    pi_hub_card = patches.FancyBboxPatch((88.0, 47.5), 14, 17, boxstyle='round,pad=0.2', fc='#E0F2FE', ec='#0284C7', lw=1.1)
-    ax.add_patch(pi_hub_card)
-    ax.text(95.0, 62.2, 'EDGE COMPUTE\nHUB', fontsize=6.8, fontweight='bold', ha='center', va='center', color='#0369A1')
-    ax.text(95.0, 53.5, '• Dual USB 3.0\n• 40-Pin GPIO\n• PCIe 2.0 Bus\n• Docker Engine\n• Ubuntu 24.04',
-            fontsize=5.8, ha='center', va='center', color='#0C4A6E', linespacing=1.22)
 
-    ax.text(32, 63.2, 'Primary Embedded SBC: Raspberry Pi 5 (8GB RAM)', fontsize=9.2, fontweight='bold', color='#0369A1')
-    
-    # Concise, non-colliding bullet points tailored to width of 55 units
+    ax.text(32, 63.2, 'Host Single-Board Computer: Raspberry Pi 5 (8GB RAM)', fontsize=9.8, fontweight='bold', color='#0369A1')
     pi_desc = (
-        "• Compute Architecture: Quad-Core ARM Cortex-A76 @ 2.4 GHz | 8GB LPDDR4X\n"
-        "• Operating Environment: Ubuntu 24.04 LTS (Kernel 6.8) | Docker (--net=host)\n"
-        "• Vision Perception: YOLOv8n Spatial Gating (45% × 65%) + MediaPipe Landmarks\n"
-        "• Supervisory Decision: Stateful ROS 2 Brain State Machine & SLAM Toolbox"
+        "• Deep Learning Vision Pipeline (YOLOv8 Person Gating + MediaPipe Landmarks)\n"
+        "• Cognitive Decision Engine & Multi-Class MLP Gesture Recognition\n"
+        "• Autonomous Navigation, Costmap Planning & ROS 2 Humble Runtime\n"
+        "• High-Speed USB 3.0 & Serial Communication Hub"
     )
-    ax.text(32, 60.2, pi_desc, fontsize=6.9, va='top', color='#1E293B', linespacing=1.35)
+    ax.text(32, 59.8, pi_desc, fontsize=7.6, va='top', color='#1E293B', linespacing=1.45)
 
     # Inter-board micro-ROS Bridge
     ax.annotate('', xy=(55, 38.5), xytext=(55, 45.5), arrowprops=dict(arrowstyle='<->', lw=2.0, color='#D97706'))
-    ax.text(55, 42.0, 'High-Speed micro-ROS UART Serial Bridge (921,600 baud)\nBi-directional DDS: /cmd_vel (Twist), /odom_raw (Ticks), /imu/data_raw',
-            fontsize=7.2, fontweight='bold', ha='center', va='center', color='#92400E',
-            bbox=dict(boxstyle='round,pad=0.2', fc='#FEF3C7', ec='#F59E0B', lw=0.9))
+    ax.text(55, 42.0, 'High-Speed micro-ROS Serial Bridge (921,600 baud)\nControl Commands (/cmd_vel, servos)  ⇄  Sensor Telemetry (/odom, /imu)',
+            fontsize=7.4, fontweight='bold', ha='center', va='center', color='#92400E',
+            bbox=dict(boxstyle='round,pad=0.22', fc='#FEF3C7', ec='#F59E0B', lw=0.9))
 
-    # Tier 2: Yahboom ESP32-S3 micro-ROS Board + Chassis Wiring - Width: 96.5
+    # Tier 2: Yahboom ESP32-S3 micro-ROS Board + Cropped Wiring Photo - Width: 96.5
     esp_box = patches.FancyBboxPatch((tier_x, 17), tier_w, 20.5, boxstyle='round,pad=0.4', fc='#FEFCE8', ec='#EAB308', lw=1.6)
     ax.add_patch(esp_box)
     embed_photo_clean(ax, 'write_up/figures/microros_control_board.jpg', 9.5, 18.5, 18, 17.5, border_c='#EAB308')
-    embed_photo_clean(ax, 'write_up/figures/robot_chassis_wiring.jpg', 88.0, 18.5, 14, 17.5, border_c='#EAB308')
-    ax.text(29.5, 34.5, 'Embedded Microcontroller: Yahboom ESP32-S3 Board', fontsize=9.4, fontweight='bold', color='#A16207')
+    embed_photo_clean(ax, 'write_up/figures/chassis_wired_cropped.jpg', 86.0, 18.5, 16.5, 17.5, border_c='#EAB308')
+    ax.text(29.5, 34.5, 'Real-Time Sub-Controller: Yahboom ESP32-S3 Board', fontsize=9.8, fontweight='bold', color='#A16207')
     esp_desc = (
-        "• Real-Time OS: FreeRTOS micro-ROS Client (50 Hz Closed-Loop Velocity PID Cycle)\n"
-        "• Inertial Measurement: Onboard 6-Axis MPU6050 IMU Transducer (/imu/data_raw)\n"
-        "• Motor Drive Bridges: 4-Channel High-Current MOSFET H-Bridges (PWM Drive)\n"
-        "• Encoder Decoding: Optical Quadrature Hall Feedback Interrupt Decoders\n"
-        "• Chassis Harness: Multi-Rail DuPont & Heavy-Gauge Screw Terminal Bus"
+        "• FreeRTOS micro-ROS Client with Deterministic 50 Hz Closed-Loop Velocity PID\n"
+        "• 4-Channel DC Motor PWM Bridges & Quadrature Encoder Decoding\n"
+        "• 2-Channel 50 Hz Hardware PWM Gimbal Servicing & Onboard 6-Axis IMU\n"
+        "• Dedicated Real-Time Reflex Layer Decoupled from High-Level Vision"
     )
-    ax.text(29.5, 31.5, esp_desc, fontsize=7.1, va='top', color='#422006', linespacing=1.3)
+    ax.text(29.5, 31.0, esp_desc, fontsize=7.5, va='top', color='#422006', linespacing=1.45)
 
     # Actuation bus arrow into Mobile Base
     ax.annotate('', xy=(55, 7.5), xytext=(55, 16.5), arrowprops=dict(arrowstyle='->', lw=1.8, color='#16A34A'))
-    ax.text(55, 12.0, '4-Channel PWM Drive Voltages & Quadrature Hall Feedback', fontsize=7.0,
+    ax.text(55, 12.0, '4-Channel Motor Drive Voltages  |  Quadrature Encoder Telemetry', fontsize=7.4,
             ha='center', va='center', fontweight='bold', color='#15803D',
-            bbox=dict(boxstyle='round,pad=0.18', fc='#DCFCE7', ec='#86EFAC', lw=0.8))
+            bbox=dict(boxstyle='round,pad=0.2', fc='#DCFCE7', ec='#86EFAC', lw=0.8))
 
     # Tier 3: Differential-Drive Mobile Base & Underside Drivetrain - Width: 96.5
     bot_box = patches.FancyBboxPatch((tier_x, -10), tier_w, 17, boxstyle='round,pad=0.4', fc='#F0FDF4', ec='#16A34A', lw=1.6)
     ax.add_patch(bot_box)
     embed_photo_clean(ax, 'write_up/figures/assembled_robot_real.jpg', 9.5, -8.8, 19, 14.5, border_c='#16A34A')
-    embed_photo_clean(ax, 'write_up/figures/robot_drivetrain_underside.jpg', 88.0, -8.8, 14, 14.5, border_c='#16A34A')
-    ax.text(30.5, 4.2, 'Differential-Drive Mobile Base & Actuation Chassis', fontsize=9.2, fontweight='bold', color='#15803D')
+    embed_photo_clean(ax, 'write_up/figures/robot_drivetrain_underside.jpg', 86.0, -8.8, 16.5, 14.5, border_c='#16A34A')
+    ax.text(30.5, 4.2, 'Mobile Base & Physical Actuation Chassis', fontsize=9.6, fontweight='bold', color='#15803D')
     bot_desc = (
-        "• Geared DC Motors: 4× 310 DC Motors with 1:45 Precision Planetary Gearboxes\n"
-        "• Optical Feedback: Dual-Channel Optical Quadrature Encoders (High-Resolution Ticks)\n"
-        "• Chassis Structure: Solid Acrylic Lower Deck, Ground Bumpers, 12.6V 3S Li-ion Battery"
+        "• 4WD Differential Skid-Steer Locomotion (4× 310 DC Geared Motors)\n"
+        "• 65 mm High-Traction Rubber Wheels & High-Resolution Optical Encoders\n"
+        "• Dual-Tier Acrylic Chassis Deck with Low-Center-of-Gravity Battery Bay"
     )
-    ax.text(30.5, 1.2, bot_desc, fontsize=7.1, va='top', color='#14532D', linespacing=1.3)
+    ax.text(30.5, 0.8, bot_desc, fontsize=7.6, va='top', color='#14532D', linespacing=1.45)
 
-    # Clean Power Rail along left side with labeled terminals
+    # Power Rail on left side with 7.4V 2S Battery specs
     pwr_box = patches.FancyBboxPatch((0.5, -8), 4.2, 74, boxstyle='round,pad=0.18', fc='#FEF2F2', ec='#DC2626', lw=1.3)
     ax.add_patch(pwr_box)
-    ax.text(2.6, 29.0, 'POWER RAIL  •  12.6V 3S Li-ion Battery  •  5V/5A Buck Regulator  •  VMOT 12.6V',
-            fontsize=6.8, fontweight='bold', ha='center', va='center', color='#991B1B', rotation=90)
+    ax.text(2.6, 29.0, 'POWER DISTRIBUTION  •  7.4V 2S Li-ion Battery (8.4V Peak)',
+            fontsize=7.4, fontweight='bold', ha='center', va='center', color='#991B1B', rotation=90)
 
-    # Labeled Power connections into Pi 5 (5V PD), ESP32 (12V VMOT), and Motors (12.6V BATT)
-    # Positioned with zero collision
+    # Labeled Power connections into Pi 5 (5V/5A Buck), ESP32 (7.4V Direct), and Motors (7.4V VMOT)
     ax.plot([4.7, 7.5], [56.0, 56.0], color='#EA580C', lw=1.5, linestyle='--')
-    ax.text(6.1, 57.5, '5V PD', fontsize=5.6, ha='center', va='bottom', color='#EA580C', fontweight='bold',
+    ax.text(6.1, 57.5, '5V / 5A', fontsize=5.8, ha='center', va='bottom', color='#EA580C', fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.1', fc='white', ec='#EA580C', lw=0.6))
-    
+
     ax.plot([4.7, 7.5], [27.0, 27.0], color='#DC2626', lw=1.5, linestyle='--')
-    ax.text(6.1, 28.5, '12V', fontsize=5.6, ha='center', va='bottom', color='#DC2626', fontweight='bold',
+    ax.text(6.1, 28.5, '7.4V', fontsize=5.8, ha='center', va='bottom', color='#DC2626', fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.1', fc='white', ec='#DC2626', lw=0.6))
-    
+
     ax.plot([4.7, 7.5], [-1.5, -1.5], color='#DC2626', lw=1.5, linestyle='--')
-    ax.text(6.1, 0.0, '12.6V', fontsize=5.4, ha='center', va='bottom', color='#DC2626', fontweight='bold',
+    ax.text(6.1, 0.0, '7.4V VMOT', fontsize=5.4, ha='center', va='bottom', color='#DC2626', fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.1', fc='white', ec='#DC2626', lw=0.6))
 
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
@@ -202,9 +209,9 @@ def generate_reengineered_spatial_zone(output_path='write_up/preview_figures/pre
     gs = fig.add_gridspec(1, 2, width_ratios=[1.15, 1.0], wspace=0.14,
                           top=0.86, bottom=0.06, left=0.04, right=0.96)
 
-    # Panel (a): Robot Onboard Camera POV with Privacy-Blurred Bystanders
+    # Panel (a): Robot Onboard Camera POV with Clean Bystander Privacy Blur
     ax1 = fig.add_subplot(gs[0, 0])
-    img_bot = Image.open('write_up/figures/robot_spatial_zone_blurred.jpg')
+    img_bot = Image.open('write_up/figures/robot_spatial_zone_clean.jpg')
     ax1.imshow(img_bot)
     ax1.axis('off')
     ax1.set_title('(a) Empirical Robot Camera Perception (/dev/video0)\n[Bystander Privacy Blur & Central Acceptance Zone HUD]',
@@ -215,45 +222,47 @@ def generate_reengineered_spatial_zone(output_path='write_up/preview_figures/pre
     ax2.set_xlim(0, 100)
     ax2.set_ylim(0, 100)
     ax2.axis('off')
-    ax2.set_title('(b) ISO 5807 Spatial Acceptance Gating Logic\n[Centroid Evaluation & Steering Error Computation]',
+    ax2.set_title('(b) ISO 5807 Spatial Acceptance Gating Logic\n[Centroid Evaluation & Intention-to-Action Dispatch]',
                   fontsize=9.0, fontweight='bold', color='#0F172A', pad=8)
 
-    # Flowchart Nodes (Sized to fit text snugly with zero spillover)
-    draw_parallelogram(ax2, 10, 84, 80, 10, slant=0.06, fc='#EFF6FF', ec='#3B82F6', lw=1.4)
-    ax2.text(50, 89, 'INPUT: /camera/image_raw (640×480 @ 20 FPS)',
-             fontsize=7.5, fontweight='bold', ha='center', va='center', color='#1E40AF')
+    # 1. Input Data Block (Parallelogram - ISO 5807 Data)
+    draw_parallelogram(ax2, 12, 84, 76, 10, slant=0.06, fc='#EFF6FF', ec='#3B82F6', lw=1.4)
+    ax2.text(50, 89, 'INPUT: Video Stream (/camera/image_raw)',
+             fontsize=7.8, fontweight='bold', ha='center', va='center', color='#1E40AF')
 
-    ax2.annotate('', xy=(50, 77), xytext=(50, 84), arrowprops=dict(arrowstyle='->', lw=1.6, color='#334155'))
+    ax2.annotate('', xy=(50, 75.5), xytext=(50, 84), arrowprops=dict(arrowstyle='->', lw=1.6, color='#334155'))
 
-    p_box = patches.FancyBboxPatch((12, 65), 76, 12, boxstyle='round,pad=0.2', fc='#F8FAFC', ec='#64748B', lw=1.4)
-    ax2.add_patch(p_box)
-    ax2.text(50, 71, 'YOLOv8n Person Centroid Localization\nExtract Bounding Box (Bx, By, Bw, Bh) → Centroid (Cx, Cy)',
-             fontsize=7.0, ha='center', va='center', color='#0F172A', linespacing=1.2)
+    # 2. Process Block (Rectangle - ISO 5807 Process)
+    draw_process(ax2, 12, 63, 76, 12.5, fc='#F8FAFC', ec='#475569', lw=1.4)
+    ax2.text(50, 69.2, 'Human Operator Localization (YOLOv8n)\nExtract Bounding Box → Centroid (cx, cy)',
+             fontsize=7.3, ha='center', va='center', color='#0F172A', linespacing=1.25)
 
-    ax2.annotate('', xy=(50, 56), xytext=(50, 65), arrowprops=dict(arrowstyle='->', lw=1.6, color='#334155'))
+    ax2.annotate('', xy=(50, 50.5), xytext=(50, 63), arrowprops=dict(arrowstyle='->', lw=1.6, color='#334155'))
 
-    draw_diamond(ax2, 50, 44, 76, 18, fc='#FEF3C7', ec='#D97706', lw=1.5)
-    ax2.text(50, 44, 'Candidate Centroid inside Zone?\nCx ∈ [176, 464] ∧ Cy ∈ [84, 396]',
-             fontsize=7.2, fontweight='bold', ha='center', va='center', color='#92400E', linespacing=1.2)
+    # 3. Decision Block (Diamond - ISO 5807 Decision)
+    draw_diamond(ax2, 50, 41, 66, 19, fc='#FEF3C7', ec='#D97706', lw=1.5)
+    ax2.text(50, 41, 'Centroid in Acceptance Zone?\n(cx, cy) ∈ Ω_ROI',
+             fontsize=7.3, fontweight='bold', ha='center', va='center', color='#92400E', linespacing=1.25)
 
-    # Branch [No]: Suppress (Left side: x=8 to 36, width 28)
-    ax2.annotate('', xy=(12, 44), xytext=(6, 44), arrowprops=dict(arrowstyle='-', lw=1.5, color='#DC2626'))
-    ax2.plot([6, 6], [44, 18], color='#DC2626', lw=1.5)
-    ax2.annotate('', xy=(8, 18), xytext=(6, 18), arrowprops=dict(arrowstyle='->', lw=1.5, color='#DC2626'))
-    ax2.text(9, 46, '[NO]', fontsize=7.2, fontweight='bold', ha='center', va='bottom', color='#DC2626')
+    # Branch [NO]: Left side -> Terminator (Stadium - ISO 5807 Terminator)
+    ax2.plot([17, 26], [41, 41], color='#DC2626', lw=1.6)
+    ax2.plot([26, 26], [41, 24.5], color='#DC2626', lw=1.6)
+    ax2.annotate('', xy=(26, 23), xytext=(26, 25), arrowprops=dict(arrowstyle='->', lw=1.6, color='#DC2626'))
+    ax2.text(21, 43.5, '[NO]', fontsize=7.4, fontweight='bold', ha='center', va='bottom', color='#DC2626')
 
-    draw_stadium(ax2, 8, 11, 30, 14, fc='#FEE2E2', ec='#DC2626', lw=1.4)
-    ax2.text(23, 18, 'Silent Suppression\nDrop Frame (v = 0)', fontsize=6.8, fontweight='bold',
-             ha='center', va='center', color='#991B1B', linespacing=1.2)
+    draw_stadium(ax2, 6, 8, 40, 15, fc='#FEE2E2', ec='#DC2626', lw=1.4)
+    ax2.text(26, 15.5, 'Bystander Suppression\nDiscard Frame | Zero Velocity (v = 0)',
+             fontsize=6.8, fontweight='bold', ha='center', va='center', color='#991B1B', linespacing=1.25)
 
-    # Branch [Yes]: Accept & Compute Steering Error (Right side: x=44 to 96, width 52)
-    ax2.annotate('', xy=(50, 28), xytext=(50, 35), arrowprops=dict(arrowstyle='->', lw=1.6, color='#16A34A'))
-    ax2.text(52, 31.5, '[YES]', fontsize=7.2, fontweight='bold', ha='left', va='center', color='#15803D')
+    # Branch [YES]: Right side -> Process (Rectangle - ISO 5807 Process)
+    ax2.plot([83, 74], [41, 41], color='#16A34A', lw=1.6)
+    ax2.plot([74, 74], [41, 24.5], color='#16A34A', lw=1.6)
+    ax2.annotate('', xy=(74, 23), xytext=(74, 25), arrowprops=dict(arrowstyle='->', lw=1.6, color='#16A34A'))
+    ax2.text(79, 43.5, '[YES]', fontsize=7.4, fontweight='bold', ha='center', va='bottom', color='#16A34A')
 
-    acc_box = patches.FancyBboxPatch((44, 10), 52, 17, boxstyle='round,pad=0.2', fc='#DCFCE7', ec='#16A34A', lw=1.4)
-    ax2.add_patch(acc_box)
-    ax2.text(70, 18.5, 'Primary Operator Accepted\nCompute Heading Error: ex = Cx - 320\nVisual Servoing: v_ω = -1.5 × ex, vx = 0.20 m/s',
-             fontsize=6.8, fontweight='bold', ha='center', va='center', color='#14532D', linespacing=1.25)
+    draw_process(ax2, 54, 8, 40, 15, fc='#DCFCE7', ec='#16A34A', lw=1.4)
+    ax2.text(74, 15.5, 'Primary Operator Accepted\nTarget Lock & Visual Servoing\nForward to Gesture Pipeline',
+             fontsize=6.7, fontweight='bold', ha='center', va='center', color='#14532D', linespacing=1.22)
 
     fig.suptitle('Empirical Spatial Receptive Zone Gating & Bystander Suppression Flow',
                  fontsize=12.5, fontweight='bold', color='#0F172A', y=0.98)
@@ -267,87 +276,131 @@ def generate_reengineered_spatial_zone(output_path='write_up/preview_figures/pre
 # 3. FEATURE PIPELINE (Real Hand Landmarks + Visible Inter-Stage Chevrons)
 # ==============================================================================
 def generate_reengineered_feature_pipeline(output_path='write_up/preview_figures/preview_fig_feature_pipeline.png'):
-    fig = plt.figure(figsize=(14.2, 5.4), dpi=300)
-    gs = fig.add_gridspec(1, 4, width_ratios=[1.15, 1.2, 1.1, 1.35], wspace=0.22,
+    fig = plt.figure(figsize=(14.5, 5.5), dpi=300)
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.15, 1.25, 1.25, 1.35], wspace=0.22,
                           top=0.88, bottom=0.06, left=0.03, right=0.97)
 
-    # Stage 1: Real Hand with 21 Landmarks + Anatomical Callouts
+    # ==============================================================================
+    # STAGE 1: Real Hand (Clean transparent float, zero inner bounding box)
+    # ==============================================================================
     ax1 = fig.add_subplot(gs[0, 0])
     ax1.set_xlim(0, 100)
     ax1.set_ylim(0, 100)
     ax1.axis('off')
     ax1.set_title('Stage 1: Real Hand Landmarks\n[MediaPipe 21 Joints]', fontsize=8.6, fontweight='bold', color='#0F172A', pad=6)
 
-    stage1_box = patches.FancyBboxPatch((2, 2), 96, 96, boxstyle='round,pad=0.3', fc='#F8FAFC', ec='#CBD5E1', lw=1.2)
+    stage1_box = patches.FancyBboxPatch((2, 2), 96, 96, boxstyle='round,pad=0.3', fc='#FFFFFF', ec='#CBD5E1', lw=1.2)
     ax1.add_patch(stage1_box)
 
-    # Mathematically exact card matching physical aspect ratio (515x983 hand in 14.2x5.4 figure)
-    # W = 62.5, H = 74.0, centered at x = 18.75 -> Zero dead margin on all 4 sides!
-    embed_photo_clean(ax1, 'write_up/figures/real_hand_landmarks_annotated.png', 18.75, 12.0, 62.5, 74.0, border_c='#3B82F6', pad=0.15)
-    
-    # Clean top topology badge
-    ax1.text(50, 90.0, 'MediaPipe 21 Joint Topology (P0–P20)', fontsize=7.2, fontweight='bold', ha='center', va='center', color='#1E40AF')
+    # Embed hand directly without ANY inner card or blue border!
+    img_hand = Image.open('write_up/figures/real_hand_landmarks_annotated.png')
+    ax_ins = ax1.inset_axes([17.0, 9.0, 66.0, 78.0], transform=ax1.transData, zorder=3)
+    ax_ins.imshow(img_hand, aspect='equal')
+    ax_ins.axis('off')
 
-    # Palm normalization reference formula at bottom
-    ax1.text(50, 6.0, 'Palm Metric: W_palm = ||P5 - P17||_2', fontsize=7.0, fontweight='bold', ha='center', va='center',
+    ax1.text(50, 91.0, '21-Joint 3D Landmark Topology', fontsize=7.2, fontweight='bold', ha='center', va='center', color='#1E40AF')
+    ax1.text(50, 5.5, 'Reference Anchor: Wrist & MCP Span', fontsize=7.0, fontweight='bold', ha='center', va='center',
              color='#1D4ED8', bbox=dict(boxstyle='round,pad=0.18', fc='#EFF6FF', ec='#93C5FD', lw=0.8))
 
-    # Stage 2: Geometric Invariance Transformations
+    # ==============================================================================
+    # STAGE 2: Invariance Transforms (Conceptual High-Level + Visual Icons)
+    # ==============================================================================
     ax2 = fig.add_subplot(gs[0, 1])
     ax2.set_xlim(0, 100)
     ax2.set_ylim(0, 100)
     ax2.axis('off')
-    ax2.set_title('Stage 2: Invariance Transforms\n[Scale & Translation Proof]', fontsize=8.6, fontweight='bold', color='#0F172A', pad=6)
+    ax2.set_title('Stage 2: Invariance Transforms\n[Scale & Translation Invariant]', fontsize=8.6, fontweight='bold', color='#0F172A', pad=6)
 
     stage2_box = patches.FancyBboxPatch((2, 2), 96, 96, boxstyle='round,pad=0.3', fc='#F8FAFC', ec='#CBD5E1', lw=1.2)
     ax2.add_patch(stage2_box)
 
-    c1 = patches.FancyBboxPatch((6, 73), 88, 20, boxstyle='round,pad=0.2', fc='#EFF6FF', ec='#3B82F6', lw=1.2)
+    # 1. Translation Invariance with visual origin shift icon
+    c1 = patches.FancyBboxPatch((5, 73), 90, 20, boxstyle='round,pad=0.2', fc='#EFF6FF', ec='#3B82F6', lw=1.2)
     ax2.add_patch(c1)
-    ax2.text(50, 87, '1. Translation Invariance', fontsize=7.6, fontweight='bold', ha='center', color='#1D4ED8')
-    ax2.text(50, 78, "p'_i = p_i - p_0  (Origin at Wrist P0)", fontsize=7.2, ha='center', color='#1E293B')
+    ax2.text(10, 87, '1. Translation Normalization', fontsize=7.4, fontweight='bold', color='#1D4ED8')
+    ax2.text(10, 78.0, 'Zero-center coordinates to wrist origin\n(Eliminates robot-to-hand position offset)', fontsize=6.7, color='#1E293B', linespacing=1.2)
+    ax2.annotate('', xy=(88, 86), xytext=(78, 86), arrowprops=dict(arrowstyle='->', lw=1.2, color='#3B82F6'))
+    ax2.annotate('', xy=(78, 92), xytext=(78, 82), arrowprops=dict(arrowstyle='->', lw=1.2, color='#3B82F6'))
+    ax2.text(80, 80, 'Origin', fontsize=5.8, color='#1D4ED8', fontweight='bold')
 
-    c2 = patches.FancyBboxPatch((6, 50), 88, 20, boxstyle='round,pad=0.2', fc='#FEFCE8', ec='#EAB308', lw=1.2)
+    # 2. Scale & Distance Normalization with visual span icon
+    c2 = patches.FancyBboxPatch((5, 50), 90, 20, boxstyle='round,pad=0.2', fc='#FEFCE8', ec='#EAB308', lw=1.2)
     ax2.add_patch(c2)
-    ax2.text(50, 64, '2. Scale & Distance Normalization', fontsize=7.6, fontweight='bold', ha='center', color='#A16207')
-    ax2.text(50, 55, "p̂_i = p'_i / W_palm  (Normalized by Palm)", fontsize=7.2, ha='center', color='#1E293B')
+    ax2.text(10, 64, '2. Scale Normalization', fontsize=7.4, fontweight='bold', color='#A16207')
+    ax2.text(10, 55.0, 'Divide distances by dynamic palm span\n(Eliminates camera distance & hand size variation)', fontsize=6.7, color='#1E293B', linespacing=1.2)
+    ax2.annotate('', xy=(88, 62), xytext=(76, 62), arrowprops=dict(arrowstyle='<->', lw=1.4, color='#EAB308'))
+    ax2.text(82, 65, 'Palm Span', fontsize=5.8, ha='center', color='#A16207', fontweight='bold')
 
-    c3 = patches.FancyBboxPatch((6, 27), 88, 20, boxstyle='round,pad=0.2', fc='#F0FDF4', ec='#16A34A', lw=1.2)
+    # 3. Finger Flexion Curl Angles with visual vector angle
+    c3 = patches.FancyBboxPatch((5, 27), 90, 20, boxstyle='round,pad=0.2', fc='#F0FDF4', ec='#16A34A', lw=1.2)
     ax2.add_patch(c3)
-    ax2.text(50, 41, '3. Finger Flexion Curl Angles', fontsize=7.6, fontweight='bold', ha='center', color='#15803D')
-    ax2.text(50, 32, "θ_j = arccos((u·v) / (||u||·||v||))", fontsize=7.2, ha='center', color='#1E293B')
+    ax2.text(10, 41, '3. Finger Flexion Angles', fontsize=7.4, fontweight='bold', color='#15803D')
+    ax2.text(10, 32.0, 'Calculate joint curl across all five digits\n(Robust invariant curvature descriptor)', fontsize=6.7, color='#1E293B', linespacing=1.2)
+    ax2.plot([78, 86], [32, 38], color='#16A34A', lw=1.3)
+    ax2.plot([78, 86], [32, 28], color='#16A34A', lw=1.3)
+    arc = patches.Arc((78, 32), 6, 6, angle=0, theta1=-25, theta2=35, color='#16A34A', lw=1.2)
+    ax2.add_patch(arc)
+    ax2.text(82, 32, 'Angle', fontsize=5.8, color='#15803D', fontweight='bold')
 
-    c4 = patches.FancyBboxPatch((6, 6), 88, 18, boxstyle='round,pad=0.2', fc='#FAF5FF', ec='#A855F7', lw=1.2)
+    # 4. Relative Geometric Vectors
+    c4 = patches.FancyBboxPatch((5, 5), 90, 19, boxstyle='round,pad=0.2', fc='#FAF5FF', ec='#A855F7', lw=1.2)
     ax2.add_patch(c4)
-    ax2.text(50, 18, '4. Thumb Relative Vector', fontsize=7.6, fontweight='bold', ha='center', color='#7E22CE')
-    ax2.text(50, 10, "Δp_thumb = p_4 - p_5  (Tip to MCP)", fontsize=7.2, ha='center', color='#1E293B')
+    ax2.text(10, 18, '4. Thumb Relative Vector', fontsize=7.4, fontweight='bold', color='#7E22CE')
+    ax2.text(10, 9.5, '3D vector from palm base to thumb tip\n(Distinguishes open hand vs thumbs gestures)', fontsize=6.7, color='#1E293B', linespacing=1.2)
+    ax2.annotate('', xy=(88, 14), xytext=(78, 14), arrowprops=dict(arrowstyle='->', lw=1.4, color='#A855F7'))
+    ax2.text(83, 17, 'Vector', fontsize=5.8, ha='center', color='#7E22CE', fontweight='bold')
 
-    # Stage 3: 19-D Feature Representation
+    # ==============================================================================
+    # STAGE 3: 19-D Feature Vector (Visual Feature Ribbon + High-Level Breakdown)
+    # ==============================================================================
     ax3 = fig.add_subplot(gs[0, 2])
     ax3.set_xlim(0, 100)
     ax3.set_ylim(0, 100)
     ax3.axis('off')
-    ax3.set_title('Stage 3: 19-D Feature Vector\n[f ∈ ℝ¹⁹ Invariant Descriptor]', fontsize=8.6, fontweight='bold', color='#0F172A', pad=6)
+    ax3.set_title('Stage 3: 19-D Feature Vector\n[Normalized Invariant Descriptor]', fontsize=8.6, fontweight='bold', color='#0F172A', pad=6)
 
     stage3_box = patches.FancyBboxPatch((2, 2), 96, 96, boxstyle='round,pad=0.3', fc='#F8FAFC', ec='#CBD5E1', lw=1.2)
     ax3.add_patch(stage3_box)
 
-    f1 = patches.FancyBboxPatch((6, 67), 88, 24, boxstyle='round,pad=0.2', fc='#EFF6FF', ec='#3B82F6', lw=1.2)
+    # Visual Feature Ribbon at top of Stage 3 (Continuous 19-slot descriptor)
+    ax3.text(50, 91.5, '19-D Invariant Feature Vector (Slots 1–19)',
+             fontsize=7.0, fontweight='bold', ha='center', va='center', color='#0F172A')
+
+    ribbon_x = np.linspace(6, 94, 20)
+    for i in range(19):
+        rx = ribbon_x[i]
+        rw = ribbon_x[i+1] - rx - 0.4
+        if i < 5:
+            col = '#3B82F6'  # 5 angles
+        elif i < 10:
+            col = '#EAB308'  # 5 distances
+        else:
+            col = '#16A34A'  # 9 relative
+        ax3.add_patch(patches.Rectangle((rx, 83), rw, 5.0, fc=col, ec='#1E293B', lw=0.5))
+        if i in [0, 4, 5, 9, 10, 18]:
+            ax3.text(rx + rw/2, 85.5, str(i+1), fontsize=4.8, ha='center', va='center', color='white', fontweight='bold')
+
+    # Group 1: 5-D Finger Curl Angles
+    f1 = patches.FancyBboxPatch((5, 56), 90, 24, boxstyle='round,pad=0.2', fc='#EFF6FF', ec='#3B82F6', lw=1.2)
     ax3.add_patch(f1)
-    ax3.text(10, 84, 'Finger Curl Angles (5-D)', fontsize=7.4, fontweight='bold', color='#1D4ED8')
-    ax3.text(10, 73, '[θ_thumb, θ_index, θ_middle,\n θ_ring, θ_pinky]', fontsize=7.0, color='#1E293B', linespacing=1.2)
+    ax3.text(8, 74.0, 'Finger Flexion Angles (5-D)', fontsize=7.4, fontweight='bold', color='#1D4ED8')
+    ax3.text(8, 64.0, '• Joint curl for thumb, index, middle, ring & pinky\n• Full flexion (0 rad) to full extension (π rad)', fontsize=6.8, color='#1E293B', linespacing=1.25)
 
-    f2 = patches.FancyBboxPatch((6, 38), 88, 24, boxstyle='round,pad=0.2', fc='#FEFCE8', ec='#EAB308', lw=1.2)
+    # Group 2: 5-D Tip-to-Wrist Distances
+    f2 = patches.FancyBboxPatch((5, 30), 90, 23, boxstyle='round,pad=0.2', fc='#FEFCE8', ec='#EAB308', lw=1.2)
     ax3.add_patch(f2)
-    ax3.text(10, 55, 'Tip-to-Wrist Distances (5-D)', fontsize=7.4, fontweight='bold', color='#A16207')
-    ax3.text(10, 44, '[d(P4,P0), d(P8,P0), d(P12,P0),\n d(P16,P0), d(P20,P0)] / W_palm', fontsize=7.0, color='#1E293B', linespacing=1.2)
+    ax3.text(8, 47.0, 'Normalized Tip Distances (5-D)', fontsize=7.4, fontweight='bold', color='#A16207')
+    ax3.text(8, 37.0, '• Radial reach from wrist origin to each fingertip\n• Normalized by palm width for distance invariance', fontsize=6.8, color='#1E293B', linespacing=1.25)
 
-    f3 = patches.FancyBboxPatch((6, 9), 88, 24, boxstyle='round,pad=0.2', fc='#F0FDF4', ec='#16A34A', lw=1.2)
+    # Group 3: 9-D Relative Geometric Descriptors
+    f3 = patches.FancyBboxPatch((5, 5), 90, 22, boxstyle='round,pad=0.2', fc='#F0FDF4', ec='#16A34A', lw=1.2)
     ax3.add_patch(f3)
-    ax3.text(10, 26, 'Relative Displacements (9-D)', fontsize=7.4, fontweight='bold', color='#15803D')
-    ax3.text(10, 15, '• Thumb-Index Vector: (Δx, Δy, Δz)\n• Inter-Tip Spreads: 4 Spacing Dists\n• Palm Aspect Ratio: W_palm / L_palm', fontsize=6.7, color='#1E293B', linespacing=1.2)
+    ax3.text(8, 21.0, 'Relative Spatial Descriptors (9-D)', fontsize=7.4, fontweight='bold', color='#15803D')
+    ax3.text(8, 12.0, '• Thumb 3D directional vector (3-D)\n• Inter-fingertip spread distances (4-D)\n• Palm aspect ratio & hand geometry (2-D)', fontsize=6.5, color='#1E293B', linespacing=1.2)
 
-    # Stage 4: MLP Neural Network & 6 Discrete Action Tokens
+    # ==============================================================================
+    # STAGE 4: MLP Neural Network (19 -> 128 -> 64 -> 6 Verified Nodes!)
+    # ==============================================================================
     ax4 = fig.add_subplot(gs[0, 3])
     ax4.set_xlim(0, 100)
     ax4.set_ylim(0, 100)
@@ -357,16 +410,16 @@ def generate_reengineered_feature_pipeline(output_path='write_up/preview_figures
     stage4_box = patches.FancyBboxPatch((2, 2), 96, 96, boxstyle='round,pad=0.3', fc='#F8FAFC', ec='#CBD5E1', lw=1.2)
     ax4.add_patch(stage4_box)
 
-    # Neural Network Node Diagram
-    layers = [3, 5, 4, 3]
+    # Neural Network Diagram with verified architecture: 19 -> 128 -> 64 -> 6
+    layers = [3, 6, 5, 3]
     layer_x = [15, 38, 62, 85]
-    layer_names = ['Input\n19-D', 'Hidden 1\n64 (ReLU)', 'Hidden 2\n32 (ReLU)', 'Output\n6 (Softmax)']
+    layer_names = ['Input\n19-D', 'Hidden 1\n128 (ReLU)', 'Hidden 2\n64 (ReLU)', 'Output\n6 (Softmax)']
     for l_idx, (num_nodes, lx) in enumerate(zip(layers, layer_x)):
         ys = np.linspace(58, 86, num_nodes)
         for y in ys:
             circle = plt.Circle((lx, y), 2.2, fc='#3B82F6', ec='#1D4ED8', lw=1.0, zorder=4)
             ax4.add_patch(circle)
-        ax4.text(lx, 52, layer_names[l_idx], fontsize=6.2, ha='center', va='top', color='#334155', fontweight='bold')
+        ax4.text(lx, 51.5, layer_names[l_idx], fontsize=6.3, ha='center', va='top', color='#334155', fontweight='bold')
 
     for l_idx in range(len(layers) - 1):
         x_a = layer_x[l_idx]
@@ -427,99 +480,195 @@ def generate_reengineered_feature_pipeline(output_path='write_up/preview_figures
 # 4. BRAIN STATE MACHINE (Zero Collisions, Unobstructed Preemption, Clean UML)
 # ==============================================================================
 def generate_reengineered_brain_state_machine(output_path='write_up/preview_figures/preview_fig_brain_state_machine.png'):
-    fig, ax = plt.subplots(figsize=(13.6, 5.8), dpi=300)
-    ax.set_xlim(0, 142)
+    fig = plt.figure(figsize=(17.5, 7.6), dpi=300)
+    ax = fig.add_axes([0.012, 0.02, 0.976, 0.92])
+    ax.set_xlim(0, 175)
     ax.set_ylim(0, 76)
     ax.axis('off')
 
-    ax.text(71, 73.5, 'Supervisory Cognition: OMG UML 2.5 Brain State Machine & Safety Preemption',
-            fontsize=12.5, fontweight='bold', ha='center', va='top', color='#0F172A')
+    fig.suptitle('Supervisory Cognition Architecture: Multi-Modal Gating, OMG UML 2.5 State Machine & twist_mux Arbitration',
+                 fontsize=12.5, fontweight='bold', color='#0F172A', y=0.978)
+
+    # ==============================================================================
+    # 1. LEFT FLANK: MULTI-MODAL INGESTION & GATING (x=3 to 42, width 39)
+    # ==============================================================================
+    flank_left = patches.FancyBboxPatch((3, 3), 39, 68.5, boxstyle='round,pad=0.35', fc='#F8FAFC', ec='#94A3B8', lw=1.3)
+    ax.add_patch(flank_left)
+    ax.text(22.5, 69.0, 'Multi-Modal Ingestion & Safety Gating', fontsize=8.6, fontweight='bold', ha='center', va='center', color='#0F172A')
+
+    # ROS 2 Input Topics (4 topics)
+    topics = [
+        ('/cognition/detection', 'YOLOv8n Person Centroid & Box (20 Hz)', '#2563EB', '#EFF6FF', 58.0),
+        ('/cognition/gesture', '19-D MLP Gesture Classifier (10 Hz)', '#7C3AED', '#F5F3FF', 50.0),
+        ('/cognition/face_identity', 'Biometric Authorization (5 Hz)', '#D97706', '#FFFBEB', 42.0),
+        ('/system/mode', 'Operational Mode [GESTURE/AUTO]', '#475569', '#F1F5F9', 34.0),
+    ]
+    for topic_name, desc, ec, fc, ty in topics:
+        t_box = patches.FancyBboxPatch((5.0, ty), 35.0, 6.8, boxstyle='round,pad=0.2', fc=fc, ec=ec, lw=1.1)
+        ax.add_patch(t_box)
+        ax.text(6.5, ty + 4.8, topic_name, fontsize=6.8, fontweight='bold', color=ec)
+        ax.text(6.5, ty + 1.8, desc, fontsize=5.8, color='#334155')
+
+    # Connecting arrow from topics down to Gating
+    ax.annotate('', xy=(22.5, 29.5), xytext=(22.5, 33.5),
+                arrowprops=dict(arrowstyle='->', lw=1.5, color='#475569'))
+
+    # Software Safety Gating Blocks
+    # Gate 1: Spatial Zone Filter
+    g1 = patches.FancyBboxPatch((5.0, 17.5), 35.0, 10.5, boxstyle='round,pad=0.2', fc='#ECFDF5', ec='#10B981', lw=1.2)
+    ax.add_patch(g1)
+    ax.text(6.5, 25.5, 'Gate 1: Spatial Acceptance Zone ROI', fontsize=6.9, fontweight='bold', color='#047857')
+    ax.text(6.5, 20.2, '• Filters out background bystanders\n• Central Acceptance Window: [45% × 65%]', fontsize=5.8, color='#065F46', linespacing=1.2)
+
+    # Gate 2: Biometric Gate
+    g2 = patches.FancyBboxPatch((5.0, 5.0), 35.0, 10.5, boxstyle='round,pad=0.2', fc='#FEF2F2', ec='#EF4444', lw=1.2)
+    ax.add_patch(g2)
+    ax.text(6.5, 13.0, 'Gate 2: Biometric Identity Gate', fontsize=6.9, fontweight='bold', color='#B91C1C')
+    ax.text(6.5, 8.0, '• require_face_auth parameter check\n• Discards unauthorized bystander gestures', fontsize=5.8, color='#991B1B', linespacing=1.2)
+
+    # Inter-flank connection arrow to FSM: exits from Gate 1/2 up into the FSM transition
+    ax.plot([40.0, 44.5, 44.5], [22.75, 22.75, 50.0], color='#0284C7', lw=1.6)
+    ax.annotate('', xy=(47.5, 50.0), xytext=(44.5, 50.0),
+                arrowprops=dict(arrowstyle='->', lw=1.6, color='#0284C7'))
+    ax.text(44.0, 36.0, 'Validated\nCommand\nEvents', fontsize=6.2, ha='center', va='center',
+            fontweight='bold', color='#0284C7', bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#38BDF8', lw=0.8))
+
+    # ==============================================================================
+    # 2. CENTER: OMG UML 2.5 BRAIN STATE MACHINE CORE (x=46.5 to 127.5, width 81)
+    # ==============================================================================
+    fsm_bg = patches.FancyBboxPatch((46.5, 3), 81.0, 68.5, boxstyle='round,pad=0.35', fc='#FFFFFF', ec='#64748B', lw=1.4)
+    ax.add_patch(fsm_bg)
+    ax.text(87.0, 69.0, 'Supervisory Cognition: OMG UML 2.5 Brain State Machine',
+            fontsize=8.8, fontweight='bold', ha='center', va='center', color='#0F172A')
 
     # Initial Pseudo-State
-    init_circle = plt.Circle((4, 49.75), 2.0, fc='#0F172A', ec='#0F172A', zorder=5)
+    init_circle = plt.Circle((49.5, 50.0), 1.8, fc='#0F172A', ec='#0F172A', zorder=5)
     ax.add_patch(init_circle)
-    ax.annotate('', xy=(8, 49.75), xytext=(6.0, 49.75), arrowprops=dict(arrowstyle='->', lw=1.6, color='#0F172A'))
+    ax.annotate('', xy=(52.5, 50.0), xytext=(51.3, 50.0), arrowprops=dict(arrowstyle='->', lw=1.5, color='#0F172A'))
 
-    # Compact state height: h = 16.5 perfectly hugs the 3 action lines!
     st_h = 16.5
 
-    # State 1: IDLE / STANDBY (x=8 to 38, width 30, y=41.5 to 58.0)
-    draw_uml_state(ax, 8, 41.5, 30, st_h, '1. IDLE / STANDBY',
+    # State 1: IDLE / STANDBY (x=52.5 to 73.5, width 21.0, y=41.5 to 58.0)
+    draw_uml_state(ax, 52.5, 41.5, 21.0, st_h, '1. IDLE / STANDBY',
                    "entry / stop_motors()\n"
                    "do / monitor_heartbeat()\n"
                    "exit / log_activation()",
                    border_c='#64748B', bg_c='#F8FAFC', badge_c='#334155')
 
-    # State 2: WAITING_CONFIRM (x=52 to 84, width 32, y=41.5 to 58.0)
-    draw_uml_state(ax, 52, 41.5, 32, st_h, '2. WAITING_CONFIRM',
+    # State 2: WAITING_CONFIRM (x=80.5 to 102.5, width 22.0, y=41.5 to 58.0)
+    draw_uml_state(ax, 80.5, 41.5, 22.0, st_h, '2. WAITING_CONFIRM',
                    "entry / start_consensus_timer()\n"
-                   "do / filter_sliding_window()\n"
-                   "exit / publish_consensus()",
+                   "do / rolling_majority_filter()\n"
+                   "exit / commit_consensus()",
                    border_c='#D97706', bg_c='#FEFCE8', badge_c='#B45309')
 
-    # State 3: EXECUTING_MOTION (x=98 to 134, width 36, y=41.5 to 58.0)
-    draw_uml_state(ax, 98, 41.5, 36, st_h, '3. EXECUTING_MOTION',
-                   "entry / dispatch_cmd_vel()\n"
-                   "do / monitor_odom_progress()\n"
+    # State 3: EXECUTING_MOTION (x=109.5 to 125.5, width 16.0, y=41.5 to 58.0)
+    draw_uml_state(ax, 109.5, 41.5, 16.0, st_h, '3. EXECUTING',
+                   "entry / dispatch_cmd()\n"
+                   "do / monitor_odom()\n"
                    "exit / zero_velocity()",
                    border_c='#16A34A', bg_c='#DCFCE7', badge_c='#15803D')
 
-    # State 4: FOLLOW MODE (Visual Servoing) (x=76 to 132, width 56, y=9.5 to 26.0)
-    draw_uml_state(ax, 76, 9.5, 56, st_h, '4. FOLLOW MODE (Visual Servoing)',
+    # State 4: FOLLOW MODE (Visual Servoing) (x=80.5 to 125.5, width 45.0, y=9.5 to 26.0)
+    draw_uml_state(ax, 80.5, 9.5, 45.0, st_h, '4. FOLLOW MODE (Visual Servoing)',
                    "entry / init_servoing_loop()\n"
-                   "do / compute_heading_error(ex = Cx - 320)\n"
-                   "do / steer(v_ω = -1.5 × ex, vx = 0.20 m/s)\n"
+                   "do / track_operator_centroid(Cx)\n"
+                   "do / publish_proportional_twist()\n"
                    "exit / zero_velocity()",
                    border_c='#2563EB', bg_c='#DBEAFE', badge_c='#1D4ED8')
 
-    # State 5: EMERGENCY HALT [OVERRIDE] (x=8 to 42, width 34, y=9.5 to 26.0)
-    draw_uml_state(ax, 8, 9.5, 34, st_h, '5. EMERGENCY HALT [OVERRIDE]',
-                   "entry / FORCE_ZERO_VELOCITY()\n"
-                   "entry / clear_consensus_buffers()\n"
-                   "do / engage_hardware_lockout()\n"
-                   "exit / require_manual_reset()",
+    # State 5: EMERGENCY HALT [OVERRIDE] (x=52.5 to 73.5, width 21.0, y=9.5 to 26.0)
+    draw_uml_state(ax, 52.5, 9.5, 21.0, st_h, '5. EMERGENCY HALT',
+                   "entry / FORCE_STOP()\n"
+                   "entry / clear_buffers()\n"
+                   "do / engage_lockout()\n"
+                   "exit / manual_reset()",
                    border_c='#DC2626', bg_c='#FEE2E2', badge_c='#991B1B')
 
-    # Forward Transition 1 -> 2 (Gap x=38 to 52, width 14)
-    ax.annotate('', xy=(52, 49.75), xytext=(38, 49.75), arrowprops=dict(arrowstyle='->', lw=1.8, color='#334155'))
-    ax.text(45, 53.0, 'Operator\nin Zone', fontsize=6.8, ha='center', va='bottom',
-            fontweight='bold', color='#1E293B', bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#CBD5E1', lw=0.8))
+    # Transitions inside FSM:
+    # 1 -> 2
+    ax.annotate('', xy=(80.5, 50.0), xytext=(73.5, 50.0), arrowprops=dict(arrowstyle='->', lw=1.6, color='#334155'))
+    ax.text(77.0, 52.5, 'Operator\nin Zone', fontsize=5.8, ha='center', va='bottom',
+            fontweight='bold', color='#1E293B', bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='#CBD5E1', lw=0.7))
 
-    # Transition 2 -> 3 (Gap x=84 to 98, width 14)
-    ax.annotate('', xy=(98, 49.75), xytext=(84, 49.75), arrowprops=dict(arrowstyle='->', lw=1.8, color='#16A34A'))
-    ax.text(91, 53.0, 'Consensus\n[Votes >= 3/5]', fontsize=6.8, ha='center', va='bottom',
-            fontweight='bold', color='#15803D', bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#86EFAC', lw=0.8))
+    # 2 -> 3
+    ax.annotate('', xy=(109.5, 50.0), xytext=(102.5, 50.0), arrowprops=dict(arrowstyle='->', lw=1.6, color='#16A34A'))
+    ax.text(106.0, 52.5, 'Consensus\n[Votes >= 3/5]', fontsize=5.6, ha='center', va='bottom',
+            fontweight='bold', color='#15803D', bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='#86EFAC', lw=0.7))
 
-    # Timeout Return Arc from State 3 to State 1
-    ax.plot([116, 116, 23, 23], [58.0, 65.5, 65.5, 58.0], color='#64748B', lw=1.6)
-    ax.annotate('', xy=(23, 58.0), xytext=(23, 59.0), arrowprops=dict(arrowstyle='->', lw=1.6, color='#64748B'))
-    ax.text(69.5, 65.5, 'Timeout [t > 3.0s] / Motion Complete', fontsize=7.4, ha='center', va='center',
-            fontweight='bold', color='#334155', bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#64748B', lw=0.9))
+    # 3 -> 1 (Timeout return arc)
+    ax.plot([117.5, 117.5, 63.0, 63.0], [58.0, 64.0, 64.0, 58.0], color='#64748B', lw=1.5)
+    ax.annotate('', xy=(63.0, 58.0), xytext=(63.0, 59.0), arrowprops=dict(arrowstyle='->', lw=1.5, color='#64748B'))
+    ax.text(90.25, 64.0, 'Timeout [t > 3.0s] / Motion Complete', fontsize=6.2, ha='center', va='center',
+            fontweight='bold', color='#334155', bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#64748B', lw=0.8))
 
-    # Follow Transition from State 3 to State 4
-    ax.annotate('', xy=(106, 26.0), xytext=(106, 41.5), arrowprops=dict(arrowstyle='->', lw=1.8, color='#2563EB'))
-    ax.text(108, 33.75, 'Gesture == FOLLOW', fontsize=7.4, ha='left', va='center',
-            fontweight='bold', color='#1D4ED8', bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#93C5FD', lw=0.8))
+    # 3 -> 4
+    ax.annotate('', xy=(114.0, 26.0), xytext=(114.0, 41.5), arrowprops=dict(arrowstyle='->', lw=1.6, color='#2563EB'))
+    ax.text(112.5, 33.75, 'Gesture ==\nFOLLOW', fontsize=5.8, ha='right', va='center',
+            fontweight='bold', color='#1D4ED8', bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='#93C5FD', lw=0.7))
 
-    # FOLLOW Return Route to State 1 via right margin into top return arc (ZERO line crossings!)
-    ax.plot([132, 136, 136, 116], [17.75, 17.75, 65.5, 65.5], color='#2563EB', lw=1.5, linestyle=':')
-    ax.text(135.5, 38.0, 'Operator Lost\n[STOP]', fontsize=6.4, ha='center', va='center',
-            fontweight='bold', color='#1D4ED8', rotation=-90,
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#93C5FD', lw=0.8))
+    # 4 -> 1 Return via top arc (Zero crossings)
+    ax.plot([125.5, 126.8, 126.8, 117.5], [17.75, 17.75, 64.0, 64.0], color='#2563EB', lw=1.3, linestyle=':')
+    ax.text(126.8, 38.0, 'Lost/STOP', fontsize=5.4, ha='center', va='center',
+            fontweight='bold', color='#1D4ED8', bbox=dict(boxstyle='round,pad=0.12', fc='white', ec='#93C5FD', lw=0.6))
 
-    # Asynchronous Preemption Route: Dropping down along x=46 from State 2 into State 5 (ZERO line crossings!)
-    ax.plot([56, 46, 46, 42], [41.5, 41.5, 17.75, 17.75], color='#DC2626', lw=2.0, linestyle='--')
-    ax.annotate('', xy=(42, 17.75), xytext=(44, 17.75), arrowprops=dict(arrowstyle='->', lw=2.0, color='#DC2626'))
+    # Global Asynchronous Preemption Line (interrupting active states into State 5)
+    ax.plot([91.5, 76.5, 76.5, 73.5], [41.5, 41.5, 17.75, 17.75], color='#DC2626', lw=1.8, linestyle='--')
+    ax.annotate('', xy=(73.5, 17.75), xytext=(75.0, 17.75), arrowprops=dict(arrowstyle='->', lw=1.8, color='#DC2626'))
+    ax.text(76.5, 30.0, '⚡ E-STOP\nPREEMPTION', fontsize=5.5, ha='center', va='center',
+            fontweight='bold', color='#991B1B', bbox=dict(boxstyle='round,pad=0.15', fc='#FEF2F2', ec='#DC2626', lw=0.8))
 
-    # Warning badge placed in the open space x in [49, 73], y in [22, 30] - ZERO OVERLAP with any state or line!
-    shield_box = patches.FancyBboxPatch((49.0, 20.0), 24.5, 7.5, boxstyle='round,pad=0.2', fc='#FEF2F2', ec='#DC2626', lw=1.2)
-    ax.add_patch(shield_box)
-    ax.text(61.25, 23.75, '⚡ ASYNCHRONOUS PREEMPTION\n[LiDAR < 0.36m] OR [/joy Kill]',
-            fontsize=6.2, ha='center', va='center', color='#991B1B', fontweight='bold', linespacing=1.2)
+    # 5 -> 1 Reset
+    ax.annotate('', xy=(57.5, 41.5), xytext=(57.5, 26.0), arrowprops=dict(arrowstyle='->', lw=1.5, color='#64748B'))
+    ax.text(56.5, 33.75, 'Clear &\nReset', fontsize=5.8, ha='right', va='center', fontweight='bold', color='#475569')
 
-    # Emergency Recovery back into State 1
-    ax.annotate('', xy=(14, 41.5), xytext=(14, 26.0), arrowprops=dict(arrowstyle='->', lw=1.6, color='#64748B'))
-    ax.text(13, 33.75, 'Clear Obstacle\n& Reset', fontsize=6.8, ha='right', va='center', fontweight='bold', color='#475569')
+    # ==============================================================================
+    # 3. RIGHT FLANK: VELOCITY ARBITRATION & SAFETY INTERLOCK (x=130.5 to 172, width 41.5)
+    # ==============================================================================
+    flank_right = patches.FancyBboxPatch((130.5, 3), 41.5, 68.5, boxstyle='round,pad=0.35', fc='#F8FAFC', ec='#94A3B8', lw=1.3)
+    ax.add_patch(flank_right)
+    ax.text(151.25, 69.0, 'twist_mux Priority & Safety Arbitration', fontsize=8.6, fontweight='bold', ha='center', va='center', color='#0F172A')
+
+    # Output from FSM to Priority 40 in twist_mux (Clean orthogonal route!)
+    ax.plot([125.5, 128.5, 128.5, 134.5], [45.0, 45.0, 29.5, 29.5], color='#16A34A', lw=1.8)
+    ax.annotate('', xy=(134.5, 29.5), xytext=(132.5, 29.5),
+                arrowprops=dict(arrowstyle='->', lw=1.8, color='#16A34A'))
+    ax.text(128.5, 37.5, '/cmd_vel_gesture\n(Priority 40)', fontsize=5.6, ha='center', va='center',
+            fontweight='bold', color='#15803D', bbox=dict(boxstyle='round,pad=0.15', fc='#DCFCE7', ec='#16A34A', lw=0.7))
+
+    # twist_mux Priority Matrix
+    mux_box = patches.FancyBboxPatch((133.0, 23.5), 36.5, 40.0, boxstyle='round,pad=0.25', fc='#FFFFFF', ec='#CBD5E1', lw=1.2)
+    ax.add_patch(mux_box)
+    ax.text(151.25, 60.5, 'ROS 2 twist_mux Priority Arbitrator', fontsize=7.2, fontweight='bold', ha='center', va='center', color='#0F172A')
+
+    mux_slots = [
+        ('PRIORITY 100 [CRITICAL]: /cmd_vel_emergency', 'LiDAR Safety Zone (< 0.36m Collision Halt)', '#DC2626', '#FEE2E2', 51.5),
+        ('PRIORITY 90 [OVERRIDE]: /joy_teleop', 'Manual Wireless Joystick / Teleoperation', '#D97706', '#FEF3C7', 43.0),
+        ('PRIORITY 50 [AUTONOMY]: /cmd_vel_nav', 'Nav2 Path Planner (Costmap Navigation)', '#2563EB', '#DBEAFE', 34.5),
+        ('PRIORITY 40 [COGNITION]: /cmd_vel_gesture', 'Cognitive Brain Node State Machine', '#16A34A', '#DCFCE7', 26.0),
+    ]
+    for pri_name, pri_desc, ec, fc, my in mux_slots:
+        p_box = patches.FancyBboxPatch((134.5, my), 33.5, 7.0, boxstyle='round,pad=0.18', fc=fc, ec=ec, lw=1.0)
+        ax.add_patch(p_box)
+        ax.text(136.0, my + 4.9, pri_name, fontsize=5.8, fontweight='bold', color=ec)
+        ax.text(136.0, my + 1.8, pri_desc, fontsize=5.3, color='#334155')
+
+    # Output to Hardware
+    ax.annotate('', xy=(151.25, 17.5), xytext=(151.25, 23.5),
+                arrowprops=dict(arrowstyle='->', lw=2.0, color='#0F172A'))
+    ax.text(152.0, 20.5, 'Arbitrated /cmd_vel', fontsize=6.2, ha='left', va='center', fontweight='bold', color='#0F172A')
+
+    # ESP32-S3 Base Controller
+    hw_box = patches.FancyBboxPatch((134.5, 5.0), 33.5, 11.5, boxstyle='round,pad=0.2', fc='#EDE9FE', ec='#7C3AED', lw=1.2)
+    ax.add_patch(hw_box)
+    ax.text(151.25, 13.5, 'ESP32-S3 Base Controller', fontsize=7.2, fontweight='bold', ha='center', va='center', color='#6D28D9')
+    ax.text(151.25, 8.5, '• micro-ROS Client | FreeRTOS Motor PID\n• 4WD Mecanum / Differential Locomotion', fontsize=5.8, ha='center', va='center', color='#4C1D95', linespacing=1.2)
+
+    # Clean Preemption Feedback route: drops from Priority 100 down along right flank and into State 5!
+    ax.plot([134.5, 130.5, 130.5, 73.5], [55.0, 55.0, 14.5, 14.5], color='#DC2626', lw=1.4, linestyle=':')
+    ax.annotate('', xy=(73.5, 14.5), xytext=(75.5, 14.5), arrowprops=dict(arrowstyle='->', lw=1.4, color='#DC2626'))
+    ax.text(102.5, 13.0, 'LiDAR Obstacle Trigger / E-Stop Lockout', fontsize=5.6, ha='center', va='center',
+            fontweight='bold', color='#B91C1C', bbox=dict(boxstyle='round,pad=0.15', fc='#FEF2F2', ec='#DC2626', lw=0.7))
 
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
     plt.close()
@@ -536,7 +685,7 @@ def generate_reengineered_system_architecture(output_path='write_up/preview_figu
     ax.axis('off')
 
     ax.text(58.0, 103.5, 'Autonomous Mobile Robot Cognitive System Architecture',
-            fontsize=12.5, fontweight='bold', ha='center', va='top', color='#0F172A')
+            fontsize=13.0, fontweight='bold', ha='center', va='top', color='#0F172A')
 
     # All Tiers share the EXACT same width: tier_w = 98.0, x=8.0 to x=106.0
     tier_w = 98.0
@@ -547,114 +696,86 @@ def generate_reengineered_system_architecture(output_path='write_up/preview_figu
     ax.add_patch(t1_box)
     embed_photo_clean(ax, 'write_up/figures/camera_gimbal.png', tier_x + 2.0, 83.5, 18, 15, border_c='#0284C7')
     embed_photo_clean(ax, 'write_up/figures/ms200_lidar.jpg', tier_x + tier_w - 20.0, 83.5, 18, 15, border_c='#0284C7')
-    ax.text(57.0, 96.5, 'Tier 1: Physical Sensing & Environment Transduction', fontsize=8.8, fontweight='bold', ha='center', color='#0F172A')
+    ax.text(57.0, 96.8, 'Tier 1: Physical Sensing & Environment Transduction', fontsize=9.4, fontweight='bold', ha='center', color='#0F172A')
     t1_desc = (
-        "• 2MP Camera on 2-DOF Gimbal: 640×480 @ 20 FPS (/camera/image_raw)\n"
-        "• MS200 2D ToF LiDAR: 360° Planar Sweep, 0.12–12 m @ 12.5 Hz (/scan)\n"
-        "• Onboard MPU6050 6-Axis IMU: Real-Time Inertial Transduction @ 50 Hz"
+        "• 2MP Monocular RGB Vision on Active 2-DOF Pan/Tilt Gimbal\n"
+        "• MS200 2D ToF LiDAR (360° Planar Laser Range Scanning)\n"
+        "• Onboard 6-Axis IMU (Real-Time Inertial Transduction)"
     )
-    ax.text(57.0, 93.2, t1_desc, fontsize=6.5, ha='center', va='top', color='#334155', linespacing=1.22)
+    ax.text(57.0, 93.2, t1_desc, fontsize=7.5, ha='center', va='top', color='#334155', linespacing=1.45)
 
     ax.annotate('', xy=(57.0, 75.0), xytext=(57.0, 82.0), arrowprops=dict(arrowstyle='->', lw=1.6, color='#0284C7'))
-    ax.text(57.0, 78.5, 'Raw Sensor Telemetry (/camera/image_raw, /scan, /imu/data)', fontsize=6.6, ha='center', va='center',
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#38BDF8', lw=0.8))
+    ax.text(57.0, 78.5, 'Raw Sensor Telemetry (/camera/image_raw, /scan, /imu/data_raw)', fontsize=7.2, ha='center', va='center',
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#38BDF8', lw=0.8))
 
-    # Tier 2: Spatial Gating & Skeletal Tracking (With robot camera POV + Right Badge)
+    # Tier 2: Spatial Gating & Skeletal Tracking (With robot camera POV on left)
     t2_box = patches.FancyBboxPatch((tier_x, 59.5), tier_w, 15.5, boxstyle='round,pad=0.35', fc='#F0F9FF', ec='#0284C7', lw=1.6)
     ax.add_patch(t2_box)
     embed_photo_clean(ax, 'write_up/figures/robot_spatial_zone_blurred.jpg', tier_x + 2.0, 60.5, 18, 13.5, border_c='#0284C7')
-    
-    # Right-side Spatial Zone Badge
-    t2_badge = patches.FancyBboxPatch((tier_x + tier_w - 20.0, 60.5), 18, 13.5, boxstyle='round,pad=0.2', fc='#E0F2FE', ec='#0284C7', lw=1.1)
-    ax.add_patch(t2_badge)
-    ax.text(tier_x + tier_w - 11.0, 70.8, 'CENTRAL HUD\n[45% × 65%]', fontsize=6.6, fontweight='bold', ha='center', va='center', color='#0369A1')
-    ax.text(tier_x + tier_w - 11.0, 64.5, '• Centroid Gating\n• ex = Cx - 320\n• Periphery Drop\n• Bystander Lock',
-            fontsize=5.8, ha='center', va='center', color='#0C4A6E', linespacing=1.18)
 
-    ax.text(tier_x + 22.0, 71.8, 'Tier 2: Edge Perception & Spatial Acceptance Gating', fontsize=8.8, fontweight='bold', color='#0369A1')
+    ax.text(tier_x + 23.0, 72.0, 'Tier 2: Edge Perception & Spatial Acceptance Gating', fontsize=9.6, fontweight='bold', color='#0369A1')
     t2_desc = (
-        "• YOLOv8n Gating: Isolates candidate operator within 45% W × 65% H ROI\n"
-        "• Bystander Lockout: Peripheral detections dropped to prevent spurious tracking\n"
-        "• MediaPipe HandLandmarker: Localizes 21 3D anatomical hand landmarks"
+        "• YOLOv8n Neural Person Detection & Centroid Spatial Gating\n"
+        "• Central 45% × 65% Interaction HUD: Automatically Discards Peripheral Bystanders\n"
+        "• MediaPipe HandLandmarker: Localizes 21 3D Anatomical Landmarks in Real Time"
     )
-    ax.text(tier_x + 22.0, 68.8, t2_desc, fontsize=6.5, va='top', color='#1E293B', linespacing=1.22)
+    ax.text(tier_x + 23.0, 68.8, t2_desc, fontsize=7.6, va='top', color='#1E293B', linespacing=1.45)
 
     ax.annotate('', xy=(57.0, 52.5), xytext=(57.0, 59.5), arrowprops=dict(arrowstyle='->', lw=1.6, color='#0284C7'))
-    ax.text(57.0, 56.0, '21 Hand Landmarks & Isolated Operator Centroid', fontsize=6.6, ha='center', va='center',
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#64748B', lw=0.8))
+    ax.text(57.0, 56.0, '21 Hand Landmarks & Isolated Operator Centroid', fontsize=7.2, ha='center', va='center',
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#64748B', lw=0.8))
 
-    # Tier 3: Feature Extraction & Neural Classifier (Real Hand + Right Badge)
+    # Tier 3: Feature Extraction & Neural Classifier (Real Hand Landmarks on left)
     t3_box = patches.FancyBboxPatch((tier_x, 37.0), tier_w, 15.5, boxstyle='round,pad=0.35', fc='#FEFCE8', ec='#EAB308', lw=1.6)
     ax.add_patch(t3_box)
     embed_photo_clean(ax, 'write_up/figures/real_hand_landmarks_annotated.png', tier_x + 2.0, 38.0, 18, 13.5, border_c='#EAB308')
-    
-    # Right-side MLP Classifier Badge
-    t3_badge = patches.FancyBboxPatch((tier_x + tier_w - 20.0, 38.0), 18, 13.5, boxstyle='round,pad=0.2', fc='#FEF9C3', ec='#EAB308', lw=1.1)
-    ax.add_patch(t3_badge)
-    ax.text(tier_x + tier_w - 11.0, 48.3, 'MLP CLASSIFIER\n[ONNX Runtime]', fontsize=6.6, fontweight='bold', ha='center', va='center', color='#A16207')
-    ax.text(tier_x + tier_w - 11.0, 42.0, '• 19-D Invariant\n• 64 → 32 ReLUs\n• 1.2 ms Latency\n• 99.38% Test Acc',
-            fontsize=5.8, ha='center', va='center', color='#713F12', linespacing=1.18)
 
-    ax.text(tier_x + 22.0, 49.3, 'Tier 3: Geometric Feature Extraction & Neural Classifier', fontsize=8.8, fontweight='bold', color='#A16207')
+    ax.text(tier_x + 23.0, 49.5, 'Tier 3: Geometric Feature Extraction & Neural Classifier', fontsize=9.6, fontweight='bold', color='#A16207')
     t3_desc = (
-        "• 19-D Feature Vector: Scale & distance-invariant curls, spreads, and distances\n"
-        "• MLP Architecture: 19 → 64 (ReLU) → 32 (ReLU) → 6 (Softmax) Classifier\n"
-        "• Edge Inference: ONNX Runtime native execution @ 10 Hz | 1.2 ms latency"
+        "• 19-D Translation-, Scale- & Distance-Invariant Geometric Feature Extraction\n"
+        "• Multilayer Perceptron (MLP) Deep Neural Gesture Recognition Network\n"
+        "• Real-Time Edge Inference Engine via Native Embedded ONNX Runtime Execution"
     )
-    ax.text(tier_x + 22.0, 46.3, t3_desc, fontsize=6.5, va='top', color='#422006', linespacing=1.22)
+    ax.text(tier_x + 23.0, 46.2, t3_desc, fontsize=7.6, va='top', color='#422006', linespacing=1.45)
 
     ax.annotate('', xy=(57.0, 30.0), xytext=(57.0, 37.0), arrowprops=dict(arrowstyle='->', lw=1.6, color='#EAB308'))
-    ax.text(57.0, 33.5, 'Discrete Gesture Tokens (/cognition/gesture)', fontsize=6.6, ha='center', va='center',
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#EAB308', lw=0.8))
+    ax.text(57.0, 33.5, 'Discrete Gesture Tokens (/cognition/gesture)', fontsize=7.2, ha='center', va='center',
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#EAB308', lw=0.8))
 
-    # Tier 4: Cognition & Supervisory Control (Balanced with Left and Right Badges)
+    # Tier 4: Cognition & Supervisory Control (Clean Full-Width Left-Aligned Box)
     t4_box = patches.FancyBboxPatch((tier_x, 14.5), tier_w, 15.5, boxstyle='round,pad=0.35', fc='#FAF5FF', ec='#A855F7', lw=1.6)
     ax.add_patch(t4_box)
-    
-    # Left Cognition Diagram Badge
-    cog_card = patches.FancyBboxPatch((tier_x + 2.0, 15.5), 18, 13.5, boxstyle='round,pad=0.2', fc='#F3E8FF', ec='#A855F7', lw=1.1)
-    ax.add_patch(cog_card)
-    ax.text(tier_x + 11.0, 25.8, 'SUPERVISORY\nCOGNITION', fontsize=6.6, fontweight='bold', ha='center', va='center', color='#7E22CE')
-    ax.text(tier_x + 11.0, 19.5, '• 5-State FSM\n• 3/5 Consensus\n• LSTM Predictor\n• 1.5s Horizon',
-            fontsize=5.8, ha='center', va='center', color='#4C1D95', linespacing=1.18)
 
-    # Right Safety Interlock Badge
-    safety_card = patches.FancyBboxPatch((tier_x + tier_w - 20.0, 15.5), 18, 13.5, boxstyle='round,pad=0.2', fc='#FEE2E2', ec='#DC2626', lw=1.1)
-    ax.add_patch(safety_card)
-    ax.text(tier_x + tier_w - 11.0, 25.8, 'SAFETY\nINTERLOCK', fontsize=6.6, fontweight='bold', ha='center', va='center', color='#991B1B')
-    ax.text(tier_x + tier_w - 11.0, 19.5, '• LiDAR < 0.36m\n• Async Preemption\n• Zero Latency\n• ISO 15066 Safe',
-            fontsize=5.8, ha='center', va='center', color='#7F1D1D', linespacing=1.18)
-
-    ax.text(tier_x + 22.0, 26.8, 'Tier 4: Supervisory Cognition & Trajectory Planning', fontsize=8.8, fontweight='bold', color='#7E22CE')
+    ax.text(tier_x + 6.0, 27.2, 'Tier 4: Supervisory Cognition & Trajectory Planning', fontsize=9.6, fontweight='bold', color='#7E22CE')
     t4_desc = (
-        "• ROS 2 brain_node: 5-State Machine with sliding window consensus filter (3/5)\n"
-        "• LSTM Intent Predictor: 5-step ahead human trajectory forecasting (1.5s horizon)\n"
-        "• Deterministic Safety: Direct preemption on LiDAR proximity (< 0.36 m)"
+        "• Supervisory Finite State Machine (brain_node) with Temporal Consensus Filter\n"
+        "• LSTM Recurrent Neural Network for 5-Step Operator Path Forecasting (1.5 s Lookahead)\n"
+        "• Nav2 Autonomous Path Planner, Dynamic Obstacle Costmaps & Trajectory Dispatch"
     )
-    ax.text(tier_x + 22.0, 23.8, t4_desc, fontsize=6.5, va='top', color='#3B0764', linespacing=1.22)
+    ax.text(tier_x + 6.0, 23.8, t4_desc, fontsize=7.6, va='top', color='#3B0764', linespacing=1.45)
 
     ax.annotate('', xy=(57.0, 7.5), xytext=(57.0, 14.5), arrowprops=dict(arrowstyle='->', lw=1.6, color='#A855F7'))
-    ax.text(57.0, 11.0, 'Velocity Setpoints (/cmd_vel via micro-ROS UART @ 921,600 baud)', fontsize=6.6, ha='center', va='center',
-            bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#A855F7', lw=0.8))
+    ax.text(57.0, 11.0, 'Velocity Setpoints (/cmd_vel)  |  micro-ROS Bridge (921,600 baud)', fontsize=7.2, ha='center', va='center',
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#A855F7', lw=0.8))
 
     # Tier 5: Physical Execution & Mechatronics
     t5_box = patches.FancyBboxPatch((tier_x, -10.0), tier_w, 17.5, boxstyle='round,pad=0.35', fc='#F0FDF4', ec='#16A34A', lw=1.6)
     ax.add_patch(t5_box)
     embed_photo_clean(ax, 'write_up/figures/microros_control_board.jpg', tier_x + 2.0, -8.5, 18, 14.5, border_c='#16A34A')
     embed_photo_clean(ax, 'write_up/figures/assembled_robot_real.jpg', tier_x + tier_w - 20.0, -8.5, 18, 14.5, border_c='#16A34A')
-    ax.text(tier_x + 22.0, 4.5, 'Tier 5: Real-Time Actuation, Motor Control & Mobile Base', fontsize=9.0, fontweight='bold', color='#15803D')
+    ax.text(tier_x + 22.0, 4.8, 'Tier 5: Real-Time Actuation & Mobile Base', fontsize=9.4, fontweight='bold', color='#15803D')
     t5_desc = (
-        "• ESP32-S3 micro-ROS Client: Deterministic 50 Hz closed-loop PID velocity control\n"
-        "• Actuation Subsystem: 4× 310 DC Geared Motors with 1:45 Planetary Gearboxes\n"
-        "• Odometry Feedback: Dual-channel optical quadrature encoders publish /odom_raw"
+        "• FreeRTOS micro-ROS Client Running 50 Hz Closed-Loop Velocity PID\n"
+        "• 4-Channel DC Motor PWM Bridges & Quadrature Optical Encoder Decoding\n"
+        "• 4WD Differential-Drive Base Executing Smooth Trajectories"
     )
-    ax.text(tier_x + 22.0, 1.5, t5_desc, fontsize=6.6, va='top', color='#14532D', linespacing=1.22)
+    ax.text(tier_x + 22.0, 1.5, t5_desc, fontsize=7.5, va='top', color='#14532D', linespacing=1.45)
 
     # Direct LiDAR Safety Bypass Interlock Line (Red dashed line down to Tier 4)
-    ax.plot([102, 110, 110, 106], [83.5, 83.5, 22.0, 22.0], color='#DC2626', lw=1.8, linestyle='--')
-    ax.annotate('', xy=(106, 22.0), xytext=(108, 22.0), arrowprops=dict(arrowstyle='->', lw=1.8, color='#DC2626'))
+    ax.plot([102, 110, 110, tier_x + tier_w], [83.5, 83.5, 22.0, 22.0], color='#DC2626', lw=1.8, linestyle='--')
+    ax.annotate('', xy=(tier_x + tier_w, 22.0), xytext=(tier_x + tier_w + 3.0, 22.0), arrowprops=dict(arrowstyle='->', lw=1.8, color='#DC2626'))
     ax.text(111.5, 52.0, 'DIRECT HARDWARE SAFETY BYPASS (LiDAR Obstacle < 0.36 m → Immediate Halt)',
-            fontsize=6.2, fontweight='bold', color='#DC2626', rotation=-90, va='center', ha='left')
+            fontsize=6.8, fontweight='bold', color='#DC2626', rotation=-90, va='center', ha='left')
 
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
     plt.close()
@@ -665,13 +786,13 @@ def generate_reengineered_system_architecture(output_path='write_up/preview_figu
 # 6. DOCKER DEPLOYMENT ARCHITECTURE (Publication Grade, Zero Text Collisions)
 # ==============================================================================
 def generate_reengineered_docker_deployment(output_path='write_up/preview_figures/preview_fig_docker_deployment.png'):
-    fig, ax = plt.subplots(figsize=(13.6, 8.0), dpi=300)
-    ax.set_xlim(0, 136)
+    fig, ax = plt.subplots(figsize=(14.2, 8.2), dpi=300)
+    ax.set_xlim(0, 140)
     ax.set_ylim(0, 94)
     ax.axis('off')
 
     # Main Title
-    ax.text(68, 91.5, 'Containerized Multi-Node Deployment Architecture (Docker Host Mode & DDS Loopback)',
+    ax.text(70, 91.8, 'Containerized Multi-Node Deployment Architecture (Docker Host Mode & DDS Loopback)',
             fontsize=12.5, fontweight='bold', ha='center', va='top', color='#0F172A')
 
     # --------------------------------------------------------------------------
@@ -681,12 +802,12 @@ def generate_reengineered_docker_deployment(output_path='write_up/preview_figure
                                       fc='#F8FAFC', ec='#475569', lw=1.8, linestyle='--')
     ax.add_patch(host_box)
     
-    # Unified Header Bar across top of Pi 5 host (x=6 to 86, y=80.0 to 85.8)
+    # Unified Header Bar across top of Pi 5 host (x=6 to 86, y=79.8 to 85.6)
     hdr_box = patches.FancyBboxPatch((6, 79.8), 80, 5.8, boxstyle='round,pad=0.2', fc='#E2E8F0', ec='#94A3B8', lw=1.0)
     ax.add_patch(hdr_box)
     ax.text(46, 83.6, 'Primary Embedded Host Computer: Raspberry Pi 5 (8GB DDR4 RAM)',
             fontsize=8.6, fontweight='bold', ha='center', va='center', color='#0F172A')
-    ax.text(46, 81.4, 'Ubuntu 24.04 LTS (Kernel 6.8)  |  Docker Engine 24.0  |  Network: --net=host',
+    ax.text(46, 81.4, 'Linux Host OS  |  Docker Containers: Ubuntu 20.04 (ROS 2 Humble)  |  --net=host',
             fontsize=7.2, ha='center', va='center', color='#475569', style='italic')
 
     # 1. Container: yahboom_base (Hardware Drivers) - Top Left (x=7 to 43, y=44 to 77)
@@ -706,21 +827,22 @@ def generate_reengineered_docker_deployment(output_path='write_up/preview_figure
     )
     ax.text(8.5, 68.8, c1_text, fontsize=6.8, va='top', color='#1E293B', linespacing=1.28)
 
-    # 2. Container: micro_ros_agent (Bridge) - Bottom Left (x=7 to 43, y=8 to 40)
-    c2_box = patches.FancyBboxPatch((7, 8), 36, 32, boxstyle='round,pad=0.3', fc='#FEFCE8', ec='#EAB308', lw=1.4)
+    # 2. Container: micro_ros_agent (Bridge) - Bottom Left (x=7 to 43, y=8 to 41)
+    c2_box = patches.FancyBboxPatch((7, 8), 36, 33, boxstyle='round,pad=0.3', fc='#FEFCE8', ec='#EAB308', lw=1.4)
     ax.add_patch(c2_box)
-    ax.text(25, 37.2, 'Container: micro_ros_agent\n[Deterministic Hardware Bridge]',
+    ax.text(25, 37.7, 'Container: micro_ros_agent\n[Deterministic Hardware Bridge]',
             fontsize=8.2, fontweight='bold', ha='center', va='center', color='#A16207', linespacing=1.2)
-    ax.plot([7, 43], [33.5, 33.5], color='#EAB308', lw=0.9)
+    ax.plot([7, 43], [34.0, 34.0], color='#EAB308', lw=0.9)
     c2_text = (
         "• micro-ROS Agent Daemon (Client Bridge)\n"
         "• Hardware UART Link @ 921,600 Baud\n"
         "• Subscribes: /cmd_vel (Twist Commands)\n"
         "• Publishes: /odom_raw (Wheel Ticks)\n"
-        "• Publishes: /battery_state (12.6V Telemetry)\n"
-        "• Deterministic 50 Hz Hardware Clock"
+        "• Publishes: /battery_state (7.4V Telemetry)\n"
+        "• Deterministic 50 Hz Hardware Clock\n"
+        "• Target: ESP32-S3 Motor Co-Processor"
     )
-    ax.text(8.5, 31.8, c2_text, fontsize=6.8, va='top', color='#422006', linespacing=1.28)
+    ax.text(8.5, 32.2, c2_text, fontsize=6.8, va='top', color='#422006', linespacing=1.28)
 
     # 3. Container: yahboom_gesture (Cognition Pipeline) - Middle Column (x=50 to 86, y=8 to 77)
     c3_box = patches.FancyBboxPatch((50, 8), 36, 69, boxstyle='round,pad=0.3', fc='#F0FDF4', ec='#16A34A', lw=1.5)
@@ -729,21 +851,30 @@ def generate_reengineered_docker_deployment(output_path='write_up/preview_figure
             fontsize=8.4, fontweight='bold', ha='center', va='center', color='#15803D', linespacing=1.2)
     ax.plot([50, 86], [70.5, 70.5], color='#16A34A', lw=0.9)
 
-    c3_sections = [
+    # 4 Well-Spaced Node Tiles Inside yahboom_gesture filling from y=70 down to y=10
+    nodes = [
         ("1. camera_pub (20 FPS)",
-         "• Video capture: /dev/video0\n• Publishes: /camera/image_raw", 68.2),
+         "• Video capture: /dev/video0\n• Publishes: /camera/image_raw (Compressed)", 58.5, 11.5),
         ("2. person_detection_node (YOLOv8n)",
-         "• Spatial zone gating (45% W × 65% H)\n• Isolates closest operator in frame\n• Publishes: /cognition/detection", 58.8),
+         "• Spatial ROI gate [45% × 65%]\n• Isolates closest interacting operator\n• Publishes: /cognition/detection", 43.0, 13.5),
         ("3. gesture_node (10 Hz, 1.2 ms)",
-         "• MediaPipe HandLandmarker (21 3D pts)\n• 19 Geometric Feature extraction\n• MLP ONNX Classifier (99.38% test acc)\n• Publishes: /cognition/gesture", 46.2),
+         "• MediaPipe HandLandmarker (21 3D pts)\n• 19-D invariant feature extraction\n• MLP ONNX classifier (99.38% test acc)\n• Publishes: /cognition/gesture", 26.5, 14.5),
         ("4. brain_node (Supervisory Logic)",
-         "• 3/5 Majority filter & 3s execution lock\n• Visual servoing steering (Kp = 1.5)\n• LiDAR Emergency Preemption (< 0.36 m)\n• Publishes: /cmd_vel to motor base", 29.5),
+         "• 3/5 Majority filter & 3.0s subject lock\n• Visual servoing follow mode (Kp = 1.5)\n• LiDAR Emergency Preemption (< 0.36m)\n• Publishes: /cmd_vel_gesture (Pri 40)", 9.5, 15.0),
     ]
-    for sec_title, sec_body, y_pos in c3_sections:
-        ax.text(52, y_pos, sec_title, fontsize=7.1, fontweight='bold', color='#15803D')
-        ax.text(53, y_pos - 1.6, sec_body, fontsize=6.5, va='top', color='#14532D', linespacing=1.22)
+    for n_title, n_body, n_y, n_h in nodes:
+        n_box = patches.FancyBboxPatch((51.5, n_y), 33.0, n_h, boxstyle='round,pad=0.18', fc='#FFFFFF', ec='#86EFAC', lw=1.0)
+        ax.add_patch(n_box)
+        ax.text(53.0, n_y + n_h - 2.2, n_title, fontsize=6.9, fontweight='bold', color='#15803D')
+        ax.text(53.0, n_y + n_h - 4.2, n_body, fontsize=6.1, va='top', color='#14532D', linespacing=1.2)
 
-    # Inter-Container Connectors (DDS Shared Memory Loopback) - Clean 7-unit channel (x=43 to 50)
+    # Connecting arrows between pipeline nodes in the gaps
+    arrow_gaps = [(58.5, 56.5), (43.0, 41.0), (26.5, 24.5)]
+    for top_y, bot_y in arrow_gaps:
+        ax.annotate('', xy=(68.0, bot_y), xytext=(68.0, top_y),
+                    arrowprops=dict(arrowstyle='->', lw=1.4, color='#15803D'))
+
+    # Inter-Container Connectors (DDS Shared Memory Loopback) - Clean channel (x=43 to 50)
     ax.annotate('', xy=(50, 60), xytext=(43, 60), arrowprops=dict(arrowstyle='<->', lw=1.8, color='#3B82F6'))
     ax.text(46.5, 64.2, 'DDS Loopback\n/scan, /camera', fontsize=6.0, ha='center', va='center',
             fontweight='bold', color='#1D4ED8',
@@ -755,40 +886,49 @@ def generate_reengineered_docker_deployment(output_path='write_up/preview_figure
             bbox=dict(boxstyle='round,pad=0.18', fc='white', ec='#D97706', lw=0.8))
 
     # --------------------------------------------------------------------------
-    # RIGHT CONTAINER: Engineering Host Workstation (x=102 to 134, y=6 to 87)
+    # RIGHT CONTAINER: Engineering Host Workstation (x=98 to 136, y=6 to 87)
     # --------------------------------------------------------------------------
-    ws_box = patches.FancyBboxPatch((102, 6), 32, 81, boxstyle='round,pad=0.7',
+    ws_box = patches.FancyBboxPatch((98, 6), 38, 81, boxstyle='round,pad=0.7',
                                     fc='#FAF5FF', ec='#9333EA', lw=1.8)
     ax.add_patch(ws_box)
-    ax.text(118, 83.6, 'Engineering Host Workstation\n(x86_64 Development PC)',
+    ax.text(117, 83.6, 'Engineering Host Workstation\n(x86_64 Development PC)',
             fontsize=8.6, fontweight='bold', ha='center', va='center', color='#7E22CE', linespacing=1.2)
-    ax.plot([102, 134], [79.8, 79.8], color='#9333EA', lw=0.9)
+    ax.plot([98, 136], [79.8, 79.8], color='#9333EA', lw=0.9)
 
-    ws_text = (
-        "• Compute Workstation:\n"
-        "  AMD Ryzen 5 | 8GB RAM | Ubuntu 24.04\n"
-        "  ROS 2 Humble Development Workspace\n\n"
-        "• RViz2 Operational Visualization:\n"
-        "  - /scan (LiDAR 2D planar point cloud)\n"
-        "  - /map (SLAM Toolbox occupancy grid)\n"
-        "  - /tf dynamic coordinate frames tree\n"
-        "  - Camera compressed frame display\n\n"
-        "• Safety & Manual Intervention:\n"
-        "  - Low-latency joystick override (/joy)\n"
-        "  - Asynchronous teleoperation E-stop\n\n"
-        "• Simulation & Sim-to-Real Twin:\n"
-        "  - Gazebo Harmonic digital twin physics\n"
-        "  - Sensor noise & friction calibration\n\n"
-        "• Deep Learning Edge Toolchain:\n"
-        "  - PyTorch MLP & LSTM gesture training\n"
-        "  - ONNX runtime model optimization"
-    )
-    ax.text(104, 77.2, ws_text, fontsize=6.6, va='top', color='#3B0764', linespacing=1.24)
+    # 4 Elegant Functional Cards Filling the Workstation from y=78 down to y=8 (ZERO WHITE SPACE!)
+    ws_cards = [
+        ("Compute Host & Software Stack",
+         "• AMD Ryzen 5 Hexa-Core CPU | 8GB DDR4 RAM\n"
+         "• Host OS: Ubuntu 24.04 LTS (Noble Numbat)\n"
+         "• ROS 2 Jazzy Jalisco Development Workspace\n"
+         "• Shared DDS Middleware (ROS_DOMAIN_ID=0)", 62.5, 15.5, '#7C3AED', '#F3E8FF'),
+        ("RViz2 Visualization & SLAM Operations",
+         "• /scan (MS200 LiDAR 2D Planar Point Cloud)\n"
+         "• /map (SLAM Toolbox Occupancy Grid Map)\n"
+         "• /tf Dynamic Coordinate Frames Tree\n"
+         "• Live Compressed Video Camera Display", 44.5, 16.0, '#2563EB', '#EFF6FF'),
+        ("Gazebo Harmonic Digital Twin Simulation",
+         "• Sim-to-Real Multi-Body Dynamics & Physics\n"
+         "• Virtual Planar LiDAR & 6-Axis IMU Models\n"
+         "• Wheel Slip & Surface Friction Calibration\n"
+         "• Synthetic Sensor Noise Benchmarking", 26.5, 16.0, '#0D9488', '#F0FDFA'),
+        ("Safety Teleoperation & ML Optimization",
+         "• /joy Low-Latency Bluetooth Joystick Teleop\n"
+         "• Priority 90 Hardware E-Stop Cutoff Override\n"
+         "• PyTorch Gesture Training Pipeline (MLP/LSTM)\n"
+         "• ONNX Runtime Edge Model Quantization", 8.5, 16.0, '#DC2626', '#FEF2F2'),
+    ]
 
-    # High-Speed Wi-Fi DDS Network Link in Wide 14-unit Channel (x=88 to 102) - ZERO OVERLAP!
-    ax.annotate('', xy=(102, 45), xytext=(88, 45),
+    for c_title, c_text, c_y, c_h, ec_c, fc_c in ws_cards:
+        c_patch = patches.FancyBboxPatch((99.8, c_y), 34.4, c_h, boxstyle='round,pad=0.2', fc=fc_c, ec=ec_c, lw=1.1)
+        ax.add_patch(c_patch)
+        ax.text(101.5, c_y + c_h - 2.3, c_title, fontsize=6.8, fontweight='bold', color=ec_c)
+        ax.text(101.5, c_y + c_h - 4.4, c_text, fontsize=6.0, va='top', color='#1E293B', linespacing=1.22)
+
+    # High-Speed Wi-Fi DDS Network Link in Clean Center Channel (x=88 to 98)
+    ax.annotate('', xy=(98, 45), xytext=(88, 45),
                 arrowprops=dict(arrowstyle='<->', lw=2.2, color='#7C3AED', linestyle=':'))
-    ax.text(95.0, 50.5, 'Wi-Fi 5 GHz DDS Link\nROS_DOMAIN_ID=0', fontsize=6.8, ha='center', va='bottom',
+    ax.text(93.0, 50.5, 'Wi-Fi 5 GHz\nDDS Link\nDOMAIN=0', fontsize=6.5, ha='center', va='bottom',
             fontweight='bold', color='#6D28D9',
             bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='#7C3AED', lw=0.9))
 

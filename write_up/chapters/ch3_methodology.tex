@@ -120,6 +120,8 @@ Ubuntu 24.04 LTS & Development Workstation & Host operating system for code deve
 \hline
 ROS2 Jazzy Jalisco & Development Workstation & Development middleware used for 3D spatial visualization (RViz2) and simulated testing. \\
 \hline
+Ubuntu 20.04 LTS & Robot (Docker Container) & Containerized Linux base environment hosting ROS2 Humble and hardware driver stacks. \\
+\hline
 ROS2 Humble Hawksbill & Robot (Docker Container) & Deployed robotics middleware providing reliable inter-process messaging via DDS transport. \\
 \hline
 Docker Engine 26.1 & Robot (Raspberry Pi 5) & Virtualization engine providing isolated, reproducible software containers on the mobile host. \\
@@ -188,7 +190,7 @@ All three containers are built upon Yahboom's official base image (\texttt{yahbo
 
 All three containers are launched in Docker's \texttt{host} network mode, allowing them to share the host network stack directly rather than communicating through virtual network bridges. This direct communication allows ROS2's built-in discovery service to link nodes across container boundaries with sub-millisecond latency. Crucially, all containers must share an identical communication channel setting known as the \texttt{ROS\_DOMAIN\_ID}; during early system integration, an elusive communication failure occurred when the base container defaulted to domain 20 while custom nodes ran on domain 0, causing the robot to silently drop commands until all containers were unified to \texttt{ROS\_DOMAIN\_ID=0}.
 
-Finally, to make the robot fully self-sufficient upon battery power-up, all software containers are automatically initialized by an operating system background service (\texttt{cognition.service}). This ensures that the robot immediately begins listening for human gestures the moment the physical power switch is flipped, without requiring manual keyboard input. During testing, the robot operates headlessly without a monitor to conserve battery and memory, while developers monitor spatial maps and diagnostic cameras remotely over Wi-Fi using RViz2 on an \texttt{x86\_64} engineering host workstation (AMD Ryzen 5, 8GB DDR4 RAM). Figure~\ref{fig:docker_deployment} illustrates this containerized multi-node deployment architecture.
+Finally, to make the robot fully self-sufficient upon battery power-up, all software containers are automatically initialized by an operating system background service (\texttt{cognition.service}). This ensures that the robot immediately begins listening for human gestures the moment the physical power switch is flipped, without requiring manual keyboard input. During testing, the robot operates headlessly without a monitor to conserve battery and memory, while developers monitor spatial maps and diagnostic cameras remotely over Wi-Fi using RViz2 on an \texttt{x86\_64} engineering host workstation (AMD Ryzen 5, 8GB DDR4 RAM running Ubuntu 24.04 LTS and ROS2 Jazzy Jalisco). Figure~\ref{fig:docker_deployment} illustrates this containerized multi-node deployment architecture.
 
 \begin{figure}[H]
 \centering
