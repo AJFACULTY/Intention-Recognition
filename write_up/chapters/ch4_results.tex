@@ -55,6 +55,15 @@ Back & 30 & 30 & 100.0\% \\
 
 Directional commands (Left, Right, and Back) achieved perfect accuracy (100\%) across all 30 trials because their geometric pointing vectors are distinct and easily separated by the feature extractor. Follow and Go achieved 96.7\% and 93.3\% accuracy respectively, demonstrating consistent classification during active interaction. Stop achieved 90.0\% accuracy (27 out of 30 successful trials); the three unclassified instances occurred when an operator presented their open palm at an oblique angle relative to the camera lens, which slightly compressed the observed hand landmarks. In total, 174 out of 180 physical trials were recognized correctly, yielding an aggregate mean physical accuracy of 96.67\%.
 
+To evaluate environmental robustness, physical trials were systematically stratified across operational distances (1.00\,m, 1.75\,m, and 2.50\,m) and ambient lighting environments (natural daylight versus artificial fluorescent illumination). At 1.00\,m proximity, the system achieved 100.0\% accuracy (54 out of 54 trials), while at 1.75\,m and 2.50\,m, recognition rates recorded 97.2\% (70 out of 72 trials) and 92.6\% (50 out of 54 trials), respectively. Across ambient illumination conditions, classification accuracy remained identical at 96.7\% (87 out of 90 trials) under both natural daylight and indoor fluorescent fixtures. As illustrated in Figure~\ref{fig:accuracy_by_condition}, this consistent operational performance confirms that the 19-dimensional geometric feature engineering framework maintains robust classification across varied operational distances and indoor lighting regimes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_accuracy_by_condition.png}
+\caption{Observed physical gesture classification accuracy across (a) discrete vocabulary classes and (b) experimental testing regimes (operational distance and ambient illumination) across all 180 physical trials.}
+\label{fig:accuracy_by_condition}
+\end{figure}
+
 Figure~\ref{fig:per_class_accuracy} illustrates the corresponding test-set classification accuracy across all six gesture classes from the offline dataset evaluation. The offline model maintained accuracy above 98.70\% across all classes, reaching 99.80\% for Right and 99.70\% for Stop. This close agreement confirms that the high theoretical accuracy of the trained multilayer perceptron model transferred reliably to physical deployment.
 
 \begin{figure}[H]
@@ -254,6 +263,17 @@ To evaluate the real-time responsiveness of the robot during physical human inte
 \hline
 \end{tabular}
 \end{table}
+
+While Table~\ref{tab:latency_budget} delineates the nominal stage-by-stage latency budget, live execution over the 180 physical trials exhibited small, deterministic runtime variations due to Linux scheduler slicing and sensor bus timing. Statistical analysis of the logged telemetry revealed an empirical end-to-end turnaround latency mean of 132.61\,ms with a standard deviation of $\pm 3.82$\,ms, a median of 132.60\,ms, an interquartile range (IQR) of 5.73\,ms, and a 95\% confidence interval of $[132.05\,\text{ms}, 133.17\,\text{ms}]$. Across all operational runs, latency peaked at a maximum of 143.8\,ms, maintaining an absolute safety buffer beneath the 150.0\,ms design deadline specified in Engineering Research Question 1.
+
+To rigorously verify whether spatial proximity or ambient lighting introduced latency overheads, inferential hypothesis testing was conducted on the physical trial dataset. A One-Way Analysis of Variance (ANOVA) across the three distance groups (1.00\,m, 1.75\,m, and 2.50\,m) indicated no statistically significant difference in turnaround latency, yielding an $F$-statistic of $F(2, 177) = 0.55$ ($p = 0.580 > 0.05$). Similarly, an independent two-sample Welch's $t$-test comparing natural daylight ($132.72 \pm 3.82$\,ms) against artificial fluorescent illumination ($132.50 \pm 3.83$\,ms) revealed no significant latency variation, $t(178) = 0.37$ ($p = 0.709 > 0.05$). As visualized in the boxplots and jittered scatter distributions in Figure~\ref{fig:latency_boxplot}, these empirical findings confirm that the embedded perception and decision pipeline operates deterministically across varying environmental conditions.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_latency_boxplot.png}
+\caption{Empirical end-to-end command turnaround latency distributions across (a) operational distance and (b) ambient lighting regimes recorded over 180 physical trials. Boxplots depict median and interquartile ranges with overlaid semi-transparent jittered scatter points, referencing the nominal 132.0\,ms design budget and 150.0\,ms ERQ 1 safety threshold.}
+\label{fig:latency_boxplot}
+\end{figure}
 
 \subsection{Benchmarking Analysis}
 To evaluate our system within the context of recent research, we benchmarked our classification and deployment performance against the gesture recognition systems of Mahmud et al. \cite{mahmud2022} and Tsitos et al. \cite{tsitos2022}. Benchmarking provides critical context on how an onboard, edge-deployed vision pipeline compares with existing research implementations. Table~\ref{tab:benchmarking} details this comparison across classifier models, reported accuracies, and deployment platforms.
