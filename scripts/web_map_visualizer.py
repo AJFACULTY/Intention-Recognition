@@ -564,7 +564,7 @@ class MapVisualizerNode(Node):
 
         # Top status banner
         yaw_deg = math.degrees(ryaw)
-        spread_str = f"±{p_spread:.2f}m" if p_spread > 0 else "0.00m"
+        spread_str = f"+/-{p_spread:.2f}m" if p_spread > 0 else "0.00m"
         telemetry_str = (
             f"AMR: ({rx:+.2f}m, {ry:+.2f}m, {yaw_deg:+.0f}deg) | "
             f"AMCL SPREAD: {spread_str} ({p_count}) | "
