@@ -37,7 +37,8 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from nav_msgs.msg import OccupancyGrid, Path
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, Twist
+from std_msgs.msg import UInt16
 from tf2_ros import Buffer, TransformListener, TransformException
 
 
@@ -62,6 +63,12 @@ class MapVisualizerNode(Node):
         self.robot_localized = False
         self.last_pose_time = 0.0
         self.trajectory_history = []  # List of (x, y) visited positions
+
+        # ── Battery & Hardware Safety State (Yahboom Micro-ROS) ──────────────
+        self.battery_voltage = 7.8
+        self.battery_pct = 75
+        self.battery_healthy = True
+        self.battery_last_time = 0.0
 
         # ── Waypoints & Patrol Landmarks ─────────────────────────────────────
         self.corridor_landmarks = [
@@ -117,11 +124,13 @@ class MapVisualizerNode(Node):
             reliability=ReliabilityPolicy.RELIABLE
         )
 
-        # ── Publishers for Interactive Navigation ────────────────────────────
+        # ── Publishers for Navigation & Physical E-Stop ──────────────────────
         self.initial_pose_pub = self.create_publisher(
             PoseWithCovarianceStamped, '/initialpose', 10)
         self.goal_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 10)
+        self.cmd_vel_pub = self.create_publisher(
+            Twist, '/cmd_vel', 10)
 
         # ── Subscriptions ────────────────────────────────────────────────────
         self.create_subscription(OccupancyGrid, '/map', self._map_cb, map_qos)
@@ -132,7 +141,9 @@ class MapVisualizerNode(Node):
         self.create_subscription(Path, '/plan', self._plan_cb, 10)
         self.create_subscription(Path, '/local_plan', self._local_plan_cb, 10)
         self.create_subscription(LaserScan, '/scan_downsampled', self._scan_cb, sensor_qos)
+        self.create_subscription(LaserScan, '/scan', self._scan_cb, sensor_qos)
         self.create_subscription(PoseStamped, '/goal_pose', self._goal_cb, 10)
+        self.create_subscription(UInt16, '/battery', self._battery_cb, 10)
 
         # Periodic TF polling timer (10 Hz)
         self.create_timer(0.1, self._poll_tf_pose)
@@ -291,6 +302,48 @@ class MapVisualizerNode(Node):
             self.goal_x = msg.pose.position.x
             self.goal_y = msg.pose.position.y
 
+    def _battery_cb(self, msg: UInt16):
+        with self.lock:
+            val = float(msg.data)
+            if val > 50.0:  # Yahboom reports voltage * 10 (e.g. 79 = 7.9V)
+                self.battery_voltage = val / 10.0
+                pct = int(max(0, min(100, (self.battery_voltage - 6.8) / (8.4 - 6.8) * 100)))
+                self.battery_pct = pct
+            else:  # Direct percentage
+                self.battery_pct = int(val)
+                self.battery_voltage = 6.8 + (val / 100.0) * 1.6
+            self.battery_healthy = (self.battery_voltage >= 7.0)
+            self.battery_last_time = time.monotonic()
+
+    def emergency_stop(self):
+        """Immediately halts the robot by sending zero velocity and clearing goals."""
+        with self.lock:
+            self.goal_x = None
+            self.goal_y = None
+            self.global_plan_points = []
+            self.local_plan_points = []
+        zero_twist = Twist()
+        for _ in range(5):
+            self.cmd_vel_pub.publish(zero_twist)
+            time.sleep(0.01)
+        self.get_logger().warn('EMERGENCY STOP: Zero velocity published to /cmd_vel.')
+
+    def dispatch_waypoint(self, x: float, y: float, yaw: float = 0.0):
+        """Dispatches a 2D navigation goal to Nav2 on /goal_pose."""
+        msg = PoseStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'map'
+        msg.pose.position.x = float(x)
+        msg.pose.position.y = float(y)
+        msg.pose.position.z = 0.0
+        msg.pose.orientation.z = math.sin(yaw / 2.0)
+        msg.pose.orientation.w = math.cos(yaw / 2.0)
+        self.goal_pub.publish(msg)
+        with self.lock:
+            self.goal_x = float(x)
+            self.goal_y = float(y)
+        self.get_logger().info(f'Dispatched Nav2 Goal: ({x:.2f}m, {y:.2f}m, yaw={math.degrees(yaw):.1f}°)')
+
     def _scan_cb(self, msg: LaserScan):
         """Projects 2D LiDAR ranges into world map coordinates with TF sensor calibration."""
         laser_x, laser_y, laser_yaw = None, None, None
@@ -420,26 +473,19 @@ class MapVisualizerNode(Node):
 
             cv2.addWeighted(cost_overlay, 0.45, resized, 0.55, 0, resized)
 
-        # ── 3. Waypoint Directory Rings & Patrol Route ────────────────────────
+        # ── 3. Subtle Mission Waypoint Pins ───────────────────────────────────
         def draw_wp_ring(img_out, wx, wy, label, col):
             rpx, rpy = w2p_s(wx, wy)
             if 0 <= rpx < img_out.shape[1] and 0 <= rpy < img_out.shape[0]:
-                cv2.circle(img_out, (rpx, rpy), 9, col, 2, cv2.LINE_AA)
+                cv2.circle(img_out, (rpx, rpy), 8, col, 2, cv2.LINE_AA)
                 cv2.circle(img_out, (rpx, rpy), 2, col, -1)
-                cv2.putText(img_out, label, (rpx + 10, rpy + 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.36, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.putText(img_out, label, (rpx + 8, rpy + 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 255), 1, cv2.LINE_AA)
 
         draw_wp_ring(resized, 0.08, 0.05, 'H', (0, 215, 0))       # Home Base (Green)
         draw_wp_ring(resized, 0.40, 0.00, '1', (200, 100, 240))   # WP1 Runway (Purple)
         draw_wp_ring(resized, 0.70, 0.35, '2', (200, 100, 240))   # WP2 Curve (Purple)
         draw_wp_ring(resized, 0.35, 0.15, '3', (200, 100, 240))   # WP3 Return (Purple)
-
-        # Corridor patrol circuit route line
-        circuit = [(0.08, 0.05), (0.40, 0.00), (0.70, 0.35), (0.35, 0.15), (0.08, 0.05)]
-        for ci in range(len(circuit) - 1):
-            p1 = w2p_s(circuit[ci][0], circuit[ci][1])
-            p2 = w2p_s(circuit[ci + 1][0], circuit[ci + 1][1])
-            cv2.line(resized, p1, p2, (200, 80, 220), 1, cv2.LINE_AA)
 
         # ── 4. Traveled Odometry Trail (Warm Amber/Gold Breadcrumbs) ─────────
         if show_tr and len(trail_pts) > 1:
@@ -539,45 +585,13 @@ class MapVisualizerNode(Node):
                 hpy = rv_s - int(round(head_len * sin_a))
                 cv2.arrowedLine(resized, (ru_s, rv_s), (hpx, hpy), (0, 240, 255), 2, tipLength=0.25)
 
-        # ── 11. In-Canvas Semi-Transparent HUD Telemetry Overlay ──────────────
-        box_x, box_y, box_w, box_h = 15, resized.shape[0] - 115, 230, 100
-        overlay = resized.copy()
-        cv2.rectangle(overlay, (box_x, box_y), (box_x + box_w, box_y + box_h), (20, 24, 30), -1)
-        cv2.rectangle(overlay, (box_x, box_y), (box_x + box_w, box_y + box_h), (60, 70, 85), 1)
-        cv2.addWeighted(overlay, 0.85, resized, 0.15, 0, resized)
-
-        cv2.putText(resized, 'WAYPOINT DIRECTORY', (box_x + 10, box_y + 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 220, 255), 1, cv2.LINE_AA)
-
-        dir_items = [
-            ('H', (0, 160, 0), 'HOME: Base (0.08, 0.05)'),
-            ('1', (160, 50, 200), 'WP1: Runway (0.40, 0.00)'),
-            ('2', (160, 50, 200), 'WP2: Curve  (0.70, 0.35)'),
-            ('3', (160, 50, 200), 'WP3: Return (0.35, 0.15)')
-        ]
-        for idx, (lbl, col, desc) in enumerate(dir_items):
-            iy = box_y + 34 + idx * 18
-            cv2.circle(resized, (box_x + 16, iy - 4), 6, col, -1)
-            cv2.circle(resized, (box_x + 16, iy - 4), 6, (255, 255, 255), 1)
-            cv2.putText(resized, desc, (box_x + 28, iy),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, (230, 230, 230), 1, cv2.LINE_AA)
-
-        # Top status banner
-        yaw_deg = math.degrees(ryaw)
-        spread_str = f"+/-{p_spread:.2f}m" if p_spread > 0 else "0.00m"
-        telemetry_str = (
-            f"AMR: ({rx:+.2f}m, {ry:+.2f}m, {yaw_deg:+.0f}deg) | "
-            f"AMCL SPREAD: {spread_str} ({p_count}) | "
-            f"PLAN: {len(plan_pts)} | LIDAR: {len(lidar_pts)}"
-        )
-        cv2.rectangle(resized, (0, 0), (resized.shape[1], 26), (15, 18, 22), -1)
-        cv2.putText(resized, telemetry_str, (12, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (240, 240, 240), 1, cv2.LINE_AA)
-
+        # ── 11. Pure Canvas Output (No burned-in HUD clutter) ─────────────────
         _, buf = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
         return buf.tobytes()
 
     def get_telemetry_dict(self):
         with self.lock:
+            bat_fresh = (time.monotonic() - self.battery_last_time < 5.0) if self.battery_last_time > 0 else False
             return {
                 "x": round(self.robot_x, 3),
                 "y": round(self.robot_y, 3),
@@ -589,6 +603,10 @@ class MapVisualizerNode(Node):
                 "particle_spread": round(self.particle_spread, 3),
                 "local_costmap_active": (time.monotonic() - self.local_costmap_last_time < 3.0),
                 "goal": [round(self.goal_x, 2), round(self.goal_y, 2)] if self.goal_x is not None else None,
+                "battery_voltage": round(self.battery_voltage, 1),
+                "battery_pct": self.battery_pct,
+                "battery_healthy": self.battery_healthy,
+                "battery_fresh": bat_fresh,
                 "toggles": {
                     "costmap": self.show_local_costmap,
                     "particles": self.show_particles,
@@ -613,22 +631,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AMR Cognition — RViz-Equivalent Web Navigation Dashboard</title>
+  <title>AMR Cognition — Autonomous Navigation Console</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     :root {
       --bg: #090d13;
-      --card-bg: #121820;
-      --border: #242c38;
+      --card-bg: #121822;
+      --card-bg-hover: #16202c;
+      --border: #222c3c;
       --text: #c9d1d9;
       --text-bright: #f0f6fc;
       --accent: #58a6ff;
       --green: #2ea043;
+      --green-glow: rgba(46, 160, 67, 0.25);
       --red: #f85149;
+      --red-glow: rgba(248, 81, 73, 0.35);
       --gold: #d29922;
+      --gold-glow: rgba(210, 153, 34, 0.25);
       --purple: #a371f7;
       --cyan: #39c5bb;
     }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 16px 24px;
@@ -642,41 +665,132 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       align-items: center;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
+      gap: 16px;
+      flex-wrap: wrap;
     }
-    h1 {
+    .brand h1 {
       margin: 0;
-      font-size: 1.35rem;
+      font-size: 1.3rem;
       color: var(--text-bright);
       font-weight: 600;
+      letter-spacing: -0.2px;
+    }
+    .sub-title {
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .sys-sub {
+      color: #8b949e;
+      font-size: 0.75rem;
+      margin-top: 3px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .battery-widget {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #161f2b;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+    }
+    .bat-bar-wrap {
+      width: 44px;
+      height: 10px;
+      background: #090d13;
+      border: 1px solid #303e52;
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+    .bat-bar-fill {
+      height: 100%;
+      background: var(--green);
+      transition: width 0.3s, background 0.3s;
     }
     .badge {
-      padding: 4px 10px;
+      padding: 5px 10px;
       border-radius: 12px;
       font-size: 0.72rem;
       font-weight: bold;
-      background: var(--green);
-      color: #fff;
       letter-spacing: 0.5px;
+    }
+    .badge-live {
+      background: rgba(46, 160, 67, 0.2);
+      border: 1px solid var(--green);
+      color: #3fb950;
+    }
+    .badge-healthy {
+      background: rgba(46, 160, 67, 0.2);
+      color: #3fb950;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.72rem;
+    }
+    .badge-warning {
+      background: rgba(248, 81, 73, 0.2);
+      color: #f85149;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.72rem;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    .btn-estop {
+      background: #da3633;
+      border: 1px solid #f85149;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 0 12px var(--red-glow);
+      transition: all 0.2s;
+    }
+    .btn-estop:hover {
+      background: #b62324;
+      box-shadow: 0 0 18px rgba(248, 81, 73, 0.6);
+      transform: scale(1.02);
+    }
+    .btn-estop:active {
+      transform: scale(0.98);
     }
     .toolbar {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 16px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
     }
     .tool-btn {
-      background: #1c2430;
+      background: #182230;
       border: 1px solid var(--border);
       color: var(--text-bright);
       padding: 6px 12px;
       border-radius: 6px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       cursor: pointer;
       font-weight: 500;
       display: inline-flex;
@@ -684,7 +798,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       gap: 6px;
       transition: all 0.2s;
     }
-    .tool-btn:hover { background: #263344; border-color: var(--accent); }
+    .tool-btn:hover { background: #223044; border-color: var(--accent); }
     .tool-btn.active {
       background: #1f4277;
       border-color: var(--accent);
@@ -700,7 +814,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .container {
       display: grid;
       grid-template-columns: 1fr 340px;
-      gap: 20px;
+      gap: 16px;
     }
     @media (max-width: 960px) {
       .container { grid-template-columns: 1fr; }
@@ -710,7 +824,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.5);
       text-align: center;
       user-select: none;
@@ -740,17 +854,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .panel {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 16px;
+      padding: 14px;
     }
     .card h2 {
       margin-top: 0;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: var(--accent);
       border-bottom: 1px solid var(--border);
       padding-bottom: 8px;
@@ -758,35 +872,62 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       justify-content: space-between;
       align-items: center;
     }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .action-btn {
+      background: #182230;
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      font-weight: 500;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .action-btn:hover {
+      background: #233144;
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .action-btn.full-width {
+      grid-column: 1 / -1;
+      justify-content: center;
+      font-weight: 600;
+    }
     .metric-row {
       display: flex;
       justify-content: space-between;
-      margin: 9px 0;
-      font-size: 0.86rem;
+      margin: 8px 0;
+      font-size: 0.82rem;
     }
     .metric-label { color: #8b949e; }
     .metric-value { font-family: monospace; font-weight: bold; color: var(--text-bright); }
-    .legend {
+    .legend-details summary {
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      outline: none;
+      user-select: none;
+    }
+    .legend-list {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      font-size: 0.82rem;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 0.78rem;
     }
     .legend-item { display: flex; align-items: center; gap: 8px; }
-    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-    .pin-badge {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.65rem;
-      font-weight: bold;
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.7);
-      flex-shrink: 0;
-    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
     .toast {
       position: fixed;
       bottom: 24px;
@@ -805,17 +946,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </head>
 <body>
   <div class="header">
-    <div>
-      <h1>Autonomous Mobile Robot — RViz-Equivalent Navigation</h1>
-      <small style="color: #8b949e;">ROS 2 Physical Robot Platform | Dual Costmaps, Particles & Calibrated LiDAR</small>
+    <div class="brand">
+      <h1>AMR COGNITION <span class="sub-title">• Yahboom Micro-ROS Console</span></h1>
+      <div class="sys-sub">Raspberry Pi 5 + ESP32-S3 Platform | Layered Costmaps & TF Telemetry</div>
     </div>
-    <span class="badge" id="conn-badge">LIVE DDS STREAM</span>
+    <div class="header-right">
+      <div class="battery-widget">
+        <span>🔋</span>
+        <span class="metric-value" id="bat-val">7.8V</span>
+        <div class="bat-bar-wrap">
+          <div class="bat-bar-fill" id="bat-fill" style="width: 75%;"></div>
+        </div>
+        <span id="bat-status" class="badge-healthy">HEALTHY</span>
+      </div>
+      <span class="badge badge-live" id="conn-badge">LIVE DDS</span>
+      <button class="btn-estop" onclick="triggerEStop()" title="Emergency Stop (Spacebar / Esc)">🛑 E-STOP</button>
+    </div>
   </div>
 
   <div class="toolbar">
-    <button class="tool-btn active" id="btn-mode-view" onclick="setMode('view')">👁 View Mode</button>
-    <button class="tool-btn" id="btn-mode-pose" onclick="setMode('pose')">📍 2D Pose Estimate</button>
-    <button class="tool-btn" id="btn-mode-goal" onclick="setMode('goal')">🎯 2D Nav Goal</button>
+    <button class="tool-btn active" id="btn-mode-view" onclick="setMode('view')">👁 View</button>
+    <button class="tool-btn" id="btn-mode-pose" onclick="setMode('pose')">📍 2D Pose</button>
+    <button class="tool-btn" id="btn-mode-goal" onclick="setMode('goal')">🎯 2D Goal</button>
     <div class="tool-separator"></div>
     <button class="tool-btn active" id="tgl-costmap" onclick="toggleLayer('costmap')">Local Costmap</button>
     <button class="tool-btn active" id="tgl-particles" onclick="toggleLayer('particles')">AMCL Particles</button>
@@ -825,7 +977,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <button class="tool-btn active" id="tgl-trail" onclick="toggleLayer('trail')">Trail</button>
     <div class="tool-separator"></div>
     <button class="tool-btn" style="color:var(--gold)" onclick="clearTrail()">🧹 Clear Trail</button>
-    <button class="tool-btn" style="color:var(--green)" onclick="resetHome()">🏠 Reset Home</button>
+    <button class="tool-btn" style="color:var(--green)" onclick="dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0)">🏠 Dock Home</button>
   </div>
 
   <div class="container">
@@ -834,14 +986,38 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <img id="map-img" src="/map.jpg" alt="Nav2 Live Occupancy Grid Map" />
         <canvas id="overlay-canvas"></canvas>
       </div>
-      <div id="instruction-hint" style="margin-top: 8px; font-size: 0.8rem; color: #8b949e;">
-        Mode: <b>View</b>. Switch to <i>2D Nav Goal</i> or <i>2D Pose Estimate</i> to click & drag heading directly on map.
+      <div id="instruction-hint" style="margin-top: 8px; font-size: 0.78rem; color: #8b949e;">
+        Mode: <b>View</b>. Switch to <i>2D Goal</i> or <i>2D Pose</i> to click & drag heading directly on map.
       </div>
     </div>
 
     <div class="panel">
       <div class="card">
-        <h2>Robot State & Localization</h2>
+        <h2>Quick Mission Dispatch</h2>
+        <div class="btn-grid">
+          <button class="action-btn" onclick="dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0)">
+            <span style="color:var(--green)">🏠</span> Home (0.08, 0.05)
+          </button>
+          <button class="action-btn" onclick="dispatchWaypoint('WP1 Runway', 0.40, 0.00, 0.0)">
+            <span style="color:var(--purple)">1️⃣</span> WP1 (0.40, 0.00)
+          </button>
+          <button class="action-btn" onclick="dispatchWaypoint('WP2 Curve', 0.70, 0.35, 1.57)">
+            <span style="color:var(--purple)">2️⃣</span> WP2 (0.70, 0.35)
+          </button>
+          <button class="action-btn" onclick="dispatchWaypoint('WP3 Return', 0.35, 0.15, 3.14)">
+            <span style="color:var(--purple)">3️⃣</span> WP3 (0.35, 0.15)
+          </button>
+          <button class="action-btn full-width" style="color:var(--accent)" onclick="runPatrolCircuit()">
+            🔄 Run Full Corridor Patrol Circuit
+          </button>
+          <button class="action-btn full-width" style="color:var(--red)" onclick="cancelGoal()">
+            ⏹ Cancel Active Nav2 Goal
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Robot Telemetry & Diagnostics</h2>
         <div class="metric-row">
           <span class="metric-label">Position X / Y:</span>
           <span class="metric-value"><span id="val-x">0.00</span>m, <span id="val-y">0.00</span>m</span>
@@ -870,30 +1046,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <span class="metric-label">LiDAR Scan Hits:</span>
           <span class="metric-value" id="val-lidar">0 pts</span>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>Mission Waypoints</h2>
-        <div class="legend">
-          <div class="legend-item"><span class="pin-badge" style="background:#00a000;">H</span> <b>HOME Base:</b> (0.08m, 0.05m)</div>
-          <div class="legend-item"><span class="pin-badge" style="background:#a032c8;">1</span> <b>WP1 Runway:</b> (0.40m, 0.00m)</div>
-          <div class="legend-item"><span class="pin-badge" style="background:#a032c8;">2</span> <b>WP2 Curve:</b> (0.70m, 0.35m)</div>
-          <div class="legend-item"><span class="pin-badge" style="background:#a032c8;">3</span> <b>WP3 Return:</b> (0.35m, 0.15m)</div>
+        <div class="metric-row">
+          <span class="metric-label">Motor Cutoff Threshold:</span>
+          <span class="metric-value" style="color: #8b949e;">6.8V Protection</span>
         </div>
       </div>
 
       <div class="card">
-        <h2>RViz Layer Visual Legend</h2>
-        <div class="legend">
-          <div class="legend-item"><span class="dot" style="background: #a371f7;"></span> <b>Local Costmap:</b> 3m rolling window</div>
-          <div class="legend-item"><span class="dot" style="background: #2ea043;"></span> <b>AMCL Cloud:</b> Convergence arrows</div>
-          <div class="legend-item"><span class="dot" style="background: #f85149;"></span> <b>LiDAR Scans:</b> Calibrated obstacle hits</div>
-          <div class="legend-item"><span class="dot" style="background: #32d74b;"></span> <b>Global Plan:</b> Nav2 route (Green ribbon)</div>
-          <div class="legend-item"><span class="dot" style="background: #00d4ff;"></span> <b>Local Trajectory:</b> Controller carrot (Cyan)</div>
-          <div class="legend-item"><span class="dot" style="background: #e3b341;"></span> <b>Traveled Trail:</b> Odom history (Gold)</div>
-          <div class="legend-item"><span class="dot" style="background: #1f6feb;"></span> <b>AMR Body:</b> Blue chassis footprint</div>
-          <div class="legend-item"><span class="dot" style="background: #d29922;"></span> <b>TF Axes:</b> Red +X, Green +Y</div>
-        </div>
+        <details class="legend-details" open>
+          <summary>Layer Visual Legend</summary>
+          <div class="legend-list">
+            <div class="legend-item"><span class="dot" style="background: #a371f7;"></span> <b>Local Costmap:</b> 3m dynamic obstacle window</div>
+            <div class="legend-item"><span class="dot" style="background: #2ea043;"></span> <b>AMCL Cloud:</b> Convergence orientation arrows</div>
+            <div class="legend-item"><span class="dot" style="background: #f85149;"></span> <b>LiDAR Scans:</b> Calibrated obstacle hits</div>
+            <div class="legend-item"><span class="dot" style="background: #32d74b;"></span> <b>Global Plan:</b> Nav2 route (Green ribbon)</div>
+            <div class="legend-item"><span class="dot" style="background: #00d4ff;"></span> <b>Local Trajectory:</b> Controller carrot (Cyan)</div>
+            <div class="legend-item"><span class="dot" style="background: #e3b341;"></span> <b>Traveled Trail:</b> Odom history (Gold)</div>
+            <div class="legend-item"><span class="dot" style="background: #1f6feb;"></span> <b>AMR Body:</b> Blue chassis footprint</div>
+            <div class="legend-item"><span class="dot" style="background: #d29922;"></span> <b>TF Axes:</b> Red +X Forward, Green +Y Left</div>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -935,11 +1107,36 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
     window.addEventListener('resize', syncCanvasDimensions);
 
-    function showToast(msg) {
+    function showToast(msg, isAlert = false) {
       const t = document.getElementById('toast');
       t.textContent = msg;
+      t.style.borderColor = isAlert ? 'var(--red)' : 'var(--accent)';
       t.style.display = 'block';
       setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    function triggerEStop() {
+      fetch('/api/estop', { method: 'POST' })
+        .then(() => showToast('🛑 EMERGENCY STOP: Zero velocity sent to /cmd_vel!', true));
+    }
+
+    function cancelGoal() {
+      fetch('/api/cancel', { method: 'POST' })
+        .then(() => showToast('⏹ Active Nav2 Goal Cancelled.'));
+    }
+
+    function dispatchWaypoint(name, x, y, yaw) {
+      fetch('/api/waypoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: x, y: y, yaw: yaw })
+      })
+      .then(() => showToast(`🎯 Nav2 Goal sent to ${name} (${x.toFixed(2)}m, ${y.toFixed(2)}m)`));
+    }
+
+    function runPatrolCircuit() {
+      dispatchWaypoint('WP1 Runway', 0.40, 0.00, 0.0);
+      showToast('🔄 Autonomous corridor patrol circuit started.');
     }
 
     function setMode(mode) {
@@ -977,16 +1174,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .then(() => showToast('🧹 Traveled trajectory trail cleared.'));
     }
 
-    function resetHome() {
-      fetch('/api/initialpose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: 0.08, y: 0.05, yaw: 0.0 })
-      })
-      .then(() => showToast('🏠 AMR reset to Home Base (0.08m, 0.05m).'));
-    }
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.key === 'Escape') {
+        triggerEStop();
+      } else if (e.key === 'h' || e.key === 'H') {
+        dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0);
+      } else if (e.key === 'c' || e.key === 'C') {
+        clearTrail();
+      }
+    });
 
-    // ── Mouse Drag Handling for Initial Pose & Goal ─────────────────────────
+    // Mouse Drag Handling for Initial Pose & Goal
     overlay.addEventListener('mousedown', (e) => {
       if (currentMode === 'view') return;
       const rect = overlay.getBoundingClientRect();
@@ -1014,7 +1213,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         return;
       }
 
-      // Calculate world coordinates from image click
       const imgW = imgElem.naturalWidth;
       const imgH = imgElem.naturalHeight;
       const scaleX = imgW / overlay.width;
@@ -1023,7 +1221,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       const px = dragStart.x * scaleX;
       const py = dragStart.y * scaleY;
 
-      // Reverse w2p_s: scale = 3.5
       const renderScale = 3.5;
       const mapPx = px / renderScale;
       const mapPy = py / renderScale;
@@ -1031,9 +1228,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       const wx = mapInfo.origin_x + mapPx * mapInfo.res;
       const wy = mapInfo.origin_y + (mapInfo.height - 1 - mapPy) * mapInfo.res;
 
-      // Yaw orientation from drag vector
       const dx = (dragEnd.x - dragStart.x);
-      const dy = -(dragEnd.y - dragStart.y);  // invert Y for Cartesian
+      const dy = -(dragEnd.y - dragStart.y);
       const yaw = Math.hypot(dx, dy) > 8 ? Math.atan2(dy, dx) : 0.0;
 
       if (currentMode === 'pose') {
@@ -1076,7 +1272,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       ctx.stroke();
     }
 
-    // ── Real-Time Telemetry Polling ─────────────────────────────────────────
+    // Real-Time Telemetry Polling
     function updateTelemetry() {
       fetch('/telemetry')
         .then(r => r.json())
@@ -1099,6 +1295,30 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           const costElem = document.getElementById('val-costmap');
           costElem.textContent = data.local_costmap_active ? 'ACTIVE (10 Hz)' : 'OFFLINE';
           costElem.style.color = data.local_costmap_active ? 'var(--green)' : 'var(--red)';
+
+          // Battery Telemetry
+          const batVal = document.getElementById('bat-val');
+          const batFill = document.getElementById('bat-fill');
+          const batStatus = document.getElementById('bat-status');
+          if (data.battery_voltage !== undefined) {
+            batVal.textContent = data.battery_voltage.toFixed(1) + 'V';
+            batFill.style.width = data.battery_pct + '%';
+            if (data.battery_voltage < 7.0) {
+              batStatus.className = 'badge-warning';
+              batStatus.textContent = 'LOW (<7.0V)';
+              batFill.style.background = 'var(--red)';
+            } else if (data.battery_voltage < 7.4) {
+              batStatus.className = 'badge-healthy';
+              batStatus.style.color = 'var(--gold)';
+              batStatus.textContent = 'MODERATE';
+              batFill.style.background = 'var(--gold)';
+            } else {
+              batStatus.className = 'badge-healthy';
+              batStatus.style.color = 'var(--green)';
+              batStatus.textContent = 'HEALTHY';
+              batFill.style.background = 'var(--green)';
+            }
+          }
         })
         .catch(() => {});
     }
@@ -1216,6 +1436,36 @@ class WebHandler(BaseHTTPRequestHandler):
                 f'{msg.pose.position.y:.2f}, yaw={yaw:.2f})')
 
             resp = json.dumps({"status": "ok", "action": "goal"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+        elif self.path == '/api/estop':
+            self.node_ref.emergency_stop()
+            resp = json.dumps({"status": "ok", "action": "estop"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+        elif self.path == '/api/cancel':
+            self.node_ref.emergency_stop()
+            resp = json.dumps({"status": "ok", "action": "cancel"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+        elif self.path == '/api/waypoint':
+            wx = float(req_data.get('x', 0.08))
+            wy = float(req_data.get('y', 0.05))
+            wyaw = float(req_data.get('yaw', 0.0))
+            self.node_ref.dispatch_waypoint(wx, wy, wyaw)
+            resp = json.dumps({"status": "ok", "action": "waypoint", "x": wx, "y": wy, "yaw": wyaw}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Content-length', str(len(resp)))

@@ -30,8 +30,10 @@ from geometry_msgs.msg import (
     PoseWithCovarianceStamped,
     PoseArray,
     Pose,
+    Twist,
     TransformStamped
 )
+from std_msgs.msg import UInt16
 from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
 
@@ -100,12 +102,15 @@ class MockNavigationSimulator(Node):
         self.particles_pub = self.create_publisher(PoseArray, '/particlecloud', 10)
         self.local_costmap_pub = self.create_publisher(OccupancyGrid, '/local_costmap/costmap', 10)
         self.scan_pub = self.create_publisher(LaserScan, '/scan_downsampled', sensor_qos)
+        self.raw_scan_pub = self.create_publisher(LaserScan, '/scan', sensor_qos)
         self.plan_pub = self.create_publisher(Path, '/plan', 10)
         self.local_plan_pub = self.create_publisher(Path, '/local_plan', 10)
+        self.battery_pub = self.create_publisher(UInt16, '/battery', 10)
 
         # ── Subscribers ──────────────────────────────────────────────────────
         self.create_subscription(PoseStamped, '/goal_pose', self._on_goal, 10)
         self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self._on_initialpose, 10)
+        self.create_subscription(Twist, '/cmd_vel', self._on_cmd_vel, 10)
 
         # ── TF Broadcasters ──────────────────────────────────────────────────
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -152,6 +157,13 @@ class MockNavigationSimulator(Node):
         self.target_yaw = 2.0 * math.atan2(qz, qw)
         self.auto_patrol = False
         self.get_logger().info(f'Interactive Goal received: ({self.target_x:.2f}m, {self.target_y:.2f}m, {math.degrees(self.target_yaw):.1f}°)')
+
+    def _on_cmd_vel(self, msg: Twist):
+        if abs(msg.linear.x) < 1e-4 and abs(msg.angular.z) < 1e-4:
+            self.auto_patrol = False
+            self.target_x = self.robot_x
+            self.target_y = self.robot_y
+            self.get_logger().info('Mock Robot halted via /cmd_vel zero clamp (E-Stop).')
 
     def _on_initialpose(self, msg: PoseWithCovarianceStamped):
         self.robot_x = msg.pose.pose.position.x
@@ -308,6 +320,7 @@ class MockNavigationSimulator(Node):
                 ranges.append(float(wall_dist))
         scan.ranges = ranges
         self.scan_pub.publish(scan)
+        self.raw_scan_pub.publish(scan)
 
         # 7. Publish /plan (Global Path) and /local_plan (Local Controller Carrot)
         plan_msg = Path()
@@ -336,6 +349,11 @@ class MockNavigationSimulator(Node):
             ps.pose.position.y = ry + t * 0.35 * math.sin(ryaw)
             local_plan.poses.append(ps)
         self.local_plan_pub.publish(local_plan)
+
+        # 8. Publish /battery (Yahboom Micro-ROS 2S Li-ion 7.8V telemetry)
+        bat_msg = UInt16()
+        bat_msg.data = 78  # 7.8V (Healthy)
+        self.battery_pub.publish(bat_msg)
 
 
 def main():
