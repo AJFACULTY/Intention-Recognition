@@ -441,11 +441,11 @@ class MapVisualizerNode(Node):
             p2 = w2p_s(circuit[ci + 1][0], circuit[ci + 1][1])
             cv2.line(resized, p1, p2, (200, 80, 220), 1, cv2.LINE_AA)
 
-        # ── 4. Traveled Odometry Trail (Warm Gold Breadcrumbs) ────────────────
+        # ── 4. Traveled Odometry Trail (Warm Amber/Gold Breadcrumbs) ─────────
         if show_tr and len(trail_pts) > 1:
             scaled_trail = [w2p_s(tx, ty) for (tx, ty) in trail_pts]
             pts_arr = np.array([scaled_trail], dtype=np.int32)
-            cv2.polylines(resized, pts_arr, False, (255, 195, 45), 2, cv2.LINE_AA)
+            cv2.polylines(resized, pts_arr, False, (45, 195, 255), 2, cv2.LINE_AA)
 
         # ── 5. Nav2 Global Planned Path (Luminous Green Ribbon) ───────────────
         if show_p and len(plan_pts) > 1:
@@ -822,6 +822,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <button class="tool-btn active" id="tgl-lidar" onclick="toggleLayer('lidar')">LiDAR Scans</button>
     <button class="tool-btn active" id="tgl-axes" onclick="toggleLayer('axes')">TF Axes</button>
     <button class="tool-btn active" id="tgl-paths" onclick="toggleLayer('paths')">Nav2 Paths</button>
+    <button class="tool-btn active" id="tgl-trail" onclick="toggleLayer('trail')">Trail</button>
+    <div class="tool-separator"></div>
+    <button class="tool-btn" style="color:var(--gold)" onclick="clearTrail()">🧹 Clear Trail</button>
+    <button class="tool-btn" style="color:var(--green)" onclick="resetHome()">🏠 Reset Home</button>
   </div>
 
   <div class="container">
@@ -884,9 +888,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="legend-item"><span class="dot" style="background: #a371f7;"></span> <b>Local Costmap:</b> 3m rolling window</div>
           <div class="legend-item"><span class="dot" style="background: #2ea043;"></span> <b>AMCL Cloud:</b> Convergence arrows</div>
           <div class="legend-item"><span class="dot" style="background: #f85149;"></span> <b>LiDAR Scans:</b> Calibrated obstacle hits</div>
-          <div class="legend-item"><span class="dot" style="background: #00d4ff;"></span> <b>Planned & Local Paths:</b> Global / Local</div>
+          <div class="legend-item"><span class="dot" style="background: #32d74b;"></span> <b>Global Plan:</b> Nav2 route (Green ribbon)</div>
+          <div class="legend-item"><span class="dot" style="background: #00d4ff;"></span> <b>Local Trajectory:</b> Controller carrot (Cyan)</div>
+          <div class="legend-item"><span class="dot" style="background: #e3b341;"></span> <b>Traveled Trail:</b> Odom history (Gold)</div>
           <div class="legend-item"><span class="dot" style="background: #1f6feb;"></span> <b>AMR Body:</b> Blue chassis footprint</div>
-          <div class="legend-item"><span class="dot" style="background: #d29922;"></span> <b>TF Coordinate Axes:</b> Red +X, Green +Y</div>
+          <div class="legend-item"><span class="dot" style="background: #d29922;"></span> <b>TF Axes:</b> Red +X, Green +Y</div>
         </div>
       </div>
     </div>
@@ -964,6 +970,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ layer: layer, value: active })
       });
+    }
+
+    function clearTrail() {
+      fetch('/api/cleartrail', { method: 'POST' })
+        .then(() => showToast('🧹 Traveled trajectory trail cleared.'));
+    }
+
+    function resetHome() {
+      fetch('/api/initialpose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: 0.08, y: 0.05, yaw: 0.0 })
+      })
+      .then(() => showToast('🏠 AMR reset to Home Base (0.08m, 0.05m).'));
     }
 
     // ── Mouse Drag Handling for Initial Pose & Goal ─────────────────────────
@@ -1202,6 +1222,16 @@ class WebHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(resp)
 
+        elif self.path == '/api/cleartrail':
+            with self.node_ref.lock:
+                self.node_ref.trajectory_history.clear()
+            resp = json.dumps({"status": "ok", "action": "cleartrail"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
         elif self.path == '/api/toggles':
             layer = req_data.get('layer', '')
             val = bool(req_data.get('value', True))
@@ -1217,6 +1247,8 @@ class WebHandler(BaseHTTPRequestHandler):
                     self.node_ref.show_axes = val
                 elif layer == 'paths':
                     self.node_ref.show_paths = val
+                elif layer == 'trail':
+                    self.node_ref.show_trail = val
 
             resp = json.dumps({"status": "ok", "layer": layer, "value": val}).encode('utf-8')
             self.send_response(200)

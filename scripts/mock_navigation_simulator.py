@@ -59,6 +59,7 @@ class MockNavigationSimulator(Node):
         # Convert image to ROS OccupancyGrid format (-1 unknown, 0 free, 100 occupied)
         # In PNG row 0 is top (Y_max), flip vertically so row 0 is bottom (Y_min = map origin)
         cartesian_img = cv2.flip(map_img, 0)
+        self.cartesian_img = cartesian_img
         grid_data = np.full((self.map_h, self.map_w), -1, dtype=np.int8)
         grid_data[cartesian_img == 254] = 0    # Free
         grid_data[cartesian_img == 0] = 100    # Occupied
@@ -174,10 +175,23 @@ class MockNavigationSimulator(Node):
             yaw_diff = (desired_yaw - self.robot_yaw + math.pi) % (2 * math.pi) - math.pi
             # Rotate toward target
             self.robot_yaw += math.copysign(min(abs(yaw_diff), 0.15), yaw_diff)
-            # Advance along heading
+            # Advance along heading with wall collision prevention
             step = min(dist, 0.018)  # ~0.18 m/s speed
-            self.robot_x += step * math.cos(self.robot_yaw)
-            self.robot_y += step * math.sin(self.robot_yaw)
+            next_x = self.robot_x + step * math.cos(self.robot_yaw)
+            next_y = self.robot_y + step * math.sin(self.robot_yaw)
+            c_col = int((next_x - self.map_origin_x) / self.map_res)
+            c_row = int((next_y - self.map_origin_y) / self.map_res)
+
+            # Check if proposed step collides with solid wall (0 in PNG)
+            if 0 <= c_col < self.map_w and 0 <= c_row < self.map_h and self.cartesian_img[c_row, c_col] == 0:
+                # Solid wall collision: stop robot and revert to safe patrol
+                step = 0.0
+                self.auto_patrol = True
+                self.circuit_idx = 0
+                self.target_x, self.target_y = self.patrol_circuit[0]
+            else:
+                self.robot_x = next_x
+                self.robot_y = next_y
         else:
             if self.auto_patrol:
                 self.circuit_idx = (self.circuit_idx + 1) % len(self.patrol_circuit)
