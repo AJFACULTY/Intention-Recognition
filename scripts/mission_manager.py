@@ -194,9 +194,17 @@ class MissionManagerNode(Node):
                 if status == GoalStatus.STATUS_SUCCEEDED:
                     leg_success = True
                 break
-            # Spatial completion check (per Josh Newans / Nav2 best practice)
-            if self._last_dist <= 0.12 and (time.time() - start_wait) > 3.0:
-                self.get_logger().info(f'Waypoint {wp.name} spatially achieved (remaining: {self._last_dist:.2f}m). Proceeding...')
+            # Spatial completion check: verify real physical distance to goal to prevent 0.00m false positives
+            pose = self.get_current_pose()
+            if pose:
+                real_dist = math.hypot(pose[0] - wp.x, pose[1] - wp.y)
+                if real_dist <= 0.15 and (time.time() - start_wait) > 4.0:
+                    self.get_logger().info(f'Waypoint {wp.name} physically achieved (measured distance: {real_dist:.2f}m). Proceeding...')
+                    leg_success = True
+                    goal_handle.cancel_goal_async()
+                    break
+            elif 0.005 < self._last_dist <= 0.12 and (time.time() - start_wait) > 4.0:
+                self.get_logger().info(f'Waypoint {wp.name} feedback achieved (remaining: {self._last_dist:.2f}m). Proceeding...')
                 leg_success = True
                 goal_handle.cancel_goal_async()
                 break
