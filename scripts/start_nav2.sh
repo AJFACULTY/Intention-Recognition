@@ -63,15 +63,16 @@ time.sleep(1.0)
 msg = PoseWithCovarianceStamped()
 msg.header.frame_id = "map"
 msg.header.stamp = node.get_clock().now().to_msg()
-msg.pose.pose.position.x = 0.0
-msg.pose.pose.position.y = 0.0
-msg.pose.pose.orientation.w = 1.0
+msg.pose.pose.position.x = 0.08
+msg.pose.pose.position.y = 0.05
+msg.pose.pose.orientation.z = 0.3826834
+msg.pose.pose.orientation.w = 0.9238795
 msg.pose.covariance[0] = 0.25
 msg.pose.covariance[7] = 0.25
 msg.pose.covariance[35] = 0.15
 
 pub.publish(msg)
-print(">> Initial pose broadcast to /initialpose at origin (0, 0).")
+print(">> Initial pose broadcast to /initialpose at Home Base (0.08, 0.05).")
 node.destroy_node()
 rclpy.shutdown()
 PYEOF
