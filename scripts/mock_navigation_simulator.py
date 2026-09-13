@@ -70,6 +70,8 @@ class MockNavigationSimulator(Node):
         # ── Simulated Robot State ────────────────────────────────────────────
         self.robot_x = 0.08
         self.robot_y = 0.05
+        self.last_safe_x = 0.08
+        self.last_safe_y = 0.05
         self.robot_yaw = 0.0
         self.target_x = 0.40
         self.target_y = 0.00
@@ -166,16 +168,49 @@ class MockNavigationSimulator(Node):
             self.get_logger().info('Mock Robot halted via /cmd_vel zero clamp (E-Stop).')
 
     def _on_initialpose(self, msg: PoseWithCovarianceStamped):
-        self.robot_x = msg.pose.pose.position.x
-        self.robot_y = msg.pose.pose.position.y
+        px = msg.pose.pose.position.x
+        py = msg.pose.pose.position.y
         qz = msg.pose.pose.orientation.z
         qw = msg.pose.pose.orientation.w
-        self.robot_yaw = 2.0 * math.atan2(qz, qw)
-        self.get_logger().info(f'AMCL Initial Pose set to: ({self.robot_x:.2f}m, {self.robot_y:.2f}m, {math.degrees(self.robot_yaw):.1f}°)')
+        yaw = 2.0 * math.atan2(qz, qw)
+
+        c_col = int((px - self.map_origin_x) / self.map_res)
+        c_row = int((py - self.map_origin_y) / self.map_res)
+
+        # Guard: if operator placed initial pose on a wall, reject and reset to Home Base
+        if 0 <= c_col < self.map_w and 0 <= c_row < self.map_h and self.cartesian_img[c_row, c_col] == 0:
+            self.get_logger().warn(f'Initial pose ({px:.2f}m, {py:.2f}m) is inside a wall! Resetting to Home Base (0.08, 0.05).')
+            self.robot_x = 0.08
+            self.robot_y = 0.05
+            self.robot_yaw = 0.0
+            self.last_safe_x = 0.08
+            self.last_safe_y = 0.05
+        else:
+            self.robot_x = px
+            self.robot_y = py
+            self.robot_yaw = yaw
+            self.last_safe_x = px
+            self.last_safe_y = py
+            self.get_logger().info(f'AMCL Initial Pose set to: ({self.robot_x:.2f}m, {self.robot_y:.2f}m, {math.degrees(self.robot_yaw):.1f}°)')
+
+        self.auto_patrol = True
+        self.circuit_idx = 0
+        self.target_x, self.target_y = self.patrol_circuit[0]
 
     def _sim_tick(self):
         now = self.get_clock().now()
         stamp = now.to_msg()
+
+        # 0. Self-healing check: if robot finds itself stuck on a wall, bounce to last safe point
+        curr_col = int((self.robot_x - self.map_origin_x) / self.map_res)
+        curr_row = int((self.robot_y - self.map_origin_y) / self.map_res)
+        if 0 <= curr_col < self.map_w and 0 <= curr_row < self.map_h and self.cartesian_img[curr_row, curr_col] == 0:
+            self.get_logger().warn(f'Robot was inside wall at ({self.robot_x:.2f}, {self.robot_y:.2f})! Teleporting to safe pose ({self.last_safe_x:.2f}, {self.last_safe_y:.2f}).')
+            self.robot_x = self.last_safe_x
+            self.robot_y = self.last_safe_y
+            self.auto_patrol = True
+            self.circuit_idx = 0
+            self.target_x, self.target_y = self.patrol_circuit[0]
 
         # 1. Update Robot Kinematics toward Target
         dx = self.target_x - self.robot_x
@@ -196,14 +231,18 @@ class MockNavigationSimulator(Node):
 
             # Check if proposed step collides with solid wall (0 in PNG)
             if 0 <= c_col < self.map_w and 0 <= c_row < self.map_h and self.cartesian_img[c_row, c_col] == 0:
-                # Solid wall collision: stop robot and revert to safe patrol
-                step = 0.0
+                # Solid wall collision: bounce back to safe coordinate and resume safe corridor patrol
+                self.robot_x = self.last_safe_x
+                self.robot_y = self.last_safe_y
                 self.auto_patrol = True
                 self.circuit_idx = 0
                 self.target_x, self.target_y = self.patrol_circuit[0]
+                self.get_logger().warn(f'Wall collision halted at ({next_x:.2f}, {next_y:.2f})! Resuming safe corridor circuit.')
             else:
                 self.robot_x = next_x
                 self.robot_y = next_y
+                self.last_safe_x = next_x
+                self.last_safe_y = next_y
         else:
             if self.auto_patrol:
                 self.circuit_idx = (self.circuit_idx + 1) % len(self.patrol_circuit)

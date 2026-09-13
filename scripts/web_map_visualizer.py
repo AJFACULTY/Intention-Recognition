@@ -978,6 +978,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="tool-separator"></div>
     <button class="tool-btn" style="color:var(--gold)" onclick="clearTrail()">🧹 Clear Trail</button>
     <button class="tool-btn" style="color:var(--green)" onclick="dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0)">🏠 Dock Home</button>
+    <button class="tool-btn" style="color:var(--accent)" onclick="resetHome()">📍 Reset Pose</button>
   </div>
 
   <div class="container">
@@ -1009,6 +1010,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </button>
           <button class="action-btn full-width" style="color:var(--accent)" onclick="runPatrolCircuit()">
             🔄 Run Full Corridor Patrol Circuit
+          </button>
+          <button class="action-btn full-width" style="color:var(--gold)" onclick="resetHome()">
+            📍 Reset Pose to Home Base (Unwedge)
           </button>
           <button class="action-btn full-width" style="color:var(--red)" onclick="cancelGoal()">
             ⏹ Cancel Active Nav2 Goal
@@ -1137,6 +1141,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     function runPatrolCircuit() {
       dispatchWaypoint('WP1 Runway', 0.40, 0.00, 0.0);
       showToast('🔄 Autonomous corridor patrol circuit started.');
+    }
+
+    function resetHome() {
+      fetch('/api/initialpose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: 0.08, y: 0.05, yaw: 0.0 })
+      })
+      .then(() => showToast('📍 AMR pose reset to Home Base (0.08m, 0.05m).'));
     }
 
     function setMode(mode) {
