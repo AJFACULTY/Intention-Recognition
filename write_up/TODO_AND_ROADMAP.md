@@ -214,6 +214,12 @@
 - [ ] **Bench Autonomy Pipeline Hardening & Display Polish:**
   - Polish `bench_autonomy_monitor.py` ANSI escape sequence redraws to ensure rock-solid in-place terminal HUD without duplicate header scrolling.
   - Live qualification of all 6 gestures (`STOP`, `GO`, `FOLLOW`, `LEFT`, `RIGHT`, `BACK`) with operator in active acceptance zone.
+- [ ] **Task 9.2.1: Permanent Turnkey Joystick Service (`joy_node` & `/cmd_vel_joy` on boot):**
+  - Install and enable a dedicated systemd service on the Pi 5 to keep `joy_node` alive in the background.
+  - Automatically route controller inputs to `/cmd_vel_joy` (Priority 100 on `twist_mux`) for instant, effortless manual override at any time.
+- [ ] **Task 9.2.2: Consolidated Master Robot Launch File (`launch/master_robot.launch.py`):**
+  - Assemble a single, Articulated Robotics-compliant top-level ROS 2 launch file.
+  - Modularly bring up micro-ROS agent, LiDAR drivers, `twist_mux`, joystick, Nav2 lifecycle stack, active vision, and the web visualizer simultaneously.
 - [ ] **Nav2 Multi-Waypoint & Room Patrol Implementation Plan (On Deck Post-Charge):**
   - [ ] **Task 9.3.1:** Implement `scripts/navigate_waypoints.py` CLI supporting `NavigateThroughPoses` and sequential `NavigateToPose` with distance-remaining feedback, ETA, and Ctrl+C emergency stop.
   - [ ] **Task 9.3.2:** Implement `scripts/run_nav2_patrol.sh` with automatic non-saturating bag recorder (`/tf`, `/odom_raw`, `/odometry/filtered`, `/scan`, `/cmd_vel`, `/amcl_pose`, `/plan`).

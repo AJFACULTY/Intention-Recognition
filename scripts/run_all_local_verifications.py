@@ -41,6 +41,11 @@ SUITES = [
         "script": "/home/j/ros2_cognition_ws/scripts/test_gesture_mlp.py",
         "python": "/home/j/ros2_venv/bin/python3",
     },
+    {
+        "name": "Industrial Acoustic Safety Audio Node (/beep & Chimes)",
+        "script": "/home/j/ros2_cognition_ws/scripts/test_safety_audio.py",
+        "python": "/home/j/ros2_venv/bin/python3",
+    },
 ]
 
 

@@ -44,10 +44,10 @@ class TestActiveVisionLogic(unittest.TestCase):
         """Verify node initializes to configured home pose and IDLE state."""
         self.assertEqual(self.node.state, ActiveVisionNode.STATE_IDLE)
         self.assertEqual(self.node.current_pan, 0.0)
-        self.assertEqual(self.node.current_tilt, 25.0)
+        self.assertEqual(self.node.current_tilt, 35.0)
         self.assertEqual(self.node.pan_home, 0)
-        self.assertEqual(self.node.tilt_home, 25)
-        print("\n✓ Test 01: Initial neutral pose verified (pan=0, tilt=25, state=IDLE)")
+        self.assertEqual(self.node.tilt_home, 35)
+        print("\n✓ Test 01: Initial neutral pose verified (pan=0, tilt=35, state=IDLE)")
 
     def test_02_deadband_suppression(self):
         """Verify errors within deadband (<= 0.05) produce zero movement."""

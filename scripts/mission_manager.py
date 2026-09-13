@@ -26,6 +26,7 @@ from rclpy.action import ActionClient
 from rclpy.duration import Duration
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from action_msgs.msg import GoalStatus
+from std_msgs.msg import String, UInt16
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Twist
 from nav2_msgs.action import NavigateToPose, NavigateThroughPoses, BackUp
 from tf2_ros import Buffer, TransformListener, TransformException
@@ -79,6 +80,16 @@ class MissionManagerNode(Node):
         # Velocity publisher for emergency stops and preemption
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
+        # Acoustic safety chime publisher
+        self.chime_pub = self.create_publisher(String, '/safety/chime', 10)
+
+        # Battery health monitoring for automated low-voltage safety return
+        self.battery_voltage = 8.4
+        self.battery_healthy = True
+        self.battery_sub = self.create_subscription(
+            UInt16, '/battery', self._battery_cb, 10
+        )
+
         # AMCL latched pose subscriber for instantaneous ground-truth localization
         self.amcl_pose = None
         qos_amcl = QoSProfile(depth=1)
@@ -98,6 +109,21 @@ class MissionManagerNode(Node):
         self.current_goal_handle = None
         self._last_dist = 999.0
         self.get_logger().info('Industrial Mission Manager initialized successfully.')
+
+    def _battery_cb(self, msg: UInt16):
+        """Monitors Yahboom battery telemetry and evaluates health."""
+        val = float(msg.data)
+        if val > 50.0:  # e.g. 79 -> 7.9V
+            self.battery_voltage = val / 10.0
+        else:  # percentage
+            self.battery_voltage = 6.8 + (val / 100.0) * 1.6
+        self.battery_healthy = (self.battery_voltage >= 7.4)
+
+    def play_chime(self, chime_name: str):
+        """Triggers acoustic warning sequence on safety_audio_node."""
+        m = String()
+        m.data = chime_name
+        self.chime_pub.publish(m)
 
     def _amcl_pose_cb(self, msg: PoseWithCovarianceStamped):
         """Callback for latched AMCL particle filter estimated pose."""
@@ -216,12 +242,14 @@ class MissionManagerNode(Node):
         self.current_goal_handle = None
 
         if leg_success:
+            self.play_chime("arrival")
             self.get_logger().info(f'✓ REACHED WAYPOINT: {wp.name}')
             if wp.dwell_sec > 0:
                 self.get_logger().info(f'Dwelling at {wp.name} for {wp.dwell_sec:.1f}s (Sensor Survey)...')
                 time.sleep(wp.dwell_sec)
             return True
         else:
+            self.play_chime("obstacle")
             self.get_logger().warn(f'✗ Failed to reach {wp.name}')
             return False
 
@@ -318,6 +346,13 @@ class MissionManagerNode(Node):
 
         success_count = 0
         for idx, wp in enumerate(waypoints, start=1):
+            # Check battery health before embarking on next leg
+            if not self.battery_healthy and mission_name != "RETURN_HOME":
+                print(f'\n[LOW BATTERY SAFETY] Battery voltage is {self.battery_voltage:.2f}V (< 7.40V cutoff)!')
+                print('                     Aborting outward mission and routing safely back to Home Base (P1)...')
+                self.play_chime("low_battery")
+                return self.execute_mission("RETURN_HOME")
+
             print(f'\n--- [Leg {idx}/{total_wp}] Target: {wp.name} ---')
             ok = self.execute_waypoint(wp)
             if ok:
@@ -328,10 +363,12 @@ class MissionManagerNode(Node):
 
         print('\n' + '=' * 70)
         if success_count == total_wp:
+            self.play_chime("mission_complete")
             print(f'🏆 MISSION COMPLETED: {mission_name} (100% Legs Succeeded)')
             print('=' * 70)
             return True
         else:
+            self.play_chime("obstacle")
             print(f'⚠️ MISSION INCOMPLETE: {success_count}/{total_wp} legs finished.')
             print('=' * 70)
             return False

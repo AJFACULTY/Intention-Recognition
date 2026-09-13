@@ -61,6 +61,7 @@ class ActiveVisionNode(Node):
         self.declare_parameter("search_duration", 30.0)# Seconds to search before reverting (30s)
         self.declare_parameter("search_amplitude", 28.0) # Safe cable-friendly sweep (+/- 28 deg arc)
         self.declare_parameter("search_freq", 0.10)    # Sweep frequency (0.10 Hz = 10s smooth wide cycle)
+        self.declare_parameter("enable_patrol_sweep", True) # Dynamic sinusoidal sweep during patrol
 
         # Read parameters
         self.target_topic = str(self.get_parameter("target_topic").value)
@@ -87,6 +88,7 @@ class ActiveVisionNode(Node):
         self.search_duration = float(self.get_parameter("search_duration").value)
         self.search_amp = float(self.get_parameter("search_amplitude").value)
         self.search_freq = float(self.get_parameter("search_freq").value)
+        self.enable_patrol_sweep = bool(self.get_parameter("enable_patrol_sweep").value)
 
         # Internal Control State
         self.current_pan = float(self.pan_home)
@@ -321,7 +323,7 @@ class ActiveVisionNode(Node):
                 self.state = self.STATE_TRACKING
                 self.integral_pan = 0.0
                 self.integral_tilt = 0.0
-            elif (now - getattr(self, 'node_start_time', now)) > 5.0 and (now - self.last_target_time) > 5.0:
+            elif self.enable_patrol_sweep and (now - getattr(self, 'node_start_time', now)) > 5.0 and (now - self.last_target_time) > 5.0:
                 self.get_logger().info("No subject in forward view. Initiating autonomous room search sweep.")
                 self.state = self.STATE_SEARCH
                 self.search_start_time = now
