@@ -96,12 +96,12 @@ class MockNavigationSimulator(Node):
         self.final_goal_x = 0.40
         self.final_goal_y = 0.00
 
-        # Mission 4-point strategic unattended circuit
+        # Mission 4-point strategic unattended circuit (L-Form Alignment)
         self.patrol_circuit = [
             (0.08, 0.05),  # P1 Home Base
-            (1.80, 0.80),  # P2 Central Hub
-            (3.00, 2.80),  # P3 North Gallery
-            (4.70, 1.80),  # P4 East Lab
+            (1.64, 1.62),  # P2 Central Hub (Collinear Midpoint)
+            (3.20, 3.20),  # P3 North Gallery (Elbow)
+            (4.70, 1.80),  # P4 East Lab (Perpendicular Short Leg)
         ]
         self.circuit_idx = 0
         self.auto_patrol = True

@@ -70,11 +70,11 @@ class MapVisualizerNode(Node):
         self.battery_healthy = True
         self.battery_last_time = 0.0
 
-        # ── Waypoints & Patrol Landmarks (4 Strategic Facility Posts) ─────────
+        # ── Waypoints & Patrol Landmarks (L-Form Alignment) ──────────────────
         self.corridor_landmarks = [
             (0.08, 0.05, "P1 Home Base"),
-            (1.80, 0.80, "P2 Central Hub"),
-            (3.00, 2.80, "P3 North Gallery"),
+            (1.64, 1.62, "P2 Central Hub"),
+            (3.20, 3.20, "P3 North Gallery"),
             (4.70, 1.80, "P4 East Lab"),
         ]
 
@@ -495,6 +495,14 @@ class MapVisualizerNode(Node):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 0, 0), 3, cv2.LINE_AA)
                 cv2.putText(img_out, label, (rpx + 10, rpy + 4),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 1, cv2.LINE_AA)
+
+        # Draw subtle L-form mission corridor guideline (P1 -> P2 -> P3 -> P4)
+        if show_p and len(self.corridor_landmarks) >= 4:
+            l_coords = [w2p_s(item[0], item[1]) for item in self.corridor_landmarks]
+            for p_idx in range(len(l_coords) - 1):
+                pt_a = l_coords[p_idx]
+                pt_b = l_coords[p_idx + 1]
+                cv2.line(resized, pt_a, pt_b, (210, 180, 240), 1, cv2.LINE_AA)
 
         pin_colors = [
             (0, 220, 100),   # P1 Home Base (Vibrant Green)
@@ -1020,13 +1028,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <button class="action-btn" onclick="dispatchWaypoint('P1 Home Base', 0.08, 0.05, 0.0)">
             <span style="color:var(--green)">🏠</span> P1 Home (0.08, 0.05)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('P2 Central Hub', 1.80, 0.80, 0.0)">
-            <span style="color:var(--cyan)">2️⃣</span> P2 Center (1.80, 0.80)
+          <button class="action-btn" onclick="dispatchWaypoint('P2 Central Hub', 1.64, 1.62, 0.78)">
+            <span style="color:var(--cyan)">2️⃣</span> P2 Center (1.64, 1.62)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('P3 North Gallery', 3.00, 2.80, 0.0)">
-            <span style="color:var(--purple)">3️⃣</span> P3 North (3.00, 2.80)
+          <button class="action-btn" onclick="dispatchWaypoint('P3 North Gallery', 3.20, 3.20, 0.78)">
+            <span style="color:var(--purple)">3️⃣</span> P3 North (3.20, 3.20)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('P4 East Lab', 4.70, 1.80, 0.0)">
+          <button class="action-btn" onclick="dispatchWaypoint('P4 East Lab', 4.70, 1.80, -0.75)">
             <span style="color:var(--gold)">4️⃣</span> P4 East (4.70, 1.80)
           </button>
           <button class="action-btn full-width" style="color:var(--accent)" onclick="startSmartPatrol('unattended')">
@@ -1526,8 +1534,8 @@ class WebHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/patrol':
             circuit = [
                 (0.08, 0.05, "P1 Home Base"),
-                (1.80, 0.80, "P2 Central Hub"),
-                (3.00, 2.80, "P3 North Gallery"),
+                (1.64, 1.62, "P2 Central Hub"),
+                (3.20, 3.20, "P3 North Gallery"),
                 (4.70, 1.80, "P4 East Lab"),
             ]
 

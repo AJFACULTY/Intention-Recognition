@@ -46,18 +46,18 @@ MISSION_CATALOG = {
         Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "CENTRAL_INSPECTION": [
-        Waypoint("P2 Central Hub", 1.80, 0.80, 0.0, dwell_sec=3.0),
+        Waypoint("P2 Central Hub", 1.64, 1.62, 0.78, dwell_sec=3.0),
         Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "NORTH_GALLERY_PATROL": [
-        Waypoint("P2 Central Hub", 1.80, 0.80, 0.0, dwell_sec=3.0),
-        Waypoint("P3 North Gallery", 3.00, 2.80, 0.0, dwell_sec=3.0),
+        Waypoint("P2 Central Hub", 1.64, 1.62, 0.78, dwell_sec=3.0),
+        Waypoint("P3 North Gallery", 3.20, 3.20, 0.78, dwell_sec=3.0),
         Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "UNATTENDED_FACILITY_PATROL": [
-        Waypoint("P2 Central Hub", 1.80, 0.80, 0.0, dwell_sec=3.0),
-        Waypoint("P3 North Gallery", 3.00, 2.80, 0.0, dwell_sec=3.0),
-        Waypoint("P4 East Lab", 4.70, 1.80, 0.0, dwell_sec=3.0),
+        Waypoint("P2 Central Hub", 1.64, 1.62, 0.78, dwell_sec=3.0),
+        Waypoint("P3 North Gallery", 3.20, 3.20, 0.78, dwell_sec=3.0),
+        Waypoint("P4 East Lab", 4.70, 1.80, -0.75, dwell_sec=3.0),
         Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
 }
