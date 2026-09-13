@@ -17,6 +17,7 @@ Simulates the complete physical robot navigation stack using the real room map:
 import os
 import math
 import time
+import heapq
 import cv2
 import numpy as np
 
@@ -66,6 +67,12 @@ class MockNavigationSimulator(Node):
         grid_data[cartesian_img == 254] = 0    # Free
         grid_data[cartesian_img == 0] = 100    # Occupied
         self.occupancy_data = grid_data.flatten().tolist()
+
+        # ── Collision Inflation & A* Grid Path Planner ──────────────────────
+        is_obstacle = (cartesian_img != 254).astype(np.uint8)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        self.inflated_grid = cv2.dilate(is_obstacle, kernel)
+        self.active_path = []  # List of (x, y) waypoints around walls
 
         # ── Simulated Robot State ────────────────────────────────────────────
         self.robot_x = 0.08
@@ -151,18 +158,97 @@ class MockNavigationSimulator(Node):
         msg.data = self.occupancy_data
         self.map_pub.publish(msg)
 
+    def _find_nearest_free(self, r: int, c: int):
+        """Finds nearest free cell if coordinates are inside an obstacle."""
+        if 0 <= r < self.map_h and 0 <= c < self.map_w and self.inflated_grid[r, c] == 0:
+            return r, c
+        for rad in range(1, 15):
+            for dr in range(-rad, rad + 1):
+                for dc in range(-rad, rad + 1):
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < self.map_h and 0 <= nc < self.map_w and self.inflated_grid[nr, nc] == 0:
+                        return nr, nc
+        return r, c
+
+    def _plan_astar(self, sx: float, sy: float, gx: float, gy: float):
+        """Calculates collision-free A* path around room partition walls and obstacles."""
+        sr = int((sy - self.map_origin_y) / self.map_res)
+        sc = int((sx - self.map_origin_x) / self.map_res)
+        gr = int((gy - self.map_origin_y) / self.map_res)
+        gc = int((gx - self.map_origin_x) / self.map_res)
+
+        start = self._find_nearest_free(sr, sc)
+        goal = self._find_nearest_free(gr, gc)
+
+        open_set = [(0, start)]
+        came_from = {}
+        g_score = {start: 0}
+
+        def h(a, b):
+            return math.hypot(a[0] - b[0], a[1] - b[1])
+
+        found = False
+        while open_set:
+            _, current = heapq.heappop(open_set)
+            if current == goal:
+                found = True
+                break
+            r, c = current
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < self.map_h and 0 <= nc < self.map_w and self.inflated_grid[nr, nc] == 0:
+                    cost = 1.414 if (dr != 0 and dc != 0) else 1.0
+                    tg = g_score[current] + cost
+                    nb = (nr, nc)
+                    if tg < g_score.get(nb, float('inf')):
+                        came_from[nb] = current
+                        g_score[nb] = tg
+                        f = tg + h(nb, goal)
+                        heapq.heappush(open_set, (f, nb))
+
+        if not found:
+            return []
+
+        curr = goal
+        cells = []
+        while curr in came_from:
+            cells.append(curr)
+            curr = came_from[curr]
+        cells.reverse()
+
+        # Downsample waypoints (every 3 cells ~ 15 cm) + final target
+        pts = []
+        for i in range(0, len(cells), 3):
+            wx = self.map_origin_x + (cells[i][1] + 0.5) * self.map_res
+            wy = self.map_origin_y + (cells[i][0] + 0.5) * self.map_res
+            pts.append((wx, wy))
+        pts.append((gx, gy))
+        return pts
+
     def _on_goal(self, msg: PoseStamped):
-        self.target_x = msg.pose.position.x
-        self.target_y = msg.pose.position.y
+        gx = msg.pose.position.x
+        gy = msg.pose.position.y
         qz = msg.pose.orientation.z
         qw = msg.pose.orientation.w
         self.target_yaw = 2.0 * math.atan2(qz, qw)
         self.auto_patrol = False
-        self.get_logger().info(f'Interactive Goal received: ({self.target_x:.2f}m, {self.target_y:.2f}m, {math.degrees(self.target_yaw):.1f}°)')
+
+        self.get_logger().info(f'Interactive Goal received: ({gx:.2f}m, {gy:.2f}m). Planning A* obstacle-free route...')
+        path = self._plan_astar(self.robot_x, self.robot_y, gx, gy)
+        if path:
+            self.active_path = path
+            self.target_x, self.target_y = self.active_path.pop(0)
+            self.get_logger().info(f'A* route planned: {len(path)} waypoints safely circumventing partition walls.')
+        else:
+            self.get_logger().warn(f'No obstacle-free path to ({gx:.2f}m, {gy:.2f}m)! Goal is inside a wall.')
+            self.active_path = []
+            self.auto_patrol = True
+            self.target_x, self.target_y = self.patrol_circuit[0]
 
     def _on_cmd_vel(self, msg: Twist):
         if abs(msg.linear.x) < 1e-4 and abs(msg.angular.z) < 1e-4:
             self.auto_patrol = False
+            self.active_path = []
             self.target_x = self.robot_x
             self.target_y = self.robot_y
             self.get_logger().info('Mock Robot halted via /cmd_vel zero clamp (E-Stop).')
@@ -194,6 +280,7 @@ class MockNavigationSimulator(Node):
             self.get_logger().info(f'AMCL Initial Pose set to: ({self.robot_x:.2f}m, {self.robot_y:.2f}m, {math.degrees(self.robot_yaw):.1f}°)')
 
         self.auto_patrol = True
+        self.active_path = []
         self.circuit_idx = 0
         self.target_x, self.target_y = self.patrol_circuit[0]
 
@@ -209,6 +296,7 @@ class MockNavigationSimulator(Node):
             self.robot_x = self.last_safe_x
             self.robot_y = self.last_safe_y
             self.auto_patrol = True
+            self.active_path = []
             self.circuit_idx = 0
             self.target_x, self.target_y = self.patrol_circuit[0]
 
@@ -217,7 +305,7 @@ class MockNavigationSimulator(Node):
         dy = self.target_y - self.robot_y
         dist = math.hypot(dx, dy)
 
-        if dist > 0.04:
+        if dist > 0.05:
             desired_yaw = math.atan2(dy, dx)
             yaw_diff = (desired_yaw - self.robot_yaw + math.pi) % (2 * math.pi) - math.pi
             # Rotate toward target
@@ -235,6 +323,7 @@ class MockNavigationSimulator(Node):
                 self.robot_x = self.last_safe_x
                 self.robot_y = self.last_safe_y
                 self.auto_patrol = True
+                self.active_path = []
                 self.circuit_idx = 0
                 self.target_x, self.target_y = self.patrol_circuit[0]
                 self.get_logger().warn(f'Wall collision halted at ({next_x:.2f}, {next_y:.2f})! Resuming safe corridor circuit.')
@@ -244,9 +333,15 @@ class MockNavigationSimulator(Node):
                 self.last_safe_x = next_x
                 self.last_safe_y = next_y
         else:
-            if self.auto_patrol:
+            # Current waypoint reached!
+            if self.active_path:
+                self.target_x, self.target_y = self.active_path.pop(0)
+            elif self.auto_patrol:
                 self.circuit_idx = (self.circuit_idx + 1) % len(self.patrol_circuit)
                 self.target_x, self.target_y = self.patrol_circuit[self.circuit_idx]
+            else:
+                # Final destination reached
+                pass
 
         rx, ry, ryaw = self.robot_x, self.robot_y, self.robot_yaw
 
@@ -365,15 +460,25 @@ class MockNavigationSimulator(Node):
         plan_msg = Path()
         plan_msg.header.stamp = stamp
         plan_msg.header.frame_id = 'map'
-        steps = 15
-        for s in range(steps + 1):
-            t = s / float(steps)
-            ps = PoseStamped()
-            ps.header.stamp = stamp
-            ps.header.frame_id = 'map'
-            ps.pose.position.x = rx + t * (self.target_x - rx)
-            ps.pose.position.y = ry + t * (self.target_y - ry)
-            plan_msg.poses.append(ps)
+        if self.active_path:
+            pts_to_draw = [(rx, ry), (self.target_x, self.target_y)] + self.active_path
+            for px, py in pts_to_draw:
+                ps = PoseStamped()
+                ps.header.stamp = stamp
+                ps.header.frame_id = 'map'
+                ps.pose.position.x = float(px)
+                ps.pose.position.y = float(py)
+                plan_msg.poses.append(ps)
+        else:
+            steps = 15
+            for s in range(steps + 1):
+                t = s / float(steps)
+                ps = PoseStamped()
+                ps.header.stamp = stamp
+                ps.header.frame_id = 'map'
+                ps.pose.position.x = rx + t * (self.target_x - rx)
+                ps.pose.position.y = ry + t * (self.target_y - ry)
+                plan_msg.poses.append(ps)
         self.plan_pub.publish(plan_msg)
 
         local_plan = Path()
