@@ -209,7 +209,8 @@ class MapVisualizerNode(Node):
         active_indices = np.where(data > 0)[0]
 
         cells = []
-        for idx in active_indices:
+        step = max(1, len(active_indices) // 1000)
+        for idx in active_indices[::step]:
             cost = int(data[idx])
             col = idx % w
             row = idx // w

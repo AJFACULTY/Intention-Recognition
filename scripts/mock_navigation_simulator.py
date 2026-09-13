@@ -74,6 +74,16 @@ class MockNavigationSimulator(Node):
         self.inflated_grid = cv2.dilate(is_obstacle, kernel)
         self.active_path = []  # List of (x, y) waypoints around walls
 
+        # ── Global Costmap Precomputation (Encompassing full building map) ──
+        is_wall = (cartesian_img == 0).astype(np.uint8)
+        dist_transform = cv2.distanceTransform(1 - is_wall, cv2.DIST_L2, 5) * self.map_res
+        global_grid = np.full((self.map_h, self.map_w), -1, dtype=np.int8)
+        global_grid[cartesian_img == 254] = 0
+        global_grid[is_wall == 1] = 100
+        inf_zone = (dist_transform > 0) & (dist_transform <= 0.35) & (is_wall == 0)
+        global_grid[inf_zone] = (99 * np.exp(-6.0 * (dist_transform[inf_zone] - 0.05))).clip(1, 99).astype(np.int8)
+        self.global_costmap_data = global_grid.flatten().tolist()
+
         # ── Simulated Robot State ────────────────────────────────────────────
         self.robot_x = 0.08
         self.robot_y = 0.05
@@ -83,6 +93,8 @@ class MockNavigationSimulator(Node):
         self.target_x = 0.40
         self.target_y = 0.00
         self.target_yaw = 0.0
+        self.final_goal_x = 0.40
+        self.final_goal_y = 0.00
 
         # Mission corridor patrol circuit
         self.patrol_circuit = [
@@ -107,6 +119,7 @@ class MockNavigationSimulator(Node):
 
         # ── Publishers ───────────────────────────────────────────────────────
         self.map_pub = self.create_publisher(OccupancyGrid, '/map', map_qos)
+        self.global_costmap_pub = self.create_publisher(OccupancyGrid, '/global_costmap/costmap', map_qos)
         self.amcl_pose_pub = self.create_publisher(PoseWithCovarianceStamped, '/amcl_pose', 10)
         self.particles_pub = self.create_publisher(PoseArray, '/particlecloud', 10)
         self.local_costmap_pub = self.create_publisher(OccupancyGrid, '/local_costmap/costmap', 10)
@@ -146,8 +159,9 @@ class MockNavigationSimulator(Node):
         self.get_logger().info('Mock Navigation Simulator ready. Ingesting room map and generating dynamic navigation telemetry.')
 
     def _publish_map(self):
+        stamp = self.get_clock().now().to_msg()
         msg = OccupancyGrid()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = stamp
         msg.header.frame_id = 'map'
         msg.info.resolution = self.map_res
         msg.info.width = self.map_w
@@ -157,6 +171,18 @@ class MockNavigationSimulator(Node):
         msg.info.origin.orientation.w = 1.0
         msg.data = self.occupancy_data
         self.map_pub.publish(msg)
+
+        gc_msg = OccupancyGrid()
+        gc_msg.header.stamp = stamp
+        gc_msg.header.frame_id = 'map'
+        gc_msg.info.resolution = self.map_res
+        gc_msg.info.width = self.map_w
+        gc_msg.info.height = self.map_h
+        gc_msg.info.origin.position.x = self.map_origin_x
+        gc_msg.info.origin.position.y = self.map_origin_y
+        gc_msg.info.origin.orientation.w = 1.0
+        gc_msg.data = self.global_costmap_data
+        self.global_costmap_pub.publish(gc_msg)
 
     def _find_nearest_free(self, r: int, c: int):
         """Finds nearest free cell if coordinates are inside an obstacle."""
@@ -231,6 +257,8 @@ class MockNavigationSimulator(Node):
         qz = msg.pose.orientation.z
         qw = msg.pose.orientation.w
         self.target_yaw = 2.0 * math.atan2(qz, qw)
+        self.final_goal_x = gx
+        self.final_goal_y = gy
         self.auto_patrol = False
 
         self.get_logger().info(f'Interactive Goal received: ({gx:.2f}m, {gy:.2f}m). Planning A* obstacle-free route...')
@@ -240,10 +268,11 @@ class MockNavigationSimulator(Node):
             self.target_x, self.target_y = self.active_path.pop(0)
             self.get_logger().info(f'A* route planned: {len(path)} waypoints safely circumventing partition walls.')
         else:
-            self.get_logger().warn(f'No obstacle-free path to ({gx:.2f}m, {gy:.2f}m)! Goal is inside a wall.')
+            self.get_logger().warn(f'No obstacle-free path to ({gx:.2f}m, {gy:.2f}m)! Goal is unreachable or inside a wall.')
+            # Halt safely in place, maintaining collision protection without blindly roaming
             self.active_path = []
-            self.auto_patrol = True
-            self.target_x, self.target_y = self.patrol_circuit[0]
+            self.target_x = self.robot_x
+            self.target_y = self.robot_y
 
     def _on_cmd_vel(self, msg: Twist):
         if abs(msg.linear.x) < 1e-4 and abs(msg.angular.z) < 1e-4:
@@ -279,10 +308,10 @@ class MockNavigationSimulator(Node):
             self.last_safe_y = py
             self.get_logger().info(f'AMCL Initial Pose set to: ({self.robot_x:.2f}m, {self.robot_y:.2f}m, {math.degrees(self.robot_yaw):.1f}°)')
 
-        self.auto_patrol = True
+        self.auto_patrol = False
         self.active_path = []
-        self.circuit_idx = 0
-        self.target_x, self.target_y = self.patrol_circuit[0]
+        self.target_x = self.robot_x
+        self.target_y = self.robot_y
 
     def _sim_tick(self):
         now = self.get_clock().now()
@@ -292,13 +321,12 @@ class MockNavigationSimulator(Node):
         curr_col = int((self.robot_x - self.map_origin_x) / self.map_res)
         curr_row = int((self.robot_y - self.map_origin_y) / self.map_res)
         if 0 <= curr_col < self.map_w and 0 <= curr_row < self.map_h and self.cartesian_img[curr_row, curr_col] == 0:
-            self.get_logger().warn(f'Robot was inside wall at ({self.robot_x:.2f}, {self.robot_y:.2f})! Teleporting to safe pose ({self.last_safe_x:.2f}, {self.last_safe_y:.2f}).')
+            self.get_logger().warn(f'Robot was inside wall at ({self.robot_x:.2f}, {self.robot_y:.2f})! Restoring safe pose ({self.last_safe_x:.2f}, {self.last_safe_y:.2f}).')
             self.robot_x = self.last_safe_x
             self.robot_y = self.last_safe_y
-            self.auto_patrol = True
             self.active_path = []
-            self.circuit_idx = 0
-            self.target_x, self.target_y = self.patrol_circuit[0]
+            self.target_x = self.last_safe_x
+            self.target_y = self.last_safe_y
 
         # 1. Update Robot Kinematics toward Target
         dx = self.target_x - self.robot_x
@@ -308,10 +336,16 @@ class MockNavigationSimulator(Node):
         if dist > 0.05:
             desired_yaw = math.atan2(dy, dx)
             yaw_diff = (desired_yaw - self.robot_yaw + math.pi) % (2 * math.pi) - math.pi
-            # Rotate toward target
-            self.robot_yaw += math.copysign(min(abs(yaw_diff), 0.15), yaw_diff)
-            # Advance along heading with wall collision prevention
-            step = min(dist, 0.018)  # ~0.18 m/s speed
+
+            # Differential Drive Rotate-to-Heading:
+            # If yaw error > ~20 degrees, rotate in place first before moving forward
+            if abs(yaw_diff) > 0.35:
+                self.robot_yaw += math.copysign(min(abs(yaw_diff), 0.22), yaw_diff)
+                step = 0.0  # Stop linear advance until heading is aligned
+            else:
+                self.robot_yaw += math.copysign(min(abs(yaw_diff), 0.15), yaw_diff)
+                step = min(dist, 0.025) * max(0.2, math.cos(yaw_diff))
+
             next_x = self.robot_x + step * math.cos(self.robot_yaw)
             next_y = self.robot_y + step * math.sin(self.robot_yaw)
             c_col = int((next_x - self.map_origin_x) / self.map_res)
@@ -319,14 +353,23 @@ class MockNavigationSimulator(Node):
 
             # Check if proposed step collides with solid wall (0 in PNG)
             if 0 <= c_col < self.map_w and 0 <= c_row < self.map_h and self.cartesian_img[c_row, c_col] == 0:
-                # Solid wall collision: bounce back to safe coordinate and resume safe corridor patrol
+                # Solid wall collision: maintain safe pose and re-plan route
                 self.robot_x = self.last_safe_x
                 self.robot_y = self.last_safe_y
-                self.auto_patrol = True
-                self.active_path = []
-                self.circuit_idx = 0
-                self.target_x, self.target_y = self.patrol_circuit[0]
-                self.get_logger().warn(f'Wall collision halted at ({next_x:.2f}, {next_y:.2f})! Resuming safe corridor circuit.')
+                if self.final_goal_x is not None and not self.auto_patrol:
+                    self.get_logger().warn(f'Obstacle guard held safe pose at ({self.last_safe_x:.2f}, {self.last_safe_y:.2f}). Re-planning path to ({self.final_goal_x:.2f}, {self.final_goal_y:.2f})...')
+                    new_path = self._plan_astar(self.robot_x, self.robot_y, self.final_goal_x, self.final_goal_y)
+                    if new_path:
+                        self.active_path = new_path
+                        self.target_x, self.target_y = self.active_path.pop(0)
+                    else:
+                        self.active_path = []
+                        self.target_x = self.robot_x
+                        self.target_y = self.robot_y
+                else:
+                    self.active_path = []
+                    self.target_x = self.robot_x
+                    self.target_y = self.robot_y
             else:
                 self.robot_x = next_x
                 self.robot_y = next_y
@@ -338,7 +381,13 @@ class MockNavigationSimulator(Node):
                 self.target_x, self.target_y = self.active_path.pop(0)
             elif self.auto_patrol:
                 self.circuit_idx = (self.circuit_idx + 1) % len(self.patrol_circuit)
-                self.target_x, self.target_y = self.patrol_circuit[self.circuit_idx]
+                gx, gy = self.patrol_circuit[self.circuit_idx]
+                p_path = self._plan_astar(self.robot_x, self.robot_y, gx, gy)
+                if p_path:
+                    self.active_path = p_path
+                    self.target_x, self.target_y = self.active_path.pop(0)
+                else:
+                    self.target_x, self.target_y = gx, gy
             else:
                 # Final destination reached
                 pass
@@ -393,28 +442,45 @@ class MockNavigationSimulator(Node):
             par_msg.poses.append(p)
         self.particles_pub.publish(par_msg)
 
-        # 5. Publish /local_costmap/costmap (3m x 3m rolling window = 60x60 cells @ 0.05m)
-        lc_size = 60
-        lc_res = 0.05
+        # 5. Publish /local_costmap/costmap (5m x 5m rolling window = 100x100 cells @ 0.05m)
+        lc_size = 100
+        lc_res = self.map_res
         lc_ox = rx - (lc_size * lc_res) / 2.0
         lc_oy = ry - (lc_size * lc_res) / 2.0
-        lc_grid = np.zeros((lc_size, lc_size), dtype=np.int8)
 
-        # Place simulated dynamic obstacle 0.55m ahead of the robot
-        obs_x = rx + 0.55 * math.cos(ryaw)
-        obs_y = ry + 0.55 * math.sin(ryaw)
+        r_start = int((lc_oy - self.map_origin_y) / self.map_res)
+        c_start = int((lc_ox - self.map_origin_x) / self.map_res)
+        r_end = r_start + lc_size
+        c_end = c_start + lc_size
+
+        lc_grid = np.zeros((lc_size, lc_size), dtype=np.int8)
+        mr_min = max(0, r_start)
+        mr_max = min(self.map_h, r_end)
+        mc_min = max(0, c_start)
+        mc_max = min(self.map_w, c_end)
+
+        if mr_max > mr_min and mc_max > mc_min:
+            lr_min = mr_min - r_start
+            lr_max = lr_min + (mr_max - mr_min)
+            lc_min = mc_min - c_start
+            lc_max = lc_min + (mc_max - mc_min)
+            sub = self.cartesian_img[mr_min:mr_max, mc_min:mc_max]
+            lc_grid[lr_min:lr_max, lc_min:lc_max][sub == 0] = 100
+
+        # Place simulated dynamic obstacle 0.6m ahead of the robot
+        obs_x = rx + 0.6 * math.cos(ryaw)
+        obs_y = ry + 0.6 * math.sin(ryaw)
         obs_col = int((obs_x - lc_ox) / lc_res)
         obs_row = int((obs_y - lc_oy) / lc_res)
+        if 0 <= obs_row < lc_size and 0 <= obs_col < lc_size:
+            cv2.circle(lc_grid, (obs_col, obs_row), 2, 100, -1)
 
-        # Create radial inflation cushion around simulated obstacle
-        for r in range(max(0, obs_row - 6), min(lc_size, obs_row + 7)):
-            for c in range(max(0, obs_col - 6), min(lc_size, obs_col + 7)):
-                d = math.hypot(r - obs_row, c - obs_col)
-                if d <= 1.5:
-                    lc_grid[r, c] = 100  # Lethal obstacle
-                elif d <= 5.5:
-                    cost = int(95 * (1.0 - (d - 1.5) / 4.0))
-                    lc_grid[r, c] = max(lc_grid[r, c], cost)
+        # Radial inflation cushion across local window
+        obs_mask = (lc_grid == 100).astype(np.uint8)
+        if np.any(obs_mask):
+            dt = cv2.distanceTransform(1 - obs_mask, cv2.DIST_L2, 3) * lc_res
+            inf_zone = (dt > 0) & (dt <= 0.35) & (obs_mask == 0)
+            lc_grid[inf_zone] = (99 * np.exp(-6.0 * (dt[inf_zone] - 0.05))).clip(1, 99).astype(np.int8)
 
         cost_msg = OccupancyGrid()
         cost_msg.header.stamp = stamp
@@ -428,7 +494,7 @@ class MockNavigationSimulator(Node):
         cost_msg.data = lc_grid.flatten().tolist()
         self.local_costmap_pub.publish(cost_msg)
 
-        # 6. Publish /scan_downsampled (120 beams)
+        # 6. Publish /scan_downsampled (120 beams) & /scan via Real Raycasting against Map Walls
         scan = LaserScan()
         scan.header.stamp = stamp
         scan.header.frame_id = 'laser_frame'
@@ -439,19 +505,26 @@ class MockNavigationSimulator(Node):
         scan.range_max = 8.0
 
         ranges = []
-        for i in range(120):
-            ang = scan.angle_min + i * scan.angle_increment
+        angles = np.linspace(-math.pi, math.pi, 120, endpoint=False)
+        for ang in angles:
             world_ang = ryaw + ang
-            # Approximate distance to wall bounds [x in -2.0..1.8, y in -1.5..1.8]
-            # Raycast against a 2.5m bounding circle + simulated obstacle
-            wall_dist = 1.6 + 0.3 * math.sin(2 * world_ang)
-            # Check ray hitting dynamic obstacle
-            ang_to_obs = math.atan2(obs_y - ry, obs_x - rx)
-            ang_diff = (ang_to_obs - world_ang + math.pi) % (2 * math.pi) - math.pi
-            if abs(ang_diff) < 0.18:
-                ranges.append(0.55)
-            else:
-                ranges.append(float(wall_dist))
+            cos_a = math.cos(world_ang)
+            sin_a = math.sin(world_ang)
+            hit_dist = scan.range_max
+            # Step in 0.04m increments along ray
+            for d in np.arange(scan.range_min, scan.range_max, 0.04):
+                wx = rx + d * cos_a
+                wy = ry + d * sin_a
+                r = int((wy - self.map_origin_y) / self.map_res)
+                c = int((wx - self.map_origin_x) / self.map_res)
+                if 0 <= r < self.map_h and 0 <= c < self.map_w:
+                    if self.cartesian_img[r, c] == 0:
+                        hit_dist = d
+                        break
+                else:
+                    hit_dist = d
+                    break
+            ranges.append(float(hit_dist))
         scan.ranges = ranges
         self.scan_pub.publish(scan)
         self.raw_scan_pub.publish(scan)
