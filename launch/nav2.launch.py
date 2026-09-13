@@ -26,8 +26,26 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    params = os.path.join(ws_dir, 'config', 'nav2_params.yaml')
-    map_yaml = os.path.join(ws_dir, 'maps', 'room_map_20260812_0826.yaml')
+
+    # Dynamic parameter file discovery
+    possible_params = [
+        os.path.join(ws_dir, 'config', 'nav2_params.yaml'),
+        '/root/cognition_ws/src/cognition_simulation/config/nav2_params.yaml',
+        '/root/cognition_ws/nav2_params.yaml',
+        '/home/pi/cognition_ws/config/nav2_params.yaml',
+    ]
+    params = next((p for p in possible_params if os.path.exists(p)), possible_params[0])
+
+    # Dynamic map file discovery
+    possible_maps = [
+        os.path.join(ws_dir, 'maps', 'room_map_20260812_0826.yaml'),
+        os.path.join(ws_dir, 'maps_new', 'room_map_20260812_0826.yaml'),
+        '/root/cognition_ws/maps_new/room_map_20260812_0826.yaml',
+        '/root/cognition_ws/maps/room_map_20260812_0826.yaml',
+        '/home/pi/maps_new/room_map_20260812_0826.yaml',
+        '/home/pi/maps/room_map_20260812_0826.yaml',
+    ]
+    map_yaml = next((m for m in possible_maps if os.path.exists(m)), possible_maps[0])
     sim_time = {'use_sim_time': False}
 
     # --- Sensor / transform chain (same as slam_real.launch.py, minus slam_toolbox) ---

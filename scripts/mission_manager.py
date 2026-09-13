@@ -52,12 +52,15 @@ MISSION_CATALOG = {
     "NORTH_GALLERY_PATROL": [
         Waypoint("P2 Central Hub", 1.64, 1.62, 0.78, dwell_sec=3.0),
         Waypoint("P3 North Gallery", 3.20, 3.20, 0.78, dwell_sec=3.0),
+        Waypoint("P2 Central Hub (Return)", 1.64, 1.62, 2.36, dwell_sec=2.0),
         Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
     "UNATTENDED_FACILITY_PATROL": [
         Waypoint("P2 Central Hub", 1.64, 1.62, 0.78, dwell_sec=3.0),
         Waypoint("P3 North Gallery", 3.20, 3.20, 0.78, dwell_sec=3.0),
         Waypoint("P4 East Lab", 4.70, 1.80, -0.75, dwell_sec=3.0),
+        Waypoint("P3 North Gallery (Return)", 3.20, 3.20, 2.36, dwell_sec=2.0),
+        Waypoint("P2 Central Hub (Return)", 1.64, 1.62, 2.36, dwell_sec=2.0),
         Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
 }
@@ -167,7 +170,7 @@ class MissionManagerNode(Node):
                     leg_success = True
                 break
             # Spatial completion check (per Josh Newans / Nav2 best practice)
-            if self._last_dist <= 0.08 and (time.time() - start_wait) > 4.0:
+            if self._last_dist <= 0.12 and (time.time() - start_wait) > 3.0:
                 self.get_logger().info(f'Waypoint {wp.name} spatially achieved (remaining: {self._last_dist:.2f}m). Proceeding...')
                 leg_success = True
                 goal_handle.cancel_goal_async()
@@ -251,15 +254,32 @@ class MissionManagerNode(Node):
             print('        Mission safely cancelled. No wheels will move.\n')
             return False
 
-        waypoints = MISSION_CATALOG[mission_name]
-        total_wp = len(waypoints)
-
         # Preflight Pose Check
         pose = self.get_current_pose()
         if pose:
             print(f'Initial Robot Position: x = {pose[0]:.2f}m, y = {pose[1]:.2f}m, heading = {pose[2]:.1f}°')
         else:
             print('Notice: AMCL pose not yet received. Nav2 will rely on initial /initialpose.')
+
+        # Dynamically build corridor return path if RETURN_HOME is selected anywhere in the building
+        if mission_name == "RETURN_HOME":
+            if pose:
+                rx, ry, _ = pose
+                wps = []
+                # If currently in or near East Lab branch (P4 branch: x > 3.4 or near corner)
+                if rx > 3.4 or (rx > 3.0 and ry < 2.8):
+                    wps.append(Waypoint("P3 North Gallery (Elbow)", 3.20, 3.20, 2.36, dwell_sec=2.0))
+                # If currently in North Gallery (ry > 2.0 or rx > 2.0)
+                if ry > 2.0 or rx > 2.0:
+                    wps.append(Waypoint("P2 Central Hub (Midpoint)", 1.64, 1.62, 2.36, dwell_sec=2.0))
+                wps.append(Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0))
+                waypoints = wps
+            else:
+                waypoints = MISSION_CATALOG["RETURN_HOME"]
+        else:
+            waypoints = MISSION_CATALOG[mission_name]
+
+        total_wp = len(waypoints)
 
         success_count = 0
         for idx, wp in enumerate(waypoints, start=1):
