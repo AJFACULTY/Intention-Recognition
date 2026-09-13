@@ -96,10 +96,13 @@ class MockNavigationSimulator(Node):
         self.final_goal_x = 0.40
         self.final_goal_y = 0.00
 
-        # Mission corridor patrol circuit
+        # Mission corridor & facility-wide patrol circuit
         self.patrol_circuit = [
             (0.08, 0.05),  # Home Base
             (0.40, 0.00),  # WP1 Runway
+            (1.80, 0.80),  # WP4 Center Hub
+            (3.00, 2.80),  # WP5 North Gallery
+            (4.70, 1.80),  # WP6 East Lab
             (0.70, 0.35),  # WP2 Curve
             (0.35, 0.15),  # WP3 Return
         ]

@@ -60,6 +60,15 @@ MISSION_CATALOG = {
         Waypoint("Inspection Post Bravo", 0.70, 0.35, 0.0, dwell_sec=5.0),
         Waypoint("Home Station (Base)", 0.08, 0.05, 0.0, dwell_sec=2.0),
     ],
+    "FACILITY_SWEEP": [
+        Waypoint("Waypoint 1 (Mid-Corridor)", 0.40, 0.00, 0.0, dwell_sec=3.0),
+        Waypoint("Waypoint 4 (Center Hub)", 1.80, 0.80, 0.0, dwell_sec=3.0),
+        Waypoint("Waypoint 5 (North Gallery)", 3.00, 2.80, 0.0, dwell_sec=3.0),
+        Waypoint("Waypoint 6 (East Lab)", 4.70, 1.80, 0.0, dwell_sec=3.0),
+        Waypoint("Waypoint 2 (Aisle Curve)", 0.70, 0.35, 0.0, dwell_sec=3.0),
+        Waypoint("Waypoint 3 (Return Leg Midpoint)", 0.35, 0.15, 0.0, dwell_sec=2.0),
+        Waypoint("Home Station (Base)", 0.08, 0.05, 0.0, dwell_sec=2.0),
+    ],
 }
 
 

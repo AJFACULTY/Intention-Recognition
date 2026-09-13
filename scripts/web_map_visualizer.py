@@ -70,12 +70,15 @@ class MapVisualizerNode(Node):
         self.battery_healthy = True
         self.battery_last_time = 0.0
 
-        # ── Waypoints & Patrol Landmarks ─────────────────────────────────────
+        # ── Waypoints & Patrol Landmarks (Full Facility Coverage) ─────────────
         self.corridor_landmarks = [
             (0.08, 0.05, "HOME Base"),
             (0.40, 0.00, "WP1 Runway"),
             (0.70, 0.35, "WP2 Curve"),
             (0.35, 0.15, "WP3 Return"),
+            (1.80, 0.80, "WP4 Center Hub"),
+            (3.00, 2.80, "WP5 North Gallery"),
+            (4.70, 1.80, "WP6 East Lab"),
         ]
 
         # ── Nav2 Paths, Scans & Goals ────────────────────────────────────────
@@ -483,10 +486,11 @@ class MapVisualizerNode(Node):
                 cv2.putText(img_out, label, (rpx + 8, rpy + 4),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 255), 1, cv2.LINE_AA)
 
-        draw_wp_ring(resized, 0.08, 0.05, 'H', (0, 215, 0))       # Home Base (Green)
-        draw_wp_ring(resized, 0.40, 0.00, '1', (200, 100, 240))   # WP1 Runway (Purple)
-        draw_wp_ring(resized, 0.70, 0.35, '2', (200, 100, 240))   # WP2 Curve (Purple)
-        draw_wp_ring(resized, 0.35, 0.15, '3', (200, 100, 240))   # WP3 Return (Purple)
+        for item in self.corridor_landmarks:
+            wx, wy, name = item
+            lbl = 'H' if 'HOME' in name else name.split()[0].replace('WP', '')
+            col = (0, 215, 0) if 'HOME' in name else (200, 100, 240)
+            draw_wp_ring(resized, wx, wy, lbl, col)
 
         # ── 4. Traveled Odometry Trail (Warm Amber/Gold Breadcrumbs) ─────────
         if show_tr and len(trail_pts) > 1:
@@ -995,7 +999,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <div class="panel">
       <div class="card">
-        <h2>Quick Mission Dispatch</h2>
+        <h2>Quick Mission Dispatch (Any Starting Position)</h2>
         <div class="btn-grid">
           <button class="action-btn" onclick="dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0)">
             <span style="color:var(--green)">🏠</span> Home (0.08, 0.05)
@@ -1009,8 +1013,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <button class="action-btn" onclick="dispatchWaypoint('WP3 Return', 0.35, 0.15, 3.14)">
             <span style="color:var(--purple)">3️⃣</span> WP3 (0.35, 0.15)
           </button>
-          <button class="action-btn full-width" style="color:var(--accent)" onclick="runPatrolCircuit()">
-            🔄 Run Full Corridor Patrol Circuit
+          <button class="action-btn" onclick="dispatchWaypoint('WP4 Center Hub', 1.80, 0.80, 0.0)">
+            <span style="color:var(--cyan)">4️⃣</span> WP4 Center (1.80, 0.80)
+          </button>
+          <button class="action-btn" onclick="dispatchWaypoint('WP5 North Gallery', 3.00, 2.80, 0.0)">
+            <span style="color:var(--cyan)">5️⃣</span> WP5 North (3.00, 2.80)
+          </button>
+          <button class="action-btn" onclick="dispatchWaypoint('WP6 East Lab', 4.70, 1.80, 0.0)">
+            <span style="color:var(--cyan)">6️⃣</span> WP6 East (4.70, 1.80)
+          </button>
+          <button class="action-btn full-width" style="color:var(--accent)" onclick="startSmartPatrol('corridor')">
+            🔄 Corridor Patrol (Starts at Nearest WP)
+          </button>
+          <button class="action-btn full-width" style="color:var(--purple)" onclick="startSmartPatrol('facility')">
+            🌐 Full Facility Sweep (Multi-Room Circuit)
           </button>
           <button class="action-btn full-width" style="color:var(--gold)" onclick="resetHome()">
             📍 Reset Pose to Home Base (Unwedge)
@@ -1140,8 +1156,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
 
     function runPatrolCircuit() {
-      dispatchWaypoint('WP1 Runway', 0.40, 0.00, 0.0);
-      showToast('🔄 Autonomous corridor patrol circuit started.');
+      startSmartPatrol('corridor');
+    }
+
+    function startSmartPatrol(circuitType) {
+      fetch('/api/patrol', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: circuitType })
+      })
+      .then(r => r.json())
+      .then(data => {
+        showToast(`🔄 Dynamic ${circuitType} patrol dispatched from nearest waypoint (${data.start_wp})`);
+      });
     }
 
     function resetHome() {
@@ -1480,6 +1507,48 @@ class WebHandler(BaseHTTPRequestHandler):
             wyaw = float(req_data.get('yaw', 0.0))
             self.node_ref.dispatch_waypoint(wx, wy, wyaw)
             resp = json.dumps({"status": "ok", "action": "waypoint", "x": wx, "y": wy, "yaw": wyaw}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+        elif self.path == '/api/patrol':
+            ctype = req_data.get('type', 'corridor')
+            if ctype == 'facility':
+                circuit = [
+                    (0.40, 0.00, "WP1 Runway"),
+                    (1.80, 0.80, "WP4 Center Hub"),
+                    (3.00, 2.80, "WP5 North Gallery"),
+                    (4.70, 1.80, "WP6 East Lab"),
+                    (0.35, 0.15, "WP3 Return"),
+                    (0.08, 0.05, "HOME Base"),
+                ]
+            else:
+                circuit = [
+                    (0.40, 0.00, "WP1 Runway"),
+                    (0.70, 0.35, "WP2 Curve"),
+                    (0.35, 0.15, "WP3 Return"),
+                    (0.08, 0.05, "HOME Base"),
+                ]
+
+            with self.node_ref.lock:
+                rx, ry = self.node_ref.robot_x, self.node_ref.robot_y
+
+            # Dynamic entry point: select nearest waypoint to robot's CURRENT position
+            dists = [math.hypot(wp[0] - rx, wp[1] - ry) for wp in circuit]
+            best_idx = int(np.argmin(dists))
+            target_wp = circuit[best_idx]
+
+            self.node_ref.dispatch_waypoint(target_wp[0], target_wp[1], 0.0)
+
+            resp = json.dumps({
+                "status": "ok",
+                "circuit": ctype,
+                "start_wp": target_wp[2],
+                "x": target_wp[0],
+                "y": target_wp[1]
+            }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Content-length', str(len(resp)))
