@@ -158,7 +158,7 @@ Multiple Persons & Spatial zone filter isolates operator and ignores bystanders 
 
 In static obstacle trials, the planar LiDAR reliably detected obstacles directly in the robot's heading path, allowing the safety controller to trigger a reactive halt at a measured safety distance of 0.36~m from the obstacle. During physical navigation testing, the robot was assigned a 1.5~m autonomous forward navigation goal; utilizing the calibrated metric map established during platform bring-up (detailed in Chapter 3, Figure~\ref{fig:slam_calibration_maps}), the robot successfully planned a collision-free local path, dynamically avoided nearby obstacles, and reached the target position without manual intervention. In multi-person environments, the spatial acceptance filter successfully isolated the primary operator, allowing navigation and follow routines to execute reliably without disruption from background bystanders.
 
-\subsection{Empirical Physical Autonomous Navigation Benchmark}
+\subsection{Empirical Single-Goal Autonomous Navigation Benchmark}
 \label{sec:nav2_evaluation}
 To evaluate the end-to-end integration of the autonomous navigation stack on physical hardware, a dedicated 1.5\,m straight-line benchmark was conducted in the indoor testing room using Nav2 and the pre-built metric map. The goal coordinate was dispatched as a \texttt{NavigateToPose} action with a tightened goal tolerance of 0.10\,m. To capture empirical ground truth without inducing disk I/O starvation or thermal throttling on the Raspberry Pi 5, a lightweight telemetry logging strategy was implemented using \texttt{rosbag2}, recording planar LiDAR scans (\texttt{/scan}) and wheel odometry (\texttt{/odom\_raw}) while strictly excluding high-bandwidth raw video. The run successfully completed with a \texttt{SUCCEEDED} action status over a total duration of 27.54 seconds.
 
@@ -172,6 +172,56 @@ To evaluate the end-to-end integration of the autonomous navigation stack on phy
 Figure~\ref{fig:nav_trajectory_empirical} illustrates the empirical trajectory and kinematic telemetry decoded directly from the 307 wheel odometry messages and 345 LiDAR scans captured in the ROS~2 bag. As shown in the 2D spatial trajectory (Figure~\ref{fig:nav_trajectory_empirical}, left), the vehicle initiated motion from its localized start pose and traversed a net physical displacement of 1.269\,m. While visual floor space appeared open to the human eye, the autonomous mobile robot executed a dynamic rightward avoidance arc, altering its heading by $-40.5^\circ$ (Figure~\ref{fig:nav_trajectory_empirical}, top-right) before converging cleanly at the terminal goal. This trajectory deviation occurred because the local costmap inflated static table structures situated along the left corridor, prompting the DWB local trajectory planner to steer the mobile base along the minimum-cost repulsive gradient into clear space.
 
 The linear velocity profile (Figure~\ref{fig:nav_trajectory_empirical}, bottom-right) highlights the smooth, multi-phase motion control sustained across the benchmark run. Following an initial heading alignment and acceleration phase between $t=5.0$\,s and $t=12.0$\,s, the robot cruised through the obstacle clearance corridor, achieving a peak forward speed of 0.236\,m/s that strictly respected the configured 0.25\,m/s software velocity limit. Upon penetrating the terminal acceptance radius, the velocity controller smoothly decelerated the vehicle down to 0.04\,m/s before commanding a complete halt once the position error fell below the 0.10\,m threshold. This physical benchmark empirically validates that the edge-deployed Nav2 stack maintains deterministic trajectory tracking, proactive costmap clearance, and collaborative safety compliance in physical indoor environments.
+
+\subsection{Empirical Multi-Waypoint Autonomous Facility Patrol Benchmark}
+\label{sec:multi_waypoint_evaluation}
+To validate extended multi-goal autonomy beyond single-point linear transits, a full-scale unattended facility patrol benchmark was conducted across the calibrated indoor testing environment. The physical mobile robot was tasked with executing the six-leg \texttt{UNATTENDED\_FACILITY\_PATROL} mission, navigating sequentially through four distinct topological inspection waypoints configured in a Geometric L-Corridor layout: $P_1$ Dock Base ($0.08\,\text{m}, 0.05\,\text{m}$), $P_2$ Central Hub ($1.64\,\text{m}, 1.62\,\text{m}$), $P_3$ North Corner ($3.20\,\text{m}, 3.20\,\text{m}$), and $P_4$ East Lab Post ($4.70\,\text{m}, 1.80\,\text{m}$), followed by an autonomous return traversal ($P_4 \to P_3 \to P_2 \to P_1$). To systematically capture high-fidelity mission telemetry without saturating the onboard storage bus or triggering thermal throttling on the Raspberry Pi 5, the automated logging script recorded twelve non-saturating scalar ROS~2 topics (\texttt{/odom\_raw}, \texttt{/odometry/filtered}, \texttt{/scan}, \texttt{/cmd\_vel}, \texttt{/cmd\_vel\_nav}, \texttt{/tf}, \texttt{/tf\_static}, \texttt{/amcl\_pose}, \texttt{/plan}, \texttt{/battery}, and \texttt{/safety/chime}) into an SQLite3 bag database over the entire run.
+
+Figure~\ref{fig:multi_waypoint_patrol_empirical} illustrates the complete empirical trajectory, path tracking error, and locomotion kinematics decoded from the 12,661 messages captured during the patrol run. As depicted in the spatial trajectory plot (Figure~\ref{fig:multi_waypoint_patrol_empirical}a), the vehicle reliably traversed the diagonal corridor from $P_1$ through $P_2$, successfully navigated the sharp $90^\circ$ elbow turn around $P_3$, entered the East Lab corridor at $P_4$, and autonomously retraced its path back to home base without getting trapped or stalling. The total physical trajectory traversed was 15.890\,m over an active duration of 158.81 seconds (2.65 minutes), achieving 100\% autonomous completion across all six mission legs. Table~\ref{tab:multi_waypoint_metrics} presents the quantitative tracking accuracy, cross-track error statistics, and closest approach tolerances recorded across the physical benchmark.
+
+\begin{table}[H]
+\centering
+\caption{Empirical Multi-Waypoint Autonomous Patrol Performance Metrics}
+\label{tab:multi_waypoint_metrics}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metric Description} & \textbf{Observed Value} & \textbf{Evaluation Standard} \\
+\hline
+Total Mission Duration & 158.81\,s (2.65\,min) & Deterministic runtime \\
+\hline
+Total Trajectory Length & 15.890\,m & 6-leg bidirectional traverse \\
+\hline
+Mean Absolute Cross-Track Error (MAE) & 15.47\,cm & $\le 20.0$\,cm corridor allowance \\
+\hline
+Root Mean Square Error (RMSE) & 22.24\,cm & Path adherence stability \\
+\hline
+Maximum Cross-Track Deviation & 66.61\,cm & Corner costmap obstacle clearance \\
+\hline
+Waypoint Arrival Error ($P_1$ Dock Base) & 2.7\,cm & Goal tolerance: 12.0\,cm (PASS) \\
+\hline
+Waypoint Arrival Error ($P_2$ Central Hub) & 3.7\,cm & Goal tolerance: 12.0\,cm (PASS) \\
+\hline
+Waypoint Arrival Error ($P_3$ North Corner) & 8.1\,cm & Goal tolerance: 12.0\,cm (PASS) \\
+\hline
+Waypoint Arrival Error ($P_4$ East Lab Post) & 6.4\,cm & Goal tolerance: 12.0\,cm (PASS) \\
+\hline
+Autonomous Mission Completion & 100\% (6/6 legs) & Zero human intervention / aborts \\
+\hline
+Acoustic Safety State Chimes & 7 events logged & Arrival \& completion verification \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/multi_waypoint_patrol_empirical.png}
+\caption{Empirical multi-waypoint autonomous patrol telemetry decoded from physical ROS~2 bag database (\texttt{patrol\_20260913\_215558}). Subplots illustrate: (a) 2D spatial trajectory across the calibrated Geometric L-Corridor topology ($P_1 \to P_2 \to P_3 \to P_4$ and return) with continuous mission timestamp colormap and chassis heading quivers; (b) Cross-track error (MAE = 15.5\,cm, RMSE = 22.2\,cm) and chassis yaw orientation relative to the 12.0\,cm goal tolerance boundary; and (c) Dynamic locomotion kinematics displaying linear velocity $v_x$ (cruising at 0.20\,m/s), angular yaw rate $\omega_z$, and zero-velocity sensor dwell intervals.}
+\label{fig:multi_waypoint_patrol_empirical}
+\end{figure}
+
+As detailed in Table~\ref{tab:multi_waypoint_metrics}, the autonomous navigation pipeline maintained high path tracking fidelity throughout the complex multi-room transit, registering a Mean Absolute Error (MAE) of 15.47\,cm and a Root Mean Square Error (RMSE) of 22.24\,cm relative to the planned global guidelines. The maximum recorded cross-track error was 66.61\,cm, occurring at elapsed time $t \approx 52.4$\,s during the negotiation of waypoint $P_3$. This localized deviation was not a tracking failure, but rather an active costmap obstacle clearance maneuver wherein the DWB local planner deflected the robot away from inflated corner geometry to guarantee collision-free transit into the East Lab. Furthermore, all four physical waypoints were achieved with sub-decimeter terminal precision ($2.7\,\text{cm}$ at $P_1$, $3.7\,\text{cm}$ at $P_2$, $8.1\,\text{cm}$ at $P_3$, and $6.4\,\text{cm}$ at $P_4$), well within the configured $12.0\,\text{cm}$ waypoint acceptance threshold.
+
+The dynamic locomotion kinematics (Figure~\ref{fig:multi_waypoint_patrol_empirical}c) demonstrate deterministic velocity control and smooth state sequencing throughout the patrol. The robot sustained a steady linear cruising velocity of $0.200\,\text{m/s}$, strictly honoring the $0.25\,\text{m/s}$ software safety ceiling while executing smooth trapezoidal acceleration and deceleration phases at each transit boundary. At designated inspection waypoints ($P_3$ and $P_4$), the mission manager enforced a 3.0-second stationary dwell period ($v_x = 0\,\text{m/s}$) for simulated sensor surveys before dispatching the subsequent leg. Seven discrete acoustic safety chime events were published and confirmed across the run (marking six waypoint arrivals and final mission completion), empirically validating that the embedded ROS~2 cognition stack is fully capable of unattended, multi-room patrol and robust autonomous navigation on real physical hardware.
 
 \section{Performance Evaluation and Benchmarking}
 

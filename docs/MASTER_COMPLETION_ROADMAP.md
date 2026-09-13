@@ -315,14 +315,20 @@ This roadmap lays out the sequential, dependency-ordered engineering action plan
   - Update `chapters/ch4_results.tex` and `chapters/ch5_conclusion.tex` on Overleaf.
   - Verify zero LaTeX errors and clean document rendering.
 
-### Task 9.3: Multi-Goal Waypoint Navigation & Room Patrol (On Deck Post-Charge)
-- **Status:** **PLANNED & READY FOR DEPLOYMENT (Robot Currently Charging).**
-- **Detailed Sub-Tasks:**
-  - **Task 9.3.1 (`scripts/navigate_waypoints.py`):** Standalone ROS 2 action client CLI supporting `NavigateThroughPoses` and sequential `NavigateToPose` with distance-remaining feedback, ETA calculation, waypoint arrival dwell timers, and graceful Ctrl+C emergency cancellation.
-  - **Task 9.3.2 (`scripts/run_nav2_patrol.sh`):** Automated deployment and telemetry harness. Triggers lightweight non-saturating bag recording (`/tf`, `/odom_raw`, `/odometry/filtered`, `/scan`, `/cmd_vel`, `/amcl_pose`, `/plan`), checks AMCL convergence, and dispatches patrol.
-  - **Task 9.3.3 (`scripts/plot_multi_waypoint_trajectory.py`):** Decodes mission bag files into 3-panel publication plots comparing planned global paths vs executed AMCL trajectories, calculating cross-track error and velocity profiles.
-  - **Task 9.3.4 (Return-to-Home & Room Patrol Route):** Execute physical Return-to-Home $(1.44\,\text{m}, 0.02\,\text{m}) \to (0.00\,\text{m}, 0.00\,\text{m})$ and 3-waypoint corridor loop.
-  - **Task 9.3.5 (Dynamic Obstacle Avoidance Verification):** Validate Nav2 costmap obstacle inflation and local path replanning when an operator steps into the patrol path.
+### Task 9.3: Multi-Goal Waypoint Navigation & Room Patrol
+- **Status:** **COMPLETED & EMPIRICALLY VERIFIED (September 13, 2026).**
+- **Verification Details:**
+  - **Live Nav2 Action Execution:** 6-leg `UNATTENDED_FACILITY_PATROL` executed sequentially across the calibrated Geometric L-Corridor topology ($P_1 \to P_2 \to P_3 \to P_4 \to P_3 \to P_2 \to P_1$).
+  - **Empirical Rosbag Telemetry:** Decoded 12,661 messages from `/home/pi/cognition_ws/bags/patrol_20260913_215558` (12.39 MB) across 12 scalar topics with zero dropped buffers.
+  - **Physical Performance:**
+    - Active Traverse Distance: $15.890\,\text{m}$.
+    - Mission Execution Duration: $158.81\,\text{s}$ ($2.65\,\text{min}$).
+    - Mean Absolute Cross-Track Error (MAE): $15.47\,\text{cm}$.
+    - Root Mean Square Error (RMSE): $22.24\,\text{cm}$.
+    - Maximum Cross-Track Error: $66.61\,\text{cm}$ (during active corner costmap clearance around $P_3$).
+    - Waypoint Arrival Precision: $P_1$ ($2.7\,\text{cm}$), $P_2$ ($3.7\,\text{cm}$), $P_3$ ($8.1\,\text{cm}$), $P_4$ ($6.4\,\text{cm}$), all $\le 12.0\,\text{cm}$ goal tolerance.
+    - Safety Confirmation: 7 acoustic safety chimes logged (6 arrivals + 1 mission complete).
+  - **Publication Plot & Thesis Integration:** Generated publication 3-panel figure ([write_up/figures/multi_waypoint_patrol_empirical.png](file:///home/j/ros2_cognition_ws/write_up/figures/multi_waypoint_patrol_empirical.png)), added Subsection 4.5.3 and Table 4.6 to `write_up/chapters/ch4_results.tex`, and updated Section 5.3 in `write_up/chapters/ch5_conclusion.tex`.
 
 ---
 

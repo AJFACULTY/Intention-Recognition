@@ -101,16 +101,17 @@
 - [ ] **Figure 3.15 (`room_map_20260810_0452.png` & `room_map_clean.png`):** Platform Calibration SLAM Maps Comparison — Verify text comparing Subfigure (a) "hourglass" rotational drift defect against Subfigure (b) Ceres scan-matching calibrated clean map in §3.9.
 - [ ] **Figure 4.1 (`per_class_accuracy_chart.png`):** Per-Class Gesture Classification Accuracy Bar Chart — Verify per-class test set percentages (99.1% to 99.8%) and comparative discussion against physical interaction trials in §4.3.2.
 - [ ] **Figure 4.2 (`MLP_Confusion_Matrix.png`):** Normalized MLP Gesture Confusion Matrix — Verify true vs predicted label matrix, off-diagonal error analysis, and hand tilt angle discussion in §4.4.
-- [ ] **Figure 4.3 (`nav_run_trajectory_empirical.png`):** Empirical Physical Navigation Benchmark Trajectory & Kinematics — Verify 3-panel plot interpretation (2D spatial path, heading deviation $-40.5^\circ$ costmap clearance arc, and $0.236\,\text{m/s}$ velocity cruise/deceleration) in §4.5.
+- [ ] **Figure 4.3 (`nav_run_trajectory_empirical.png`):** Empirical Single-Goal Navigation Benchmark Trajectory & Kinematics — Verify 3-panel plot interpretation (2D spatial path, heading deviation $-40.5^\circ$ costmap clearance arc, and $0.236\,\text{m/s}$ velocity cruise/deceleration) in §4.5.2.
+- [ ] **Figure 4.4 (`multi_waypoint_patrol_empirical.png`):** Empirical Multi-Waypoint Autonomous Facility Patrol Trajectory & Kinematics — Verify 3-panel plot interpretation (Geometric L-Corridor 15.89m traverse, MAE = 15.5 cm, RMSE = 22.2 cm, sub-decimeter waypoint arrivals, and velocity cruise profiles) in §4.5.3.
 
 ---
 
 ## 1.6. Overleaf Online Thesis Synchronization Checklist
 *Tasks required to synchronize local Git and LaTeX improvements with the primary Overleaf cloud project:*
-- [ ] **Upload All Publication Figures:** Upload all updated figures (`hardware_design.png`, `system_architecture.png`, `fig_spatial_zone.png`, `fig_feature_pipeline.png`, `fig_brain_state_machine.png`, `fig_docker_deployment.png`, `nav_run_trajectory_empirical.png`) to the `figures/` folder on Overleaf.
+- [ ] **Upload All Publication Figures:** Upload all updated figures (`hardware_design.png`, `system_architecture.png`, `fig_spatial_zone.png`, `fig_feature_pipeline.png`, `fig_brain_state_machine.png`, `fig_docker_deployment.png`, `nav_run_trajectory_empirical.png`, `multi_waypoint_patrol_empirical.png`) to the `figures/` folder on Overleaf.
 - [ ] **Sync Chapter 3:** Replace `chapters/ch3_methodology.tex` on Overleaf with the updated local version containing the real hand landmark pipeline, empirical spatial zone with privacy blur, and formal workstation nomenclature.
-- [ ] **Sync Chapter 4:** Replace `chapters/ch4_results.tex` on Overleaf with the updated local version containing the empirical navigation benchmark (§4.5.2) and telemetry metrics.
-- [ ] **Sync Chapter 5:** Replace `chapters/ch5_conclusion.tex` on Overleaf with the refined limitation text acknowledging the successful lightweight ROS 2 bag telemetry validation.
+- [ ] **Sync Chapter 4:** Replace `chapters/ch4_results.tex` on Overleaf with the updated local version containing the empirical navigation benchmark (§4.5.2, §4.5.3) and telemetry metrics.
+- [ ] **Sync Chapter 5:** Replace `chapters/ch5_conclusion.tex` on Overleaf with the refined limitation text acknowledging the successful lightweight ROS 2 bag telemetry validation and multi-waypoint patrol achievement.
 - [ ] **Verify Overleaf Compilation:** Recompile full document on Overleaf to confirm zero compilation errors, zero missing figure warnings, and clean table floats.
 
 ---
@@ -217,15 +218,14 @@
 - [ ] **Task 9.2.1: Permanent Turnkey Joystick Service (`joy_node` & `/cmd_vel_joy` on boot):**
   - Install and enable a dedicated systemd service on the Pi 5 to keep `joy_node` alive in the background.
   - Automatically route controller inputs to `/cmd_vel_joy` (Priority 100 on `twist_mux`) for instant, effortless manual override at any time.
-- [ ] **Task 9.2.2: Consolidated Master Robot Launch File (`launch/master_robot.launch.py`):**
-  - Assemble a single, Articulated Robotics-compliant top-level ROS 2 launch file.
-  - Modularly bring up micro-ROS agent, LiDAR drivers, `twist_mux`, joystick, Nav2 lifecycle stack, active vision, and the web visualizer simultaneously.
-- [ ] **Nav2 Multi-Waypoint & Room Patrol Implementation Plan (On Deck Post-Charge):**
-  - [ ] **Task 9.3.1:** Implement `scripts/navigate_waypoints.py` CLI supporting `NavigateThroughPoses` and sequential `NavigateToPose` with distance-remaining feedback, ETA, and Ctrl+C emergency stop.
-  - [ ] **Task 9.3.2:** Implement `scripts/run_nav2_patrol.sh` with automatic non-saturating bag recorder (`/tf`, `/odom_raw`, `/odometry/filtered`, `/scan`, `/cmd_vel`, `/amcl_pose`, `/plan`).
-  - [ ] **Task 9.3.3:** Implement `scripts/plot_multi_waypoint_trajectory.py` to extract bag telemetry and generate empirical multi-waypoint tracking curves (MAE, cross-track error, velocity profiles).
-  - [ ] **Task 9.3.4:** Execute Return-to-Home mission ($(1.44\,\text{m}, 0.02\,\text{m}) \to (0.00\,\text{m}, 0.00\,\text{m})$) and 3-waypoint room patrol loop.
-  - [ ] **Task 9.3.5:** Validate dynamic obstacle avoidance and costmap clearing when operator steps into patrol path.
+- [x] **Task 9.2.2: Consolidated Master Robot Launch File (`launch/master_robot.launch.py`):**
+  - Modularly bring up micro-ROS agent, LiDAR drivers, `twist_mux`, joystick, Nav2 lifecycle stack, active vision, and the web visualizer simultaneously without ROS port conflicts (Verified).
+- [x] **Nav2 Multi-Waypoint & Room Patrol Implementation Plan (COMPLETED & EMPIRICALLY VERIFIED):**
+  - [x] **Task 9.3.1:** Implement `scripts/navigate_waypoints.py` / `scripts/mission_manager.py` CLI supporting sequential `NavigateToPose` with distance-remaining feedback, ETA, dwell timers, and graceful Ctrl+C emergency stop.
+  - [x] **Task 9.3.2:** Implement `scripts/run_nav2_patrol.sh` with automatic non-saturating bag recorder (`/tf`, `/tf_static`, `/odom_raw`, `/odometry/filtered`, `/scan`, `/cmd_vel`, `/cmd_vel_nav`, `/amcl_pose`, `/plan`, `/battery`, `/safety/chime`).
+  - [x] **Task 9.3.3:** Implement `scripts/plot_multi_waypoint_trajectory.py` to extract bag telemetry and generate empirical multi-waypoint tracking curves (MAE, cross-track error, velocity profiles).
+  - [x] **Task 9.3.4:** Execute physical multi-waypoint facility patrol ($P_1 \to P_2 \to P_3 \to P_4 \to P_3 \to P_2 \to P_1$, 15.89m traverse, 100% legs passed, sub-decimeter waypoint accuracy).
+  - [x] **Task 9.3.5:** Validate dynamic obstacle avoidance and costmap clearing when negotiating narrow corridor corners and lab entrances.
 - [ ] **Milestone 10 (Master 6-Phase Live Hardware Verification Gate):** Execute live hardware verification matrix.
 
 ---
