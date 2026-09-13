@@ -24,8 +24,9 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.duration import Duration
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import PoseStamped, Twist
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Twist
 from nav2_msgs.action import NavigateToPose, NavigateThroughPoses, BackUp
 from tf2_ros import Buffer, TransformListener, TransformException
 
@@ -78,7 +79,19 @@ class MissionManagerNode(Node):
         # Velocity publisher for emergency stops and preemption
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-        # TF listener for ground-truth pose lookup
+        # AMCL latched pose subscriber for instantaneous ground-truth localization
+        self.amcl_pose = None
+        qos_amcl = QoSProfile(depth=1)
+        qos_amcl.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        qos_amcl.reliability = ReliabilityPolicy.RELIABLE
+        self.amcl_sub = self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/amcl_pose',
+            self._amcl_pose_cb,
+            qos_amcl
+        )
+
+        # TF listener for fallback ground-truth pose lookup
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -86,23 +99,35 @@ class MissionManagerNode(Node):
         self._last_dist = 999.0
         self.get_logger().info('Industrial Mission Manager initialized successfully.')
 
+    def _amcl_pose_cb(self, msg: PoseWithCovarianceStamped):
+        """Callback for latched AMCL particle filter estimated pose."""
+        p = msg.pose.pose
+        yaw = math.degrees(2.0 * math.atan2(p.orientation.z, p.orientation.w))
+        self.amcl_pose = (p.position.x, p.position.y, yaw)
+
     # ── POSE HELPERS ──────────────────────────────────────────────
 
     def get_current_pose(self) -> Optional[tuple]:
-        """Looks up the latest transform from map -> base_footprint."""
+        """Returns the latest localized robot pose from AMCL or TF."""
+        # 1. Check AMCL subscription (spin briefly to ingest latched message)
+        for _ in range(15):
+            rclpy.spin_once(self, timeout_sec=0.05)
+            if self.amcl_pose is not None:
+                return self.amcl_pose
+
+        # 2. Fallback to TF buffer
         try:
-            now = rclpy.time.Time()
             t = self.tf_buffer.lookup_transform(
-                'map', 'base_footprint', now, timeout=Duration(seconds=1.5)
+                'map', 'base_footprint', rclpy.time.Time()
             )
             x = t.transform.translation.x
             y = t.transform.translation.y
             qz = t.transform.rotation.z
             qw = t.transform.rotation.w
-            yaw = 2.0 * math.atan2(qz, qw)
-            return x, y, math.degrees(yaw)
-        except TransformException as e:
-            self.get_logger().warn(f'Could not resolve ground-truth pose via TF: {e}')
+            yaw = math.degrees(2.0 * math.atan2(qz, qw))
+            return x, y, yaw
+        except Exception as e:
+            self.get_logger().warn(f'Could not resolve ground-truth pose via TF or AMCL: {e}')
             return None
 
     def make_pose_stamped(self, x: float, y: float, yaw_deg: float) -> PoseStamped:
@@ -266,11 +291,13 @@ class MissionManagerNode(Node):
             if pose:
                 rx, ry, _ = pose
                 wps = []
-                # If currently in or near East Lab branch (P4 branch: x > 3.4 or near corner)
-                if rx > 3.4 or (rx > 3.0 and ry < 2.8):
+                dist_p3 = math.hypot(rx - 3.20, ry - 3.20)
+                dist_p2 = math.hypot(rx - 1.64, ry - 1.62)
+                # If currently far down the East Lab branch (P4 branch)
+                if rx > 3.8 and dist_p3 > 0.6:
                     wps.append(Waypoint("P3 North Gallery (Elbow)", 3.20, 3.20, 2.36, dwell_sec=2.0))
-                # If currently in North Gallery (ry > 2.0 or rx > 2.0)
-                if ry > 2.0 or rx > 2.0:
+                # If currently in North Gallery corridor above P2
+                if (ry > 1.9 or rx > 1.9) and dist_p2 > 0.4:
                     wps.append(Waypoint("P2 Central Hub (Midpoint)", 1.64, 1.62, 2.36, dwell_sec=2.0))
                 wps.append(Waypoint("P1 Home Base", 0.08, 0.05, 0.0, dwell_sec=2.0))
                 waypoints = wps
