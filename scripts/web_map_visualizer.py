@@ -38,7 +38,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from nav_msgs.msg import OccupancyGrid, Path
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, Twist
-from std_msgs.msg import UInt16
+from std_msgs.msg import UInt16, String
 from tf2_ros import Buffer, TransformListener, TransformException
 
 
@@ -70,15 +70,12 @@ class MapVisualizerNode(Node):
         self.battery_healthy = True
         self.battery_last_time = 0.0
 
-        # ── Waypoints & Patrol Landmarks (Full Facility Coverage) ─────────────
+        # ── Waypoints & Patrol Landmarks (4 Strategic Facility Posts) ─────────
         self.corridor_landmarks = [
-            (0.08, 0.05, "HOME Base"),
-            (0.40, 0.00, "WP1 Runway"),
-            (0.70, 0.35, "WP2 Curve"),
-            (0.35, 0.15, "WP3 Return"),
-            (1.80, 0.80, "WP4 Center Hub"),
-            (3.00, 2.80, "WP5 North Gallery"),
-            (4.70, 1.80, "WP6 East Lab"),
+            (0.08, 0.05, "P1 Home Base"),
+            (1.80, 0.80, "P2 Central Hub"),
+            (3.00, 2.80, "P3 North Gallery"),
+            (4.70, 1.80, "P4 East Lab"),
         ]
 
         # ── Nav2 Paths, Scans & Goals ────────────────────────────────────────
@@ -134,6 +131,8 @@ class MapVisualizerNode(Node):
             PoseStamped, '/goal_pose', 10)
         self.cmd_vel_pub = self.create_publisher(
             Twist, '/cmd_vel', 10)
+        self.patrol_cmd_pub = self.create_publisher(
+            String, '/patrol_cmd', 10)
 
         # ── Subscriptions ────────────────────────────────────────────────────
         self.create_subscription(OccupancyGrid, '/map', self._map_cb, map_qos)
@@ -319,8 +318,16 @@ class MapVisualizerNode(Node):
             self.battery_healthy = (self.battery_voltage >= 7.0)
             self.battery_last_time = time.monotonic()
 
+    def dispatch_patrol_cmd(self, cmd: str):
+        """Dispatches patrol mode command to navigation stack."""
+        msg = String()
+        msg.data = str(cmd)
+        self.patrol_cmd_pub.publish(msg)
+        self.get_logger().info(f'Patrol command sent: {cmd}')
+
     def emergency_stop(self):
-        """Immediately halts the robot by sending zero velocity and clearing goals."""
+        """Immediately halts robot kinematics via zero velocity clamp."""
+        self.dispatch_patrol_cmd('stop')
         with self.lock:
             self.goal_x = None
             self.goal_y = None
@@ -477,19 +484,28 @@ class MapVisualizerNode(Node):
 
             cv2.addWeighted(cost_overlay, 0.45, resized, 0.55, 0, resized)
 
-        # ── 3. Subtle Mission Waypoint Pins ───────────────────────────────────
+        # ── 3. Subtle Strategic Waypoint Pins ─────────────────────────────────
         def draw_wp_ring(img_out, wx, wy, label, col):
             rpx, rpy = w2p_s(wx, wy)
             if 0 <= rpx < img_out.shape[1] and 0 <= rpy < img_out.shape[0]:
                 cv2.circle(img_out, (rpx, rpy), 8, col, 2, cv2.LINE_AA)
                 cv2.circle(img_out, (rpx, rpy), 2, col, -1)
-                cv2.putText(img_out, label, (rpx + 8, rpy + 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 255), 1, cv2.LINE_AA)
+                # Dual-pass outline: black border then bright core for crisp readability on any background
+                cv2.putText(img_out, label, (rpx + 10, rpy + 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 0, 0), 3, cv2.LINE_AA)
+                cv2.putText(img_out, label, (rpx + 10, rpy + 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 1, cv2.LINE_AA)
 
-        for item in self.corridor_landmarks:
+        pin_colors = [
+            (0, 220, 100),   # P1 Home Base (Vibrant Green)
+            (255, 190, 40),  # P2 Central Hub (Cyan/Sky)
+            (220, 100, 240), # P3 North Gallery (Magenta)
+            (40, 180, 255),  # P4 East Lab (Warm Amber)
+        ]
+        for i, item in enumerate(self.corridor_landmarks):
             wx, wy, name = item
-            lbl = 'H' if 'HOME' in name else name.split()[0].replace('WP', '')
-            col = (0, 215, 0) if 'HOME' in name else (200, 100, 240)
+            lbl = name.split()[0]  # P1, P2, P3, P4
+            col = pin_colors[i % len(pin_colors)]
             draw_wp_ring(resized, wx, wy, lbl, col)
 
         # ── 4. Traveled Odometry Trail (Warm Amber/Gold Breadcrumbs) ─────────
@@ -982,7 +998,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <button class="tool-btn active" id="tgl-trail" onclick="toggleLayer('trail')">Trail</button>
     <div class="tool-separator"></div>
     <button class="tool-btn" style="color:var(--gold)" onclick="clearTrail()">🧹 Clear Trail</button>
-    <button class="tool-btn" style="color:var(--green)" onclick="dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0)">🏠 Dock Home</button>
+    <button class="tool-btn" style="color:var(--green)" onclick="dispatchWaypoint('P1 Home Base', 0.08, 0.05, 0.0)">🏠 Dock Home</button>
     <button class="tool-btn" style="color:var(--accent)" onclick="resetHome()">📍 Reset Pose</button>
   </div>
 
@@ -999,34 +1015,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <div class="panel">
       <div class="card">
-        <h2>Quick Mission Dispatch (Any Starting Position)</h2>
+        <h2>Strategic Waypoint Dispatch (4-Point Facility Coverage)</h2>
         <div class="btn-grid">
-          <button class="action-btn" onclick="dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0)">
-            <span style="color:var(--green)">🏠</span> Home (0.08, 0.05)
+          <button class="action-btn" onclick="dispatchWaypoint('P1 Home Base', 0.08, 0.05, 0.0)">
+            <span style="color:var(--green)">🏠</span> P1 Home (0.08, 0.05)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('WP1 Runway', 0.40, 0.00, 0.0)">
-            <span style="color:var(--purple)">1️⃣</span> WP1 (0.40, 0.00)
+          <button class="action-btn" onclick="dispatchWaypoint('P2 Central Hub', 1.80, 0.80, 0.0)">
+            <span style="color:var(--cyan)">2️⃣</span> P2 Center (1.80, 0.80)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('WP2 Curve', 0.70, 0.35, 1.57)">
-            <span style="color:var(--purple)">2️⃣</span> WP2 (0.70, 0.35)
+          <button class="action-btn" onclick="dispatchWaypoint('P3 North Gallery', 3.00, 2.80, 0.0)">
+            <span style="color:var(--purple)">3️⃣</span> P3 North (3.00, 2.80)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('WP3 Return', 0.35, 0.15, 3.14)">
-            <span style="color:var(--purple)">3️⃣</span> WP3 (0.35, 0.15)
+          <button class="action-btn" onclick="dispatchWaypoint('P4 East Lab', 4.70, 1.80, 0.0)">
+            <span style="color:var(--gold)">4️⃣</span> P4 East (4.70, 1.80)
           </button>
-          <button class="action-btn" onclick="dispatchWaypoint('WP4 Center Hub', 1.80, 0.80, 0.0)">
-            <span style="color:var(--cyan)">4️⃣</span> WP4 Center (1.80, 0.80)
-          </button>
-          <button class="action-btn" onclick="dispatchWaypoint('WP5 North Gallery', 3.00, 2.80, 0.0)">
-            <span style="color:var(--cyan)">5️⃣</span> WP5 North (3.00, 2.80)
-          </button>
-          <button class="action-btn" onclick="dispatchWaypoint('WP6 East Lab', 4.70, 1.80, 0.0)">
-            <span style="color:var(--cyan)">6️⃣</span> WP6 East (4.70, 1.80)
-          </button>
-          <button class="action-btn full-width" style="color:var(--accent)" onclick="startSmartPatrol('corridor')">
-            🔄 Corridor Patrol (Starts at Nearest WP)
-          </button>
-          <button class="action-btn full-width" style="color:var(--purple)" onclick="startSmartPatrol('facility')">
-            🌐 Full Facility Sweep (Multi-Room Circuit)
+          <button class="action-btn full-width" style="color:var(--accent)" onclick="startSmartPatrol('unattended')">
+            🔄 Run 4-Point Unattended Mission (Starts at Nearest Post)
           </button>
           <button class="action-btn full-width" style="color:var(--gold)" onclick="resetHome()">
             📍 Reset Pose to Home Base (Unwedge)
@@ -1156,18 +1160,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
 
     function runPatrolCircuit() {
-      startSmartPatrol('corridor');
+      startSmartPatrol('unattended');
     }
 
     function startSmartPatrol(circuitType) {
       fetch('/api/patrol', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: circuitType })
+        body: JSON.stringify({ type: circuitType || 'unattended' })
       })
       .then(r => r.json())
       .then(data => {
-        showToast(`🔄 Dynamic ${circuitType} patrol dispatched from nearest waypoint (${data.start_wp})`);
+        showToast(`🔄 Dynamic 4-Point Unattended mission active (Starting at ${data.start_wp})`);
       });
     }
 
@@ -1220,7 +1224,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       if (e.code === 'Space' || e.key === 'Escape') {
         triggerEStop();
       } else if (e.key === 'h' || e.key === 'H') {
-        dispatchWaypoint('HOME Base', 0.08, 0.05, 0.0);
+        dispatchWaypoint('P1 Home Base', 0.08, 0.05, 0.0);
       } else if (e.key === 'c' || e.key === 'C') {
         clearTrail();
       }
@@ -1493,6 +1497,11 @@ class WebHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
 
         elif self.path == '/api/cancel':
+            with self.node_ref.lock:
+                self.node_ref.goal_x = None
+                self.node_ref.goal_y = None
+                self.node_ref.global_plan_points = []
+                self.node_ref.local_plan_points = []
             self.node_ref.emergency_stop()
             resp = json.dumps({"status": "ok", "action": "cancel"}).encode('utf-8')
             self.send_response(200)
@@ -1505,6 +1514,7 @@ class WebHandler(BaseHTTPRequestHandler):
             wx = float(req_data.get('x', 0.08))
             wy = float(req_data.get('y', 0.05))
             wyaw = float(req_data.get('yaw', 0.0))
+            self.node_ref.dispatch_patrol_cmd('stop')
             self.node_ref.dispatch_waypoint(wx, wy, wyaw)
             resp = json.dumps({"status": "ok", "action": "waypoint", "x": wx, "y": wy, "yaw": wyaw}).encode('utf-8')
             self.send_response(200)
@@ -1514,23 +1524,12 @@ class WebHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
 
         elif self.path == '/api/patrol':
-            ctype = req_data.get('type', 'corridor')
-            if ctype == 'facility':
-                circuit = [
-                    (0.40, 0.00, "WP1 Runway"),
-                    (1.80, 0.80, "WP4 Center Hub"),
-                    (3.00, 2.80, "WP5 North Gallery"),
-                    (4.70, 1.80, "WP6 East Lab"),
-                    (0.35, 0.15, "WP3 Return"),
-                    (0.08, 0.05, "HOME Base"),
-                ]
-            else:
-                circuit = [
-                    (0.40, 0.00, "WP1 Runway"),
-                    (0.70, 0.35, "WP2 Curve"),
-                    (0.35, 0.15, "WP3 Return"),
-                    (0.08, 0.05, "HOME Base"),
-                ]
+            circuit = [
+                (0.08, 0.05, "P1 Home Base"),
+                (1.80, 0.80, "P2 Central Hub"),
+                (3.00, 2.80, "P3 North Gallery"),
+                (4.70, 1.80, "P4 East Lab"),
+            ]
 
             with self.node_ref.lock:
                 rx, ry = self.node_ref.robot_x, self.node_ref.robot_y
@@ -1541,10 +1540,11 @@ class WebHandler(BaseHTTPRequestHandler):
             target_wp = circuit[best_idx]
 
             self.node_ref.dispatch_waypoint(target_wp[0], target_wp[1], 0.0)
+            self.node_ref.dispatch_patrol_cmd('start')
 
             resp = json.dumps({
                 "status": "ok",
-                "circuit": ctype,
+                "circuit": "4-point-unattended",
                 "start_wp": target_wp[2],
                 "x": target_wp[0],
                 "y": target_wp[1]

@@ -34,7 +34,7 @@ from geometry_msgs.msg import (
     Twist,
     TransformStamped
 )
-from std_msgs.msg import UInt16
+from std_msgs.msg import UInt16, String
 from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
 
@@ -96,17 +96,14 @@ class MockNavigationSimulator(Node):
         self.final_goal_x = 0.40
         self.final_goal_y = 0.00
 
-        # Mission corridor & facility-wide patrol circuit
+        # Mission 4-point strategic unattended circuit
         self.patrol_circuit = [
-            (0.08, 0.05),  # Home Base
-            (0.40, 0.00),  # WP1 Runway
-            (1.80, 0.80),  # WP4 Center Hub
-            (3.00, 2.80),  # WP5 North Gallery
-            (4.70, 1.80),  # WP6 East Lab
-            (0.70, 0.35),  # WP2 Curve
-            (0.35, 0.15),  # WP3 Return
+            (0.08, 0.05),  # P1 Home Base
+            (1.80, 0.80),  # P2 Central Hub
+            (3.00, 2.80),  # P3 North Gallery
+            (4.70, 1.80),  # P4 East Lab
         ]
-        self.circuit_idx = 1
+        self.circuit_idx = 0
         self.auto_patrol = True
 
         # ── QoS Profiles ─────────────────────────────────────────────────────
@@ -136,6 +133,7 @@ class MockNavigationSimulator(Node):
         self.create_subscription(PoseStamped, '/goal_pose', self._on_goal, 10)
         self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self._on_initialpose, 10)
         self.create_subscription(Twist, '/cmd_vel', self._on_cmd_vel, 10)
+        self.create_subscription(String, '/patrol_cmd', self._on_patrol_cmd, 10)
 
         # ── TF Broadcasters ──────────────────────────────────────────────────
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -284,6 +282,30 @@ class MockNavigationSimulator(Node):
             self.target_x = self.robot_x
             self.target_y = self.robot_y
             self.get_logger().info('Mock Robot halted via /cmd_vel zero clamp (E-Stop).')
+
+    def _on_patrol_cmd(self, msg: String):
+        cmd = msg.data.strip().lower()
+        if cmd in ['start', 'resume', 'facility', 'unattended', 'patrol']:
+            self.auto_patrol = True
+            # Dynamically select nearest waypoint among the 4 strategic posts
+            dists = [math.hypot(p[0] - self.robot_x, p[1] - self.robot_y) for p in self.patrol_circuit]
+            self.circuit_idx = int(np.argmin(dists))
+            gx, gy = self.patrol_circuit[self.circuit_idx]
+            self.final_goal_x = gx
+            self.final_goal_y = gy
+            self.get_logger().info(f'Patrol mode initiated! Starting at nearest post P{self.circuit_idx+1} ({gx:.2f}m, {gy:.2f}m).')
+            p_path = self._plan_astar(self.robot_x, self.robot_y, gx, gy)
+            if p_path:
+                self.active_path = p_path
+                self.target_x, self.target_y = self.active_path.pop(0)
+            else:
+                self.target_x, self.target_y = gx, gy
+        elif cmd in ['stop', 'pause', 'cancel']:
+            self.auto_patrol = False
+            self.active_path = []
+            self.target_x = self.robot_x
+            self.target_y = self.robot_y
+            self.get_logger().info('Patrol mode stopped.')
 
     def _on_initialpose(self, msg: PoseWithCovarianceStamped):
         px = msg.pose.pose.position.x
