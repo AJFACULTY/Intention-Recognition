@@ -25,9 +25,9 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    share = get_package_share_directory('cognition_simulation')
-    params = '/root/cognition_ws/src/cognition_simulation/config/nav2_params.yaml'
-    map_yaml = '/root/cognition_ws/maps_new/room_map_20260812_0826.yaml'
+    ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    params = os.path.join(ws_dir, 'config', 'nav2_params.yaml')
+    map_yaml = os.path.join(ws_dir, 'maps', 'room_map_20260812_0826.yaml')
     sim_time = {'use_sim_time': False}
 
     # --- Sensor / transform chain (same as slam_real.launch.py, minus slam_toolbox) ---
@@ -145,7 +145,7 @@ def generate_launch_description():
                 'ros2', 'topic', 'pub', '--once', '/initialpose',
                 'geometry_msgs/msg/PoseWithCovarianceStamped',
                 ('{header: {frame_id: map}, pose: {pose: {position: '
-                 '{x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}, '
+                 '{x: 0.08, y: 0.05, z: 0.0}, orientation: {w: 1.0}}, '
                  'covariance: [0.25,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,'
                  '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.068]}}'),
             ],

@@ -9,9 +9,9 @@ amcl:
     laser_max_range: 8.0
     laser_min_range: 0.12
     max_beams: 60
-    initial_pose_x: 0.0
-    initial_pose_y: 0.0
-    initial_pose_a: 0.0
+    initial_pose_x: 0.08
+    initial_pose_y: 0.05
+    initial_pose_a: 0.785
     set_initial_pose: true
 
 bt_navigator:
