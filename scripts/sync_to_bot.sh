@@ -76,10 +76,16 @@ scp \
     /home/j/ros2_cognition_ws/ml_models/weights/label_encoder_features.pkl \
     "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/models/"
 
+scp \
+    /home/j/ros2_cognition_ws/maps/room_map_20260812_0826.yaml \
+    /home/j/ros2_cognition_ws/maps/room_map_20260812_0826.png \
+    "${ROBOT_USER}@${ROBOT_HOST}:~/maps_new/"
+
 # 3. Synchronize package sources and inject directly into Docker container
 echo "[3/4] Updating package source trees and injecting into 'yahboom_gesture' Docker container..."
 ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     CONTAINER=yahboom_gesture
+    docker start \${CONTAINER} >/dev/null 2>&1 || true
     PERCEPT_DIR=/root/cognition_ws/src/cognition_perception/cognition_perception
     BRAIN_DIR=/root/cognition_ws/src/cognition_brain/cognition_brain
     CONFIG_DIR=/root/cognition_ws/src/cognition_simulation/config

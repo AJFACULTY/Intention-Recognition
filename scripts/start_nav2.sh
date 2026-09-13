@@ -78,8 +78,14 @@ rclpy.shutdown()
 PYEOF
 '
 
-echo "Waiting 5s for scan matching convergence..."
-sleep 5
+# 3. Assert camera gimbal eye level
+echo "[Extra] Aligning 2-DOF camera gimbal to eye level (+35°)..."
+docker exec "$CONTAINER" bash -c '
+    export ROS_DOMAIN_ID=20
+    source /opt/ros/humble/setup.bash
+    ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 "{data: 0}" >/dev/null 2>&1 || true
+    ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 "{data: 35}" >/dev/null 2>&1 || true
+'
 
 ROBOT_IP=$(hostname -I | awk '{print $1}')
 echo "=================================================================="
