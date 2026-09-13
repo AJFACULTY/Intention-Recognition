@@ -15,17 +15,26 @@ echo "=================================================================="
 # 1. Always flush old navigation processes to ensure clean costmaps and uncorrupted particle filters
 echo "[1/3] Flushing old navigation processes..."
 docker exec "$CONTAINER" bash -c "
-    pkill -9 -f 'web_map_visualizer|laser_tf|scan_republisher|odom_imu_republisher|ekf_node|nav2_|amcl|map_server|planner_server|controller_server|behavior_server|bt_navigator|waypoint_follower|lifecycle_manager' 2>/dev/null || true
+    pkill -9 -f 'twist_mux|safety_audio_node|web_map_visualizer|laser_tf|scan_republisher|odom_imu_republisher|ekf_node|nav2_|amcl|map_server|planner_server|controller_server|behavior_server|bt_navigator|waypoint_follower|lifecycle_manager' 2>/dev/null || true
 "
 sleep 2
 
-echo "[2/3] Launching nav2.launch.py and Web Visualizer in background..."
+echo "[2/3] Launching nav2.launch.py, Web Visualizer, Safety Audio Node, and Twist Mux..."
 docker exec -d "$CONTAINER" bash -c "
     export ROS_DOMAIN_ID=20
     export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     source /opt/ros/humble/setup.bash
     source /root/cognition_ws/install/setup.bash
     ros2 launch /root/cognition_ws/src/cognition_simulation/launch/nav2.launch.py > /tmp/nav2_run.log 2>&1
+"
+
+# Launch ROS 2 twist_mux priority velocity arbiter (Joystick=100, Nav2=50, Gesture=40, E-Stop=255)
+docker exec -d "$CONTAINER" bash -c "
+    export ROS_DOMAIN_ID=20
+    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    source /opt/ros/humble/setup.bash
+    source /root/cognition_ws/install/setup.bash
+    ros2 run twist_mux twist_mux --ros-args --params-file /root/cognition_ws/twist_mux.yaml -r cmd_vel_out:=/cmd_vel > /tmp/twist_mux.log 2>&1
 "
 
 # Launch lightweight crash-free web visualizer
@@ -35,6 +44,14 @@ docker exec -d "$CONTAINER" bash -c "
     source /opt/ros/humble/setup.bash
     source /root/cognition_ws/install/setup.bash
     python3 /root/cognition_ws/web_map_visualizer.py > /tmp/web_vis.log 2>&1
+"
+
+# Launch industrial acoustic safety audio node (/beep)
+docker exec -d "$CONTAINER" bash -c "
+    export ROS_DOMAIN_ID=20
+    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    source /opt/ros/humble/setup.bash
+    python3 /root/cognition_ws/safety_audio_node.py > /tmp/safety_audio.log 2>&1
 "
 
 echo "Waiting 18s for full lifecycle initialization..."
@@ -71,7 +88,12 @@ msg.pose.covariance[0] = 0.25
 msg.pose.covariance[7] = 0.25
 msg.pose.covariance[35] = 0.15
 
-pub.publish(msg)
+for _ in range(5):
+    pub.publish(msg)
+    for _ in range(5):
+        rclpy.spin_once(node, timeout_sec=0.05)
+    time.sleep(0.1)
+
 print(">> Initial pose broadcast to /initialpose at Home Base (0.08, 0.05).")
 node.destroy_node()
 rclpy.shutdown()

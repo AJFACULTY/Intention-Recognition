@@ -66,8 +66,19 @@ def generate_launch_description():
         description="Launch twist_mux priority velocity multiplexer",
     )
 
+    def resolve_path(candidates, default_rel):
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+        return os.path.join(ws_dir, default_rel)
+
     # ── 2. Twist Mux Priority Arbiter ────────────────────────────────────────
-    twist_mux_config = os.path.join(ws_dir, "launch", "twist_mux.yaml")
+    twist_mux_config = resolve_path([
+        os.path.join(ws_dir, "launch", "twist_mux.yaml"),
+        os.path.join(ws_dir, "twist_mux.yaml"),
+        "/root/cognition_ws/twist_mux.yaml",
+    ], "launch/twist_mux.yaml")
+
     twist_mux_node = Node(
         package="twist_mux",
         executable="twist_mux",
@@ -79,7 +90,13 @@ def generate_launch_description():
     )
 
     # ── 3. Industrial Safety Audio Node ──────────────────────────────────────
-    safety_audio_script = os.path.join(ws_dir, "src_nodes", "safety_audio_node.py")
+    safety_audio_script = resolve_path([
+        os.path.join(ws_dir, "src_nodes", "safety_audio_node.py"),
+        os.path.join(ws_dir, "safety_audio_node.py"),
+        "/root/cognition_ws/safety_audio_node.py",
+        "/root/cognition_ws/src/cognition_perception/cognition_perception/safety_audio_node.py",
+    ], "src_nodes/safety_audio_node.py")
+
     safety_audio_node = ExecuteProcess(
         cmd=[sys.executable, safety_audio_script],
         name="safety_audio_node",
@@ -88,14 +105,26 @@ def generate_launch_description():
     )
 
     # ── 4. Nav2 Autonomous Navigation Include ────────────────────────────────
-    nav2_launch_path = os.path.join(ws_dir, "launch", "nav2.launch.py")
+    nav2_launch_path = resolve_path([
+        os.path.join(ws_dir, "launch", "nav2.launch.py"),
+        os.path.join(ws_dir, "nav2.launch.py"),
+        "/root/cognition_ws/src/cognition_simulation/launch/nav2.launch.py",
+        "/root/cognition_ws/nav2.launch.py",
+    ], "launch/nav2.launch.py")
+
     nav2_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(nav2_launch_path),
         condition=IfCondition(LaunchConfiguration("enable_nav2")),
     )
 
     # ── 5. Cognition Perception & Brain Include (Delayed for Nav2 bringup) ────
-    cognition_launch_path = os.path.join(ws_dir, "launch", "cognition_autonomy.launch.py")
+    cognition_launch_path = resolve_path([
+        os.path.join(ws_dir, "launch", "cognition_autonomy.launch.py"),
+        os.path.join(ws_dir, "cognition_autonomy.launch.py"),
+        "/root/cognition_ws/src/cognition_simulation/launch/cognition_autonomy.launch.py",
+        "/root/cognition_ws/cognition_autonomy.launch.py",
+    ], "launch/cognition_autonomy.launch.py")
+
     cognition_include = TimerAction(
         period=4.0,
         actions=[
@@ -108,7 +137,12 @@ def generate_launch_description():
     )
 
     # ── 6. Web Map Visualizer (Port :8080) ───────────────────────────────────
-    visualizer_script = os.path.join(ws_dir, "scripts", "web_map_visualizer.py")
+    visualizer_script = resolve_path([
+        os.path.join(ws_dir, "scripts", "web_map_visualizer.py"),
+        os.path.join(ws_dir, "web_map_visualizer.py"),
+        "/root/cognition_ws/web_map_visualizer.py",
+    ], "scripts/web_map_visualizer.py")
+
     visualizer_process = TimerAction(
         period=6.0,
         actions=[

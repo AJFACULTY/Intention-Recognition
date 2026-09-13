@@ -125,12 +125,14 @@ def generate_launch_description():
     controller = TimerAction(period=5.0, actions=[Node(
         package='nav2_controller', executable='controller_server',
         name='controller_server', output='screen',
-        parameters=[params, sim_time])])
+        parameters=[params, sim_time],
+        remappings=[('cmd_vel', '/cmd_vel_nav')])])
 
     behaviors = TimerAction(period=5.0, actions=[Node(
         package='nav2_behaviors', executable='behavior_server',
         name='behavior_server', output='screen',
-        parameters=[params, sim_time])])
+        parameters=[params, sim_time],
+        remappings=[('cmd_vel', '/cmd_vel_nav')])])
 
     bt_navigator = TimerAction(period=5.0, actions=[Node(
         package='nav2_bt_navigator', executable='bt_navigator',
@@ -157,7 +159,7 @@ def generate_launch_description():
         }])])
 
     initial_pose_cmd = TimerAction(
-        period=10.0,
+        period=12.0,
         actions=[ExecuteProcess(
             cmd=[
                 'ros2', 'topic', 'pub', '--once', '/initialpose',

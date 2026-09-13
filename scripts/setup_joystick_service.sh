@@ -21,8 +21,7 @@ Type=simple
 User=pi
 Restart=always
 RestartSec=5
-ExecStartPre=/bin/sleep 5
-ExecStart=/usr/bin/docker exec yahboom_base bash -c "source /opt/ros/humble/setup.bash && source /root/yahboomcar_ws/install/setup.bash && ros2 launch yahboomcar_ctrl yahboomcar_joy_launch.py --ros-args -r /cmd_vel:=/cmd_vel_joy"
+ExecStart=/usr/bin/docker exec yahboom_base bash -c "source /opt/ros/humble/setup.bash && source /root/yahboomcar_ws/install/setup.bash && ros2 launch /root/yahboomcar_ws/yahboomcar_joy_teleop.launch.py"
 
 [Install]
 WantedBy=multi-user.target

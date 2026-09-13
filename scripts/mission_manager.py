@@ -136,8 +136,8 @@ class MissionManagerNode(Node):
     def get_current_pose(self) -> Optional[tuple]:
         """Returns the latest localized robot pose from AMCL or TF."""
         # 1. Check AMCL subscription (spin briefly to ingest latched message)
-        for _ in range(15):
-            rclpy.spin_once(self, timeout_sec=0.05)
+        for _ in range(30):
+            rclpy.spin_once(self, timeout_sec=0.1)
             if self.amcl_pose is not None:
                 return self.amcl_pose
 
@@ -217,8 +217,14 @@ class MissionManagerNode(Node):
             rclpy.spin_once(self, timeout_sec=0.2)
             if get_result_future.done():
                 status = get_result_future.result().status
+                elapsed = time.time() - start_wait
                 if status == GoalStatus.STATUS_SUCCEEDED:
                     leg_success = True
+                    if elapsed < 1.5:
+                        self.get_logger().info(
+                            f'Target {wp.name} already satisfied by current localization '
+                            f'(elapsed: {elapsed:.2f}s, distance: {self._last_dist:.2f}m).'
+                        )
                 break
             # Spatial completion check: verify real physical distance to goal to prevent 0.00m false positives
             pose = self.get_current_pose()
