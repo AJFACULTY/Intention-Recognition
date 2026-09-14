@@ -35,11 +35,11 @@ class ActiveVisionNode(Node):
 
         # Configurable Parameters (Yahboom 0-Centric Hardware Protocol: 0 deg = Center Forward)
         self.declare_parameter("pan_home", 0)          # Hardware neutral center forward (0 deg)
-        self.declare_parameter("tilt_home", 35)        # Forward human eye-level (35 deg)
+        self.declare_parameter("tilt_home", 8)         # Forward level horizon (+8 deg, clear of motor)
         self.declare_parameter("pan_min", -60)         # Max left pan (-60 deg)
         self.declare_parameter("pan_max", 60)          # Max right pan (+60 deg)
-        self.declare_parameter("tilt_min", 25)         # Strictly prevent tilting below eye level (min 25 deg)
-        self.declare_parameter("tilt_max", 55)         # Max upward tilt (+55 deg)
+        self.declare_parameter("tilt_min", -15)        # Lower tilt limit (-15 deg)
+        self.declare_parameter("tilt_max", 18)         # Upper tilt limit (+18 deg, prevents hitting motor)
 
         # Control Gains
         self.declare_parameter("kp_pan", 18.0)         # Deg per normalized unit error

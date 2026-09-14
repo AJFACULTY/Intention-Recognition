@@ -101,12 +101,27 @@ PYEOF
 '
 
 # 3. Assert camera gimbal eye level
-echo "[Extra] Aligning 2-DOF camera gimbal to eye level (+35°)..."
+echo "[Extra] Aligning 2-DOF camera gimbal to level horizon (+8°)..."
 docker exec "$CONTAINER" bash -c '
     export ROS_DOMAIN_ID=20
+    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     source /opt/ros/humble/setup.bash
-    ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 "{data: 0}" >/dev/null 2>&1 || true
-    ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 "{data: 35}" >/dev/null 2>&1 || true
+    python3 -c "
+import time, rclpy
+from rclpy.node import Node
+from std_msgs.msg import Int32
+rclpy.init()
+n = Node(\"gimbal_aligner\")
+p1 = n.create_publisher(Int32, \"/servo_s1\", 10)
+p2 = n.create_publisher(Int32, \"/servo_s2\", 10)
+time.sleep(0.2)
+m1 = Int32(); m1.data = 0
+m2 = Int32(); m2.data = 8
+for _ in range(5):
+    p1.publish(m1); p2.publish(m2)
+    rclpy.spin_once(n, timeout_sec=0.05); time.sleep(0.05)
+n.destroy_node(); rclpy.shutdown()
+" >/dev/null 2>&1 || true
 '
 
 ROBOT_IP=$(hostname -I | awk '{print $1}')
