@@ -73,10 +73,12 @@ scp \
     /home/j/ros2_cognition_ws/scripts/run_nav2_patrol.sh \
     /home/j/ros2_cognition_ws/scripts/run_mission.sh \
     /home/j/ros2_cognition_ws/scripts/setup_joystick_service.sh \
+    /home/j/ros2_cognition_ws/scripts/launch_autonomy.sh \
+    /home/j/ros2_cognition_ws/scripts/stop_autonomy.sh \
     /home/j/ros2_cognition_ws/src_nodes/brain_node.py \
     "${ROBOT_USER}@${ROBOT_HOST}:~/"
 
-ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py"
+ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py"
 
 scp \
     /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \

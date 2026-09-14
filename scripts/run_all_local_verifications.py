@@ -46,6 +46,11 @@ SUITES = [
         "script": "/home/j/ros2_cognition_ws/scripts/test_safety_audio.py",
         "python": "/home/j/ros2_venv/bin/python3",
     },
+    {
+        "name": "LiDAR Frontal Safety Preemption & Active Reverse (<0.36m)",
+        "script": "/home/j/ros2_cognition_ws/scripts/test_safety_reactive_reverse.py",
+        "python": "/home/j/ros2_venv/bin/python3",
+    },
 ]
 
 

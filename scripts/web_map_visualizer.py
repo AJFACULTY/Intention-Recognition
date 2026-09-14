@@ -36,7 +36,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from nav_msgs.msg import OccupancyGrid, Path
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, CompressedImage
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, Twist
 from std_msgs.msg import UInt16, String
 from tf2_ros import Buffer, TransformListener, TransformException
@@ -147,6 +147,10 @@ class MapVisualizerNode(Node):
         self.create_subscription(PoseStamped, '/goal_pose', self._goal_cb, 10)
         self.create_subscription(UInt16, '/battery', self._battery_cb, 10)
 
+        # ── Live Camera Feed Subscription ────────────────────────────────────
+        self.latest_camera_jpeg = None
+        self.create_subscription(CompressedImage, '/camera/image_raw/compressed', self._camera_cb, 10)
+
         # Periodic TF polling timer (10 Hz)
         self.create_timer(0.1, self._poll_tf_pose)
 
@@ -158,6 +162,10 @@ class MapVisualizerNode(Node):
         self.get_logger().info('RViz-Equivalent Web Map Visualizer initialized.')
 
     # ── ROS Callbacks ────────────────────────────────────────────────────────
+
+    def _camera_cb(self, msg: CompressedImage):
+        with self.lock:
+            self.latest_camera_jpeg = bytes(msg.data)
 
     def _map_cb(self, msg: OccupancyGrid):
         with self.lock:
@@ -1047,6 +1055,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             ⏹ Cancel Active Nav2 Goal
           </button>
         </div>
+      <div class="card">
+        <h2>Live Onboard Camera Stream</h2>
+        <div style="position:relative; width:100%; height:180px; background:#0b0f15; border-radius:6px; overflow:hidden; border:1px solid var(--border);">
+          <img id="cam-img" src="/camera.jpg" style="width:100%; height:100%; object-fit:contain;" onerror="document.getElementById('cam-status').style.display='flex';" onload="document.getElementById('cam-status').style.display='none';" />
+          <div id="cam-status" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; color:#8b949e; font-size:0.75rem; text-align:center;">
+            Camera Stream Standby...<br><span style="color:var(--accent); font-size:0.70rem;">/camera/image_raw/compressed</span>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -1131,6 +1147,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       nextImg.src = '/map.jpg?t=' + Date.now();
     }
     streamMap();
+
+    const camElem = document.getElementById('cam-img');
+    function streamCam() {
+      const nextCam = new Image();
+      nextCam.onload = function() {
+        camElem.src = nextCam.src;
+        document.getElementById('cam-status').style.display = 'none';
+        setTimeout(streamCam, 100); // 10 FPS live camera feed
+      };
+      nextCam.onerror = function() {
+        document.getElementById('cam-status').style.display = 'flex';
+        setTimeout(streamCam, 1000);
+      };
+      nextCam.src = '/camera.jpg?t=' + Date.now();
+    }
+    streamCam();
 
     function syncCanvasDimensions() {
       if (overlay.width !== imgElem.clientWidth || overlay.height !== imgElem.clientHeight) {
@@ -1393,6 +1425,11 @@ class WebHandler(BaseHTTPRequestHandler):
             self.send_header('Content-length', str(len(jpeg_bytes)))
             self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
             self.end_headers()
+        elif self.path.startswith('/camera.jpg'):
+            self.send_response(200)
+            self.send_header('Content-type', 'image/jpeg')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.end_headers()
         elif self.path == '/telemetry':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -1412,6 +1449,20 @@ class WebHandler(BaseHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
             self.end_headers()
             self.wfile.write(jpeg_bytes)
+
+        elif self.path.startswith('/camera.jpg'):
+            with self.node_ref.lock:
+                jpeg_bytes = self.node_ref.latest_camera_jpeg
+            if jpeg_bytes is not None:
+                self.send_response(200)
+                self.send_header('Content-type', 'image/jpeg')
+                self.send_header('Content-length', str(len(jpeg_bytes)))
+                self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+                self.end_headers()
+                self.wfile.write(jpeg_bytes)
+            else:
+                self.send_response(404)
+                self.end_headers()
 
         elif self.path == '/telemetry':
             data = self.node_ref.get_telemetry_dict()

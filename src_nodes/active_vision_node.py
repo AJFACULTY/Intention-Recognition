@@ -52,15 +52,15 @@ class ActiveVisionNode(Node):
         # Smoothing & PTZ Slew Rate
         self.declare_parameter("alpha_ema", 0.35)      # Centroid Exponential Moving Average smoothing
         self.declare_parameter("deadband", 0.05)       # 5% deadband window (anti-jitter)
-        self.declare_parameter("max_slew_deg", 0.8)    # 0.8 deg/tick @ 20Hz = 16 deg/sec smooth glide (eliminates snapping)
-        self.declare_parameter("control_rate_hz", 20.0)# 20 Hz control loop
+        self.declare_parameter("max_slew_deg", 0.6)    # 0.6 deg/tick @ 30Hz = 18 deg/sec cinematic glide (eliminates gear stutter)
+        self.declare_parameter("control_rate_hz", 30.0)# 30 Hz control loop for fine-grained sub-degree steps
 
         # Target Topic, Timeout & Search
         self.declare_parameter("target_topic", "/cognition/face_target")
         self.declare_parameter("target_timeout", 1.5)  # Seconds of target loss before search
         self.declare_parameter("search_duration", 30.0)# Seconds to search before reverting (30s)
-        self.declare_parameter("search_amplitude", 28.0) # Safe cable-friendly sweep (+/- 28 deg arc)
-        self.declare_parameter("search_freq", 0.10)    # Sweep frequency (0.10 Hz = 10s smooth wide cycle)
+        self.declare_parameter("search_amplitude", 20.0) # Ultra-safe cable-friendly sweep (+/- 20 deg arc, 40 deg total)
+        self.declare_parameter("search_freq", 0.08)    # Sweep frequency (0.08 Hz = 12.5s gentle, smooth cycle)
         self.declare_parameter("enable_patrol_sweep", True) # Dynamic sinusoidal sweep during patrol
 
         # Read parameters
@@ -107,6 +107,8 @@ class ActiveVisionNode(Node):
         self.latest_target = None
         self.last_go_time = 0.0
         self.node_start_time = time.time()
+        self.last_published_pan = None
+        self.last_published_tilt = None
 
         # Publishers
         self.pan_pub = self.create_publisher(Int32, "/servo_s1", 10)
@@ -396,7 +398,7 @@ class ActiveVisionNode(Node):
         # -------------------------------------------------------------
         # SLEW-RATE LIMITING (Anti-Blur) & MECHANICAL CLAMPING
         # -------------------------------------------------------------
-        slew_limit = 2.0 if self.state == self.STATE_SEARCH else self.max_slew_deg
+        slew_limit = self.max_slew_deg
         pan_step = self.clamp(target_pan - self.current_pan, -slew_limit, slew_limit)
         tilt_step = self.clamp(target_tilt - self.current_tilt, -slew_limit, slew_limit)
 
@@ -414,13 +416,17 @@ class ActiveVisionNode(Node):
         self.state_pub.publish(state_msg)
 
     def publish_servos(self, pan: int, tilt: int):
-        p_msg = Int32()
-        p_msg.data = pan
-        self.pan_pub.publish(p_msg)
+        if pan != self.last_published_pan:
+            p_msg = Int32()
+            p_msg.data = pan
+            self.pan_pub.publish(p_msg)
+            self.last_published_pan = pan
 
-        t_msg = Int32()
-        t_msg.data = tilt
-        self.tilt_pub.publish(t_msg)
+        if tilt != self.last_published_tilt:
+            t_msg = Int32()
+            t_msg.data = tilt
+            self.tilt_pub.publish(t_msg)
+            self.last_published_tilt = tilt
 
 
 def main(args=None):

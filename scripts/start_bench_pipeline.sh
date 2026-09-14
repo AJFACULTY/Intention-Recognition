@@ -12,7 +12,7 @@ cleanup() {
         . /opt/ros/humble/setup.bash >/dev/null 2>&1
         timeout 1s ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}' >/dev/null 2>&1 || true
         timeout 1s ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 '{data: 0}' >/dev/null 2>&1 || true
-        timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 25}' >/dev/null 2>&1 || true
+        timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 8}' >/dev/null 2>&1 || true
         pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor' 2>/dev/null || true
         rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true
     "
