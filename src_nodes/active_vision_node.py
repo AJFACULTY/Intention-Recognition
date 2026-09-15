@@ -237,8 +237,15 @@ class ActiveVisionNode(Node):
             return
 
         if getattr(msg, 'label', '') == 'person' and getattr(msg, 'confidence', 0.0) >= 0.35:
+            # Anticipatory tracking: blend measured center with LSTM predicted trajectory
+            pred_x = getattr(msg, 'predicted_x', 0.0)
+            if pred_x > 0.0:
+                target_cx = float(0.70 * msg.center_x + 0.30 * pred_x)
+            else:
+                target_cx = float(msg.center_x)
+
             point = Point()
-            point.x = float((msg.center_x - 0.5) * 2.0)
+            point.x = float((target_cx - 0.5) * 2.0)
             point.y = float((msg.center_y - 0.5) * 2.0)
             point.z = float(msg.confidence)
             self.target_callback(point)

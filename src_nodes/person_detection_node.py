@@ -101,11 +101,19 @@ class PersonDetectionNode(Node):
         self.ort_path = None
         path_candidates = [
             os.path.join(_share, 'models', 'path_predictor.onnx'),
-            os.path.join('/home/j/cognition_ws/src/cognition_perception/cognition_perception/models/path_predictor.onnx'),
+            os.path.join('/root/cognition_ws/models', 'path_predictor.onnx'),
+            os.path.join('/root/cognition_ws/src/cognition_perception/cognition_perception/models', 'path_predictor.onnx'),
+            os.path.join('/home/pi/cognition_ws/models', 'path_predictor.onnx'),
+            os.path.join('/home/j/ros2_cognition_ws/ml_models/weights', 'path_predictor.onnx'),
+            os.path.join(os.path.dirname(__file__), '..', 'models', 'path_predictor.onnx'),
         ]
         config_candidates = [
             os.path.join(_share, 'models', 'path_predictor_config.pkl'),
-            os.path.join('/home/j/cognition_ws/src/cognition_perception/cognition_perception/models/path_predictor_config.pkl'),
+            os.path.join('/root/cognition_ws/models', 'path_predictor_config.pkl'),
+            os.path.join('/root/cognition_ws/src/cognition_perception/cognition_perception/models', 'path_predictor_config.pkl'),
+            os.path.join('/home/pi/cognition_ws/models', 'path_predictor_config.pkl'),
+            os.path.join('/home/j/ros2_cognition_ws/ml_models/weights', 'path_predictor_config.pkl'),
+            os.path.join(os.path.dirname(__file__), '..', 'models', 'path_predictor_config.pkl'),
         ]
         path_onnx = next((p for p in path_candidates if os.path.exists(p)), None)
         config_path = next((p for p in config_candidates if os.path.exists(p)), None)
@@ -292,7 +300,12 @@ class PersonDetectionNode(Node):
                 det_msg.velocity_x = active_det['vel_x']
                 det_msg.velocity_y = active_det['vel_y']
                 det_msg.direction = active_det['direction']
-                det_msg.predicted_x = max(0.0, min(1.0, active_det['cx'] + active_det['vel_x'] * 0.5))
+                # Use LSTM path prediction if available, otherwise extrapolate linearly
+                predicted_pts = self.predict_path(self.person_histories[0])
+                if predicted_pts:
+                    det_msg.predicted_x = float(np.clip(predicted_pts[-1][0], 0.0, 1.0))
+                else:
+                    det_msg.predicted_x = max(0.0, min(1.0, active_det['cx'] + active_det['vel_x'] * 0.5))
 
                 self.last_active_det = active_det
                 self.last_det_time = now

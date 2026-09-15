@@ -250,24 +250,32 @@ class SystemHealthChecker:
         return None, "Topic /battery not publishing or micro-ROS agent idle"
 
     def _check_assets(self) -> bool:
-        check_paths = [
-            f"{WORKSPACE_LOCAL}/ml_models/weights/gesture_model_features.pkl",
-            f"{WORKSPACE_LOCAL}/maps/room_map_20260812_0826.yaml"
-        ]
         if IS_INSIDE_CONTAINER:
-            check_paths = [
-                "/root/cognition_ws/src/cognition_perception/cognition_perception/models/gesture_model_features.pkl",
-                "/root/cognition_ws/maps_new/room_map_20260812_0826.yaml"
-            ]
+            model_ok = (
+                os.path.exists("/root/cognition_ws/src/cognition_perception/cognition_perception/models/gesture_model_features.pkl") or
+                os.path.exists("/root/cognition_ws/models/gesture_model_features.pkl")
+            )
+            map_ok = (
+                os.path.exists("/root/cognition_ws/maps/room_map_20260812_0826.yaml") or
+                os.path.exists("/root/cognition_ws/maps_new/room_map_20260812_0826.yaml")
+            )
+            return model_ok and map_ok
         elif IS_ON_PI:
-            check_paths = [
-                "/home/pi/cognition_ws/models/gesture_model_features.pkl",
-                "/home/pi/maps_new/room_map_20260812_0826.yaml"
-            ]
-        for p in check_paths:
-            if not os.path.exists(p):
-                return False
-        return True
+            model_ok = (
+                os.path.exists("/home/pi/cognition_ws/models/gesture_model_features.pkl") or
+                os.path.exists("/home/pi/cognition_ws/src/cognition_perception/cognition_perception/models/gesture_model_features.pkl")
+            )
+            map_ok = (
+                os.path.exists("/home/pi/maps/room_map_20260812_0826.yaml") or
+                os.path.exists("/home/pi/maps_new/room_map_20260812_0826.yaml") or
+                os.path.exists("/home/pi/cognition_ws/maps/room_map_20260812_0826.yaml")
+            )
+            return model_ok and map_ok
+        else:
+            return (
+                os.path.exists(f"{WORKSPACE_LOCAL}/ml_models/weights/gesture_model_features.pkl") and
+                os.path.exists(f"{WORKSPACE_LOCAL}/maps/room_map_20260812_0826.yaml")
+            )
 
     def display_report(self):
         print(f"{C_BOLD}{C_WHITE}  [PRE-FLIGHT SYSTEM HEALTH MATRIX]{C_RESET}")
@@ -339,8 +347,11 @@ def dispatch_interactive_gesture_hri():
     print("  Live Terminal HUD: Displays real-time detection confidence, FPS, and wheel velocities.")
     print()
 
-    cmd = "bash ~/start_bench_pipeline.sh" if IS_ON_PI else (
-        f"ssh -t pi@{robot_ip} 'bash ~/start_bench_pipeline.sh'" if IS_DEV_WORKSTATION else
+    record_choice = input(f"{C_BOLD}Record synchronized telemetry rosbag for this session? [y/N]: {C_RESET}").strip().lower()
+    record_flag = " --record" if record_choice in ("y", "yes") else ""
+
+    cmd = f"bash ~/start_bench_pipeline.sh{record_flag}" if IS_ON_PI else (
+        f"ssh -t pi@{robot_ip} 'bash ~/start_bench_pipeline.sh{record_flag}'" if IS_DEV_WORKSTATION else
         "python3 -u /root/cognition_ws/bench_autonomy_monitor.py"
     )
     run_interactive_command(cmd)

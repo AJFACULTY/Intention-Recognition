@@ -26,6 +26,7 @@ import time
 import json
 import argparse
 import threading
+from typing import Optional, Tuple, List
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import cv2
@@ -33,6 +34,7 @@ import numpy as np
 
 # ── ROS 2 Imports with Graceful Fallback ───────────────────────────────────────
 HAS_ROS2 = False
+HAS_COGNITION_MSGS = False
 try:
     import rclpy
     from rclpy.node import Node
@@ -43,6 +45,11 @@ try:
     from std_msgs.msg import UInt16, String
     from tf2_ros import Buffer, TransformListener, TransformException
     HAS_ROS2 = True
+    try:
+        from cognition_interfaces.msg import Gesture
+        HAS_COGNITION_MSGS = True
+    except ImportError:
+        HAS_COGNITION_MSGS = False
 except ImportError:
     HAS_ROS2 = False
 
@@ -129,7 +136,11 @@ class MapVisualizerNode(BaseNode):
         self.latest_camera_jpeg = None
         self._cached_camera_jpeg = None
         self._cached_map_jpeg = None
-        self._workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        curr_dir = os.path.abspath(os.path.dirname(__file__))
+        if os.path.basename(curr_dir) == 'scripts':
+            self._workspace_root = os.path.abspath(os.path.join(curr_dir, '..'))
+        else:
+            self._workspace_root = curr_dir
 
         # Load offline fallback map and camera preview
         self._load_offline_assets()
@@ -146,10 +157,29 @@ class MapVisualizerNode(BaseNode):
         self._render_thread = threading.Thread(target=self._render_loop, daemon=True)
         self._render_thread.start()
 
+    def _find_asset_path(self, subpath: str) -> Optional[str]:
+        candidates = [
+            os.path.join(self._workspace_root, subpath),
+            os.path.join(os.path.dirname(__file__), subpath),
+            os.path.join(os.path.dirname(__file__), '..', subpath),
+            os.path.join('/root/cognition_ws', subpath),
+            os.path.join('/home/pi/cognition_ws', subpath),
+            os.path.join('/home/pi', subpath),
+            os.path.join('/home/j/ros2_cognition_ws', subpath),
+        ]
+        for c in candidates:
+            abs_c = os.path.abspath(c)
+            if os.path.exists(abs_c):
+                return abs_c
+        return None
+
     def _load_offline_assets(self):
         """Loads realistic offline preview assets (floor map and laboratory camera frame)."""
-        map_path = os.path.join(self._workspace_root, 'maps', 'room_map_20260812_0826.png')
-        if os.path.exists(map_path):
+        map_path = (
+            self._find_asset_path('maps/room_map_20260812_0826.png') or
+            self._find_asset_path('maps_new/room_map_20260812_0826.png')
+        )
+        if map_path and os.path.exists(map_path):
             raw = cv2.imread(map_path)
             if raw is not None:
                 self.map_img = raw
@@ -158,8 +188,8 @@ class MapVisualizerNode(BaseNode):
                 self.map_origin_y = -3.84
                 self.map_res = 0.05
 
-        cam_path = os.path.join(self._workspace_root, 'assets', 'preview_camera.jpg')
-        if os.path.exists(cam_path):
+        cam_path = self._find_asset_path('assets/preview_camera.jpg')
+        if cam_path and os.path.exists(cam_path):
             cam_raw = cv2.imread(cam_path)
             if cam_raw is not None:
                 self._cached_camera_jpeg = self._annotate_preview_camera(cam_raw)
@@ -198,7 +228,7 @@ class MapVisualizerNode(BaseNode):
             self.tf_buffer = Buffer()
             self.tf_listener = TransformListener(self.tf_buffer, self)
 
-            map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliABILITYPolicy.RELIABLE if hasattr(ReliabilityPolicy, 'RELIABLE') else ReliabilityPolicy.BEST_EFFORT)
+            map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE if hasattr(ReliabilityPolicy, 'RELIABLE') else ReliabilityPolicy.BEST_EFFORT)
             sensor_qos = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
             costmap_qos = QoSProfile(depth=1, durability=DurabilityPolicy.VOLATILE, reliability=ReliabilityPolicy.RELIABLE)
 
@@ -219,6 +249,8 @@ class MapVisualizerNode(BaseNode):
             self.create_subscription(PoseStamped, '/goal_pose', self._goal_cb, 10)
             self.create_subscription(UInt16, '/battery', self._battery_cb, 10)
             self.create_subscription(CompressedImage, '/camera/image_raw/compressed', self._camera_cb, 10)
+            if HAS_COGNITION_MSGS:
+                self.create_subscription(Gesture, '/cognition/gesture', self._cognition_gesture_cb, 10)
             self.create_subscription(String, '/hand_gesture_cmd', self._gesture_cb, 10)
 
             self.create_timer(0.1, self._poll_tf_pose)
@@ -252,6 +284,13 @@ class MapVisualizerNode(BaseNode):
     def _gesture_cb(self, msg):
         with self.lock:
             self.latest_gesture = msg.data
+
+    def _cognition_gesture_cb(self, msg):
+        with self.lock:
+            label = getattr(msg, 'gesture_label', '') or ''
+            conf = getattr(msg, 'confidence', 0.0) or 0.0
+            if label and label not in ('NONE', 'TOO_FAR'):
+                self.latest_gesture = f"{label} ({conf:.2f})"
 
     def _global_costmap_cb(self, msg):
         with self.lock:

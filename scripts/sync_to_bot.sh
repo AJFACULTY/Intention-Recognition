@@ -39,7 +39,7 @@ echo ">> Robot is reachable at ${ROBOT_HOST}."
 
 # 2. Transfer files to Pi staging directory
 echo "[2/4] Transferring verified files to staging area on Pi..."
-ssh "${ROBOT_USER}@${ROBOT_HOST}" "mkdir -p ~/cognition_ws/models ~/cognition_ws/src/cognition_perception/cognition_perception ~/cognition_ws/src/cognition_brain/cognition_brain"
+ssh "${ROBOT_USER}@${ROBOT_HOST}" "mkdir -p ~/cognition_ws/models ~/cognition_ws/assets ~/maps_new ~/cognition_ws/src/cognition_perception/cognition_perception ~/cognition_ws/src/cognition_brain/cognition_brain"
 
 scp \
     /home/j/ros2_cognition_ws/src_nodes/gesture_node.py \
@@ -88,12 +88,19 @@ scp \
     /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \
     /home/j/ros2_cognition_ws/ml_models/weights/scaler_features.pkl \
     /home/j/ros2_cognition_ws/ml_models/weights/label_encoder_features.pkl \
+    /home/j/ros2_cognition_ws/ml_models/weights/path_predictor.onnx \
+    /home/j/ros2_cognition_ws/ml_models/weights/path_predictor.onnx.data \
+    /home/j/ros2_cognition_ws/ml_models/weights/path_predictor_config.pkl \
     "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/models/"
 
 scp \
     /home/j/ros2_cognition_ws/maps/room_map_20260812_0826.yaml \
     /home/j/ros2_cognition_ws/maps/room_map_20260812_0826.png \
     "${ROBOT_USER}@${ROBOT_HOST}:~/maps_new/"
+
+scp \
+    /home/j/ros2_cognition_ws/assets/preview_camera.jpg \
+    "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/assets/"
 
 # 3. Synchronize package sources and inject directly into Docker container
 echo "[3/4] Updating package source trees and injecting into 'yahboom_gesture' Docker container..."
@@ -116,7 +123,10 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     cp ~/cognition_ws/brain_node.py ~/cognition_ws/src/cognition_brain/cognition_brain/
 
     # Copy Perception & Audio nodes into container across all fallback locations
-    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts
+    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/assets /root/cognition_ws/maps_new /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts
+    docker cp ~/cognition_ws/assets/preview_camera.jpg \${CONTAINER}:/root/cognition_ws/assets/preview_camera.jpg
+    docker cp ~/maps_new/room_map_20260812_0826.png \${CONTAINER}:/root/cognition_ws/maps_new/room_map_20260812_0826.png
+    docker cp ~/maps_new/room_map_20260812_0826.yaml \${CONTAINER}:/root/cognition_ws/maps_new/room_map_20260812_0826.yaml
     docker cp ~/cognition_ws/gesture_node.py \${CONTAINER}:\${PERCEPT_DIR}/gesture_node.py
     docker cp ~/cognition_ws/hand_features.py \${CONTAINER}:\${PERCEPT_DIR}/hand_features.py
     docker cp ~/cognition_ws/active_vision_node.py \${CONTAINER}:\${PERCEPT_DIR}/active_vision_node.py
@@ -168,11 +178,17 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
         docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${INSTALLED_BRAIN}
     fi
 
-    # Copy models into package models dir and share dir
-    docker exec \${CONTAINER} mkdir -p \${PERCEPT_DIR}/models
+    # Copy models into package models dir, container models dir, and share dir
+    docker exec \${CONTAINER} mkdir -p \${PERCEPT_DIR}/models /root/cognition_ws/models
     docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
     docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
     docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx \${CONTAINER}:\${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx.data \${CONTAINER}:\${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor_config.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx \${CONTAINER}:/root/cognition_ws/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx.data \${CONTAINER}:/root/cognition_ws/models/
+    docker cp ~/cognition_ws/models/path_predictor_config.pkl \${CONTAINER}:/root/cognition_ws/models/
 
     # Also copy to installed share directory if present
     SHARE_DIR=/root/cognition_ws/install/cognition_perception/share/cognition_perception/models
@@ -180,6 +196,9 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
         docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${SHARE_DIR}/
         docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${SHARE_DIR}/
         docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/path_predictor.onnx \${CONTAINER}:\${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/path_predictor.onnx.data \${CONTAINER}:\${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/path_predictor_config.pkl \${CONTAINER}:\${SHARE_DIR}/
     fi
 
     echo \">> All autonomy, mission, waypoint, and model files successfully injected into Docker container.\"

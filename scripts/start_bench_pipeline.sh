@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Bag recording toggle via CLI argument (--record / -r) or env variable (RECORD=1)
+RECORD_BAG=false
+if [ "${1:-}" = "--record" ] || [ "${1:-}" = "-r" ] || [ "${RECORD:-0}" = "1" ]; then
+    RECORD_BAG=true
+fi
+TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+BAG_NAME="gesture_follow_${TIMESTAMP}"
+
 # Cleanup handler on Ctrl+C (SIGINT) or SIGTERM
 cleanup() {
     echo ""
@@ -13,16 +21,24 @@ cleanup() {
         timeout 1s ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}' >/dev/null 2>&1 || true
         timeout 1s ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 '{data: 0}' >/dev/null 2>&1 || true
         timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 30}' >/dev/null 2>&1 || true
-        pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer' 2>/dev/null || true
+        pkill -2 -f 'ros2 bag record' 2>/dev/null || true
+        sleep 1
+        pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer|ros2 bag record' 2>/dev/null || true
         rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true
     "
     echo ">> Pipeline stopped cleanly."
+    if [ "$RECORD_BAG" = "true" ]; then
+        echo ">> Synchronized bag saved to: ~/cognition_ws/bags/${BAG_NAME}"
+    fi
     exit 0
 }
 trap cleanup SIGINT SIGTERM
 
 echo "=================================================================="
 echo "    STARTING COGNITION MULTI-MODAL BENCH DEMONSTRATION"
+if [ "$RECORD_BAG" = "true" ]; then
+    echo "    [BAG RECORDING ACTIVE]: ${BAG_NAME}"
+fi
 echo "=================================================================="
 
 # Common environment for all nodes (FastDDS hardware bridge to host micro-ROS agent)
@@ -31,7 +47,7 @@ ROS_ENV="export RMW_IMPLEMENTATION=rmw_fastrtps_cpp; export ROS_DOMAIN_ID=20; . 
 # 1. Clean previous runs and purge stale FastDDS shared memory locks
 echo "[1/8] Cleaning previous instances and FastDDS lockfiles..."
 docker exec yahboom_gesture bash -c "
-    pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer' 2>/dev/null || true
+    pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer|ros2 bag record' 2>/dev/null || true
     rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true
 "
 sleep 1
@@ -114,6 +130,26 @@ docker exec yahboom_gesture bash -c "
     nohup python3 -u \"\$VIS_SCRIPT\" > /tmp/web_vis.log 2>&1 &
 "
 sleep 1
+
+if [ "$RECORD_BAG" = "true" ]; then
+    echo "[*] Starting Synchronized Telemetry Bag Recorder..."
+    echo "    Output Destination: /root/cognition_ws/bags/${BAG_NAME}"
+    docker exec yahboom_gesture bash -c "
+        $ROS_ENV
+        mkdir -p /root/cognition_ws/bags
+        nohup ros2 bag record -o /root/cognition_ws/bags/${BAG_NAME} \
+            /cognition/gesture \
+            /cognition/detection \
+            /cmd_vel \
+            /cmd_vel_gesture \
+            /odom_raw \
+            /imu \
+            /scan \
+            /tf \
+            /tf_static > /tmp/bag_record.log 2>&1 &
+    "
+    sleep 1
+fi
 
 # Verify running processes inside container
 echo ""
