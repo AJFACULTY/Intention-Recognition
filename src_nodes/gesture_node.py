@@ -53,7 +53,7 @@ class GestureNode(Node):
 
         # Parameters
         self.declare_parameter("headless", True)
-        self.declare_parameter("min_hand_size", 0.04)
+        self.declare_parameter("min_hand_size", 0.02)
         self.declare_parameter("frame_skip", 3)
         if not self.has_parameter("use_sim_time"):
             self.declare_parameter("use_sim_time", False)
@@ -123,9 +123,9 @@ class GestureNode(Node):
                 options = mp_vision.HandLandmarkerOptions(
                     base_options=base_options,
                     num_hands=1,
-                    min_hand_detection_confidence=0.5,
-                    min_hand_presence_confidence=0.5,
-                    min_tracking_confidence=0.5
+                    min_hand_detection_confidence=0.35,
+                    min_hand_presence_confidence=0.35,
+                    min_tracking_confidence=0.35
                 )
                 self.detector = mp_vision.HandLandmarker.create_from_options(options)
                 self.get_logger().info("MediaPipe HandLandmarker initialized successfully.")

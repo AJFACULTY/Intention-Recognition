@@ -60,6 +60,7 @@ scp \
     /home/j/ros2_cognition_ws/scripts/navigate_waypoints.py \
     /home/j/ros2_cognition_ws/scripts/setup_joystick_service.sh \
     /home/j/ros2_cognition_ws/scripts/test_safety_audio.py \
+    /home/j/ros2_cognition_ws/scripts/diagnostics/test_camera_stream.py \
     /home/j/ros2_cognition_ws/launch/nav2.launch.py \
     /home/j/ros2_cognition_ws/launch/demo_system.launch.py \
     /home/j/ros2_cognition_ws/launch/cognition_autonomy.launch.py \
@@ -114,26 +115,32 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     cp ~/cognition_ws/safety_audio_node.py ~/cognition_ws/src/cognition_perception/cognition_perception/
     cp ~/cognition_ws/brain_node.py ~/cognition_ws/src/cognition_brain/cognition_brain/
 
-    # Copy Perception & Audio nodes into container
+    # Copy Perception & Audio nodes into container across all fallback locations
+    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts
     docker cp ~/cognition_ws/gesture_node.py \${CONTAINER}:\${PERCEPT_DIR}/gesture_node.py
     docker cp ~/cognition_ws/hand_features.py \${CONTAINER}:\${PERCEPT_DIR}/hand_features.py
     docker cp ~/cognition_ws/active_vision_node.py \${CONTAINER}:\${PERCEPT_DIR}/active_vision_node.py
     docker cp ~/cognition_ws/person_detection_node.py \${CONTAINER}:\${PERCEPT_DIR}/person_detection_node.py
-    docker cp ~/cognition_ws/camera_pub.py \${CONTAINER}:\${PERCEPT_DIR}/camera_pub.py
     docker cp ~/cognition_ws/face_recognition_node.py \${CONTAINER}:\${PERCEPT_DIR}/face_recognition_node.py
     docker cp ~/cognition_ws/face_id_lib.py \${CONTAINER}:\${PERCEPT_DIR}/face_id_lib.py
-    docker cp ~/cognition_ws/safety_audio_node.py \${CONTAINER}:\${PERCEPT_DIR}/safety_audio_node.py
-    docker cp ~/cognition_ws/safety_audio_node.py \${CONTAINER}:/root/cognition_ws/safety_audio_node.py
+
+    for dir in \${PERCEPT_DIR} /root/cognition_ws /root/cognition_ws/src_nodes /root/cognition_ws/src/cognition_simulation/src_nodes; do
+        docker cp ~/cognition_ws/camera_pub.py \${CONTAINER}:\${dir}/camera_pub.py
+        docker cp ~/cognition_ws/safety_audio_node.py \${CONTAINER}:\${dir}/safety_audio_node.py
+    done
+
     docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
     docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/master_demo_menu.py
-    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/scripts
     docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/scripts/master_demo_menu.py
 
     # Copy Brain Decision node, Mission Manager, Waypoint Navigator & Web Map Visualizer
     docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${BRAIN_DIR}/brain_node.py
     docker cp ~/cognition_ws/mission_manager.py \${CONTAINER}:/root/cognition_ws/mission_manager.py
     docker cp ~/cognition_ws/navigate_waypoints.py \${CONTAINER}:/root/cognition_ws/navigate_waypoints.py
-    docker cp ~/cognition_ws/web_map_visualizer.py \${CONTAINER}:/root/cognition_ws/web_map_visualizer.py
+
+    for dir in /root/cognition_ws /root/cognition_ws/scripts /root/cognition_ws/src/cognition_simulation/scripts; do
+        docker cp ~/cognition_ws/web_map_visualizer.py \${CONTAINER}:\${dir}/web_map_visualizer.py
+    done
     docker cp ~/cognition_ws/nav2_params.yaml \${CONTAINER}:\${CONFIG_DIR}/nav2_params.yaml
     docker cp ~/cognition_ws/twist_mux.yaml \${CONTAINER}:/root/cognition_ws/twist_mux.yaml
     docker cp ~/cognition_ws/twist_mux.yaml \${CONTAINER}:\${LAUNCH_SRC}/twist_mux.yaml

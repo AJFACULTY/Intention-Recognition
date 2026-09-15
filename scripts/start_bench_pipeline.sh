@@ -13,7 +13,7 @@ cleanup() {
         timeout 1s ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}' >/dev/null 2>&1 || true
         timeout 1s ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 '{data: 0}' >/dev/null 2>&1 || true
         timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 30}' >/dev/null 2>&1 || true
-        pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor' 2>/dev/null || true
+        pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer' 2>/dev/null || true
         rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true
     "
     echo ">> Pipeline stopped cleanly."
@@ -29,9 +29,9 @@ echo "=================================================================="
 ROS_ENV="export RMW_IMPLEMENTATION=rmw_fastrtps_cpp; export ROS_DOMAIN_ID=20; . /opt/ros/humble/setup.bash; . /root/cognition_ws/install/setup.bash 2>/dev/null || true"
 
 # 1. Clean previous runs and purge stale FastDDS shared memory locks
-echo "[1/7] Cleaning previous instances and FastDDS lockfiles..."
+echo "[1/8] Cleaning previous instances and FastDDS lockfiles..."
 docker exec yahboom_gesture bash -c "
-    pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor' 2>/dev/null || true
+    pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer' 2>/dev/null || true
     rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true
 "
 sleep 1
@@ -59,45 +59,59 @@ if [ "$CAM_TEST" != "1" ]; then
 fi
 
 # 2. Launch Background Pipeline Nodes inside container
-echo "[2/7] Starting Camera Publisher (/dev/video0 -> /camera/image_raw/compressed)..."
+echo "[2/8] Starting Camera Publisher (/dev/video* -> /camera/image_raw/compressed)..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
-    nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/camera_pub.py > /tmp/camera_pub.log 2>&1 &
+    CAM_SCRIPT=\$(test -f /root/cognition_ws/camera_pub.py && echo /root/cognition_ws/camera_pub.py || echo /root/cognition_ws/src/cognition_perception/cognition_perception/camera_pub.py)
+    nohup python3 -u \"\$CAM_SCRIPT\" > /tmp/camera_pub.log 2>&1 &
 "
 sleep 2
 
-echo "[3/7] Starting Throttled Person Detection (YOLOv8n 10 Hz, 2 threads)..."
+echo "[3/8] Starting Throttled Person Detection (YOLOv8n 10 Hz, 2 threads)..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
     nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/person_detection_node.py > /tmp/person_detection.log 2>&1 &
 "
 sleep 2
 
-echo "[4/7] Starting Active Vision Gimbal Tracking Node..."
+echo "[4/8] Starting Active Vision Gimbal Tracking Node..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
     nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/active_vision_node.py > /tmp/active_vision.log 2>&1 &
 "
 sleep 1
 
-echo "[5/7] Starting InsightFace ArcFace Biometric Face ID Node..."
-docker exec yahboom_gesture bash -c "
-    $ROS_ENV
-    nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/face_recognition_node.py > /tmp/face_recognition.log 2>&1 &
-"
-sleep 1
+HAS_INSIGHTFACE=$(docker exec yahboom_gesture python3 -c "import insightface; print(1)" 2>/dev/null || echo 0)
+if [ "$HAS_INSIGHTFACE" = "1" ]; then
+    echo "[5/8] Starting InsightFace ArcFace Biometric Face ID Node..."
+    docker exec yahboom_gesture bash -c "
+        $ROS_ENV
+        nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/face_recognition_node.py > /tmp/face_recognition.log 2>&1 &
+    "
+    sleep 1
+else
+    echo "[5/8] ArcFace Biometric Auth: Optional / Skipped (Pure Gesture Mode Active)"
+fi
 
-echo "[6/7] Starting MediaPipe Gesture Classifier..."
+echo "[6/8] Starting 19-Feature MediaPipe Gesture Classifier..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
     nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/gesture_node.py > /tmp/gesture.log 2>&1 &
 "
 sleep 2
 
-echo "[7/7] Starting Brain Decision & Motion Arbitration Node..."
+echo "[7/8] Starting Brain Decision & Motion Arbitration Node..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
-    nohup python3 -u /root/cognition_ws/src/cognition_brain/cognition_brain/brain_node.py --ros-args -p cmd_vel_topic:=/cmd_vel > /tmp/brain.log 2>&1 &
+    nohup python3 -u /root/cognition_ws/src/cognition_brain/cognition_brain/brain_node.py --ros-args -p cmd_vel_topic:=/cmd_vel -p require_face_auth:=false > /tmp/brain.log 2>&1 &
+"
+sleep 1
+
+echo "[8/8] Starting Live Web Map & Camera Visualizer Dashboard on Port :8080..."
+docker exec yahboom_gesture bash -c "
+    $ROS_ENV
+    VIS_SCRIPT=\$(test -f /root/cognition_ws/web_map_visualizer.py && echo /root/cognition_ws/web_map_visualizer.py || echo /root/cognition_ws/scripts/web_map_visualizer.py)
+    nohup python3 -u \"\$VIS_SCRIPT\" > /tmp/web_vis.log 2>&1 &
 "
 sleep 1
 
@@ -106,7 +120,8 @@ echo ""
 echo "=================================================================="
 echo "  Verifying Active Autonomy Processes:"
 echo "=================================================================="
-docker exec yahboom_gesture ps aux | grep -E 'camera_pub|person_detection|active_vision|face_recognition|gesture_node|brain_node' | grep -v grep || echo "Warning: Some nodes failed to start"
+docker exec yahboom_gesture ps aux | grep -E 'camera_pub|person_detection|active_vision|gesture_node|brain_node|web_map_visualizer' | grep -v grep || echo "Warning: Some nodes failed to start"
+echo "  >> Live Web Visualizer is ACTIVE at: http://\$(hostname -I | awk '{print \$1}'):8080"
 echo "=================================================================="
 echo ""
 

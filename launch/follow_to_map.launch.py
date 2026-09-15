@@ -35,6 +35,12 @@ from launch_ros.actions import Node
 def generate_launch_description():
     ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+    def resolve_path(candidates, default_rel):
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+        return os.path.join(ws_dir, default_rel)
+
     # ── 1. Launch Arguments ──────────────────────────────────────────────────
     declare_audio = DeclareLaunchArgument(
         "enable_audio",
@@ -46,9 +52,20 @@ def generate_launch_description():
         default_value="true",
         description="Launch twist_mux priority velocity multiplexer",
     )
+    declare_visualizer = DeclareLaunchArgument(
+        "enable_visualizer",
+        default_value="true",
+        description="Launch live web map visualizer dashboard on http://localhost:8080",
+    )
 
     # ── 2. Twist Mux Priority Arbiter ────────────────────────────────────────
-    twist_mux_config = os.path.join(ws_dir, "launch", "twist_mux.yaml")
+    twist_mux_config = resolve_path([
+        os.path.join(ws_dir, "launch", "twist_mux.yaml"),
+        os.path.join(ws_dir, "twist_mux.yaml"),
+        "/root/cognition_ws/twist_mux.yaml",
+        "/root/cognition_ws/src/cognition_simulation/config/twist_mux.yaml",
+    ], "launch/twist_mux.yaml")
+
     twist_mux_node = Node(
         package="twist_mux",
         executable="twist_mux",
@@ -60,7 +77,16 @@ def generate_launch_description():
     )
 
     # ── 3. Industrial Safety Audio Node ──────────────────────────────────────
-    safety_audio_script = os.path.join(ws_dir, "src_nodes", "safety_audio_node.py")
+    safety_audio_script = resolve_path([
+        os.path.join(ws_dir, "src_nodes", "safety_audio_node.py"),
+        os.path.join(ws_dir, "safety_audio_node.py"),
+        "/root/cognition_ws/safety_audio_node.py",
+        "/root/cognition_ws/src_nodes/safety_audio_node.py",
+        "/root/cognition_ws/src/cognition_perception/cognition_perception/safety_audio_node.py",
+        "/root/cognition_ws/src/cognition_simulation/src_nodes/safety_audio_node.py",
+        "/root/cognition_ws/src/cognition_simulation/safety_audio_node.py",
+    ], "src_nodes/safety_audio_node.py")
+
     safety_audio_node = ExecuteProcess(
         cmd=[sys.executable, safety_audio_script],
         name="safety_audio_node",
@@ -69,19 +95,56 @@ def generate_launch_description():
     )
 
     # ── 4. SLAM Toolbox (Online Asynchronous Mapping & EKF) ──────────────────
-    slam_launch_path = os.path.join(ws_dir, "launch", "slam_real.launch.py")
+    slam_launch_path = resolve_path([
+        os.path.join(ws_dir, "launch", "slam_real.launch.py"),
+        os.path.join(ws_dir, "slam_real.launch.py"),
+        "/root/cognition_ws/src/cognition_simulation/launch/slam_real.launch.py",
+        "/root/cognition_ws/slam_real.launch.py",
+    ], "launch/slam_real.launch.py")
+
     slam_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_path)
     )
 
     # ── 5. Cognition Perception & Brain Include (Follow Mode) ────────────────
-    cognition_launch_path = os.path.join(ws_dir, "launch", "cognition_autonomy.launch.py")
+    cognition_launch_path = resolve_path([
+        os.path.join(ws_dir, "launch", "cognition_autonomy.launch.py"),
+        os.path.join(ws_dir, "cognition_autonomy.launch.py"),
+        "/root/cognition_ws/src/cognition_simulation/launch/cognition_autonomy.launch.py",
+        "/root/cognition_ws/cognition_autonomy.launch.py",
+    ], "launch/cognition_autonomy.launch.py")
+
     cognition_include = TimerAction(
         period=3.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(cognition_launch_path),
-                launch_arguments={"cmd_vel_topic": "/cmd_vel_gesture"}.items(),
+                launch_arguments={
+                    "cmd_vel_topic": "/cmd_vel_gesture",
+                    "require_face_auth": "false",
+                }.items(),
+            )
+        ],
+    )
+
+    # ── 6. Live Web Map Visualizer Dashboard (Port :8080) ───────────────────
+    visualizer_script = resolve_path([
+        os.path.join(ws_dir, "scripts", "web_map_visualizer.py"),
+        os.path.join(ws_dir, "web_map_visualizer.py"),
+        "/root/cognition_ws/web_map_visualizer.py",
+        "/root/cognition_ws/scripts/web_map_visualizer.py",
+        "/root/cognition_ws/src/cognition_simulation/scripts/web_map_visualizer.py",
+        "/root/cognition_ws/src/cognition_simulation/web_map_visualizer.py",
+    ], "scripts/web_map_visualizer.py")
+
+    visualizer_process = TimerAction(
+        period=5.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[sys.executable, visualizer_script],
+                name="web_map_visualizer",
+                output="screen",
+                condition=IfCondition(LaunchConfiguration("enable_visualizer")),
             )
         ],
     )
@@ -90,9 +153,11 @@ def generate_launch_description():
         [
             declare_audio,
             declare_twist_mux,
+            declare_visualizer,
             twist_mux_node,
             safety_audio_node,
             slam_include,
             cognition_include,
+            visualizer_process,
         ]
     )

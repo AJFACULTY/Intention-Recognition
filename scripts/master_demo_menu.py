@@ -56,6 +56,18 @@ IS_ON_PI = os.path.exists("/home/pi") and not IS_INSIDE_CONTAINER
 IS_DEV_WORKSTATION = not IS_INSIDE_CONTAINER and not IS_ON_PI
 
 
+def get_robot_ip() -> str:
+    """Returns first reachable robot IP, or default fallback."""
+    for ip in DEFAULT_ROBOT_IPS:
+        try:
+            ret = subprocess.call(["ping", "-c", "1", "-W", "1", ip], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if ret == 0:
+                return ip
+        except Exception:
+            pass
+    return DEFAULT_ROBOT_IPS[0]
+
+
 def clear_screen():
     os.system("clear" if os.name != "nt" else "cls")
 
@@ -311,21 +323,24 @@ def dispatch_collaborative_follow_slam():
 
 
 def dispatch_interactive_gesture_hri():
-    """Unmapped Mode 2: Free-Space Interactive Gesture Teleop & Biometric Auth."""
-    print_header("INTERACTIVE GESTURE TELEOPERATION & BIOMETRIC AUTH", "Real-Time 19-D Hand Feature Recognition & PTZ Gimbal")
-    print(f"{C_WHITE}Mission Overview:{C_RESET}")
-    print("  • Evaluates the 6 canonical touchless gestures in open floor space:")
-    print("      - STOP   (Open Palm)    -> Instant wheel halt (cmd_vel = 0)")
-    print("      - GO     (Thumbs Up)    -> Translates forward at 0.25 m/s")
-    print("      - LEFT   (Point Left)   -> In-place pivot counter-clockwise (+0.4 rad/s)")
-    print("      - RIGHT  (Point Right)  -> In-place pivot clockwise (-0.4 rad/s)")
-    print("      - BACK   (Point Down)   -> Translates backward at -0.15 m/s")
-    print("      - FOLLOW (Peace Sign)   -> Visual servoing shadows human operator")
-    print("  • Active Vision 2-DOF gimbal tracks operator optical centroid.")
+    """Unmapped Mode 2: Full 6-Gesture Evaluation Suite & Touchless Teleoperation."""
+    print_header("FULL 6-GESTURE EVALUATION & TELEOPERATION SUITE", "Test GO, STOP, FOLLOW, LEFT, RIGHT, BACK + Live Visualizer (:8080)")
+    robot_ip = get_robot_ip()
+    print(f"{C_WHITE}Gesture Verification Protocol:{C_RESET}")
+    print("  Stand ~1.5m in front of the 2-DOF camera to evaluate all 6 canonical gestures:")
+    print(f"    1. {C_BOLD}{C_RED}STOP{C_RESET}   (Open Palm)    -> Instant wheel halt (/cmd_vel = 0.0 m/s)")
+    print(f"    2. {C_BOLD}{C_GREEN}GO{C_RESET}     (Thumbs Up)    -> Translates forward (+0.25 m/s)")
+    print(f"    3. {C_BOLD}{C_CYAN}FOLLOW{C_RESET} (Peace Sign)   -> Visual servoing shadows your footsteps")
+    print(f"    4. {C_BOLD}{C_BLUE}LEFT{C_RESET}   (Point Left)   -> In-place pivot counter-clockwise (+0.4 rad/s)")
+    print(f"    5. {C_BOLD}{C_BLUE}RIGHT{C_RESET}  (Point Right)  -> In-place pivot clockwise (-0.4 rad/s)")
+    print(f"    6. {C_BOLD}{C_YELLOW}BACK{C_RESET}   (Point Down)   -> Translates backward (-0.15 m/s)")
+    print()
+    print(f"  Live Visualizer & Camera Stream: {C_BOLD}{C_CYAN}http://{robot_ip}:8080{C_RESET}")
+    print("  Live Terminal HUD: Displays real-time detection confidence, FPS, and wheel velocities.")
     print()
 
     cmd = "bash ~/start_bench_pipeline.sh" if IS_ON_PI else (
-        f"ssh -t pi@10.27.122.136 'bash ~/start_bench_pipeline.sh'" if IS_DEV_WORKSTATION else
+        f"ssh -t pi@{robot_ip} 'bash ~/start_bench_pipeline.sh'" if IS_DEV_WORKSTATION else
         "python3 -u /root/cognition_ws/bench_autonomy_monitor.py"
     )
     run_interactive_command(cmd)
@@ -404,8 +419,9 @@ def dispatch_capstone_patrol_preemption():
     print("  5. Raise GO gesture -> Robot resumes transit and completes the patrol mission.")
     print()
 
+    robot_ip = get_robot_ip()
     cmd = "bash ~/run_nav2_patrol.sh" if IS_ON_PI else (
-        "ssh -t pi@10.27.122.136 'bash ~/run_nav2_patrol.sh'" if IS_DEV_WORKSTATION else
+        f"ssh -t pi@{robot_ip} 'bash ~/run_nav2_patrol.sh'" if IS_DEV_WORKSTATION else
         "bash /root/cognition_ws/run_nav2_patrol.sh"
     )
     run_interactive_command(cmd)
@@ -480,6 +496,29 @@ def dispatch_clean_fastdds():
     run_interactive_command(cmd)
 
 
+def dispatch_camera_diagnostic():
+    """Probes V4L2 devices, benchmarks capture rates, and checks ROS 2 image topics."""
+    print_header("LIVE CAMERA FEED & V4L2 DEVICE DIAGNOSTIC", "Hardware Interface, FPS Benchmark & Snapshot")
+    cmd = (
+        "python3 scripts/diagnostics/test_camera_stream.py" if IS_DEV_WORKSTATION else
+        "docker exec -it yahboom_gesture python3 /root/cognition_ws/test_camera_stream.py" if IS_ON_PI else
+        "python3 /root/cognition_ws/test_camera_stream.py"
+    )
+    run_interactive_command(cmd)
+
+
+def dispatch_standalone_web_visualizer():
+    """Launches the lightweight RViz-equivalent Web Visualizer on port 8080."""
+    print_header("STANDALONE WEB MAP & CAMERA VISUALIZER", "HTTP Port 8080 Dashboard")
+    print(f"Opening server on http://0.0.0.0:8080 ...")
+    cmd = (
+        "python3 scripts/web_map_visualizer.py" if IS_DEV_WORKSTATION else
+        "docker exec -it yahboom_gesture python3 /root/cognition_ws/web_map_visualizer.py" if IS_ON_PI else
+        "python3 /root/cognition_ws/web_map_visualizer.py"
+    )
+    run_interactive_command(cmd)
+
+
 # ════════════════════════════════════════════════════════════════════════════════
 # 3. INTERACTIVE SUB-MENUS WITH ERGONOMIC BACK NAVIGATION
 # ════════════════════════════════════════════════════════════════════════════════
@@ -488,7 +527,7 @@ def menu_unmapped_environment():
     while True:
         print_header("CATEGORY [1]: UNMAPPED ENVIRONMENT (COLLABORATIVE SLAM & HRI)", "Mode 1: Zero Prior Map Required — Exploration & Touchless Interaction")
         print(f"  {C_BOLD}[1.1]{C_RESET} Collaborative 'Follow-to-Map' SLAM (Live Map Construction on :8080)")
-        print(f"  {C_BOLD}[1.2]{C_RESET} Free-Space Interactive Gesture Teleoperation & Biometric Auth")
+        print(f"  {C_BOLD}[1.2]{C_RESET} Full 6-Gesture Evaluation Suite (Test GO, STOP, FOLLOW, LEFT, RIGHT, BACK)")
         print(f"  {C_BOLD}[1.3]{C_RESET} ISO 15066 Safety Bubble & 20cm Reactive Reverse Retreat Test")
         print(f"  {C_BOLD}[1.4]{C_RESET} Manual Wireless Gamepad SLAM Mapping (Priority 100 Teleop)")
         print(f"  {C_BOLD}[1.5]{C_RESET} Save Generated 2D Metric Map (.yaml & .png)")
@@ -571,6 +610,8 @@ def menu_diagnostics_suite():
         print(f"  {C_BOLD}[3.4]{C_RESET} Industrial Acoustic Safety Chimes & Buzzer Self-Test (/beep)")
         print(f"  {C_BOLD}[3.5]{C_RESET} Run Full Automated Verification Suite (7/7 Master Suites)")
         print(f"  {C_BOLD}[3.6]{C_RESET} Clean FastDDS Shared Memory Lockfiles & Process Reset")
+        print(f"  {C_BOLD}[3.7]{C_RESET} Test Live Camera Feed & V4L2 Devices (FPS & Snapshot)")
+        print(f"  {C_BOLD}[3.8]{C_RESET} Launch Standalone Web Visualizer Dashboard (Port :8080)")
         print()
         print(f"  {C_BOLD}[H]{C_RESET}   {C_RED}EMERGENCY CHASSIS HALT (/cmd_vel = 0.0){C_RESET}")
         print(f"  {C_BOLD}[B]{C_RESET}   {C_CYAN}Back to Main Menu{C_RESET}")
@@ -596,6 +637,10 @@ def menu_diagnostics_suite():
             dispatch_run_unit_verifications()
         elif choice in ["6", "3.6"]:
             dispatch_clean_fastdds()
+        elif choice in ["7", "3.7"]:
+            dispatch_camera_diagnostic()
+        elif choice in ["8", "3.8"]:
+            dispatch_standalone_web_visualizer()
         else:
             print(f"{C_RED}Invalid selection.{C_RESET}")
             time.sleep(0.8)

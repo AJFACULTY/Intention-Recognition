@@ -135,6 +135,7 @@ class BenchAutonomyMonitor(Node):
             "================================================================================\033[K",
             "           COGNITION ROBOTICS — BENCH AUTONOMY LIVE DEMO MONITOR\033[K",
             f"           Robot Battery: {bat_str} | FastDDS Domain: 20\033[K",
+            "           Live Web Visualizer & Camera Feed: \033[96mhttp://<robot_ip>:8080\033[0m\033[K",
             "================================================================================\033[K",
             f"  [1] PERSON DETECTION   : {person_str}\033[K",
             f"  [2] ACTIVE GIMBAL      : Pan = {self.current_pan:3d}° | Tilt = {self.current_tilt:3d}° | State: {state_color}{self.gimbal_state}\033[0m\033[K",

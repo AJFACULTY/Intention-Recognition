@@ -24,6 +24,7 @@ Usage:
 """
 
 import os
+import sys
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction, ExecuteProcess
@@ -139,20 +140,27 @@ def generate_launch_description():
     )
 
     # ── 3. Perception & Cognition Pipeline ──
-    camera_node = Node(
-        package='cognition_perception',
-        executable='camera_pub',
-        name='camera_publisher',
-        parameters=[{
-            'device_index': -1,
-            'publish_fps': 20.0,
-            'capture_width': 640,
-            'capture_height': 480,
-            'output_width': 320,
-            'output_height': 240,
-            'jpeg_quality': 80,
-        }],
-        output='screen',
+    ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    def resolve_path(candidates, default_rel):
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+        return os.path.join(ws_dir, default_rel)
+
+    camera_script = resolve_path([
+        os.path.join(ws_dir, "src_nodes", "camera_pub.py"),
+        os.path.join(ws_dir, "camera_pub.py"),
+        "/root/cognition_ws/camera_pub.py",
+        "/root/cognition_ws/src_nodes/camera_pub.py",
+        "/root/cognition_ws/src/cognition_perception/cognition_perception/camera_pub.py",
+        "/root/cognition_ws/src/cognition_simulation/src_nodes/camera_pub.py",
+    ], "src_nodes/camera_pub.py")
+
+    camera_node = ExecuteProcess(
+        cmd=[sys.executable, "-u", camera_script],
+        name="camera_publisher",
+        output="screen",
         condition=IfCondition(with_cognition)
     )
 

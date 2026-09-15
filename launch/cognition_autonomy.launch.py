@@ -20,8 +20,9 @@ Usage:
 """
 
 import os
+import sys
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.actions import DeclareLaunchArgument, TimerAction, ExecuteProcess
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -67,21 +68,26 @@ def generate_launch_description():
     launch_camera = LaunchConfiguration('launch_camera')
     dashboard = LaunchConfiguration('dashboard')
 
+    ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    def resolve_path(candidates, default_rel):
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+        return os.path.join(ws_dir, default_rel)
+
+    camera_script = resolve_path([
+        os.path.join(ws_dir, "src_nodes", "camera_pub.py"),
+        os.path.join(ws_dir, "camera_pub.py"),
+        "/root/cognition_ws/src/cognition_perception/cognition_perception/camera_pub.py",
+        "/root/cognition_ws/camera_pub.py",
+    ], "src_nodes/camera_pub.py")
+
     # ── 1. Robust Camera Publisher ──
-    camera_node = Node(
-        package='cognition_perception',
-        executable='camera_pub',
-        name='camera_publisher',
-        parameters=[{
-            'device_index': -1,  # Auto-probe [1, 0, 2, 3]
-            'publish_fps': 20.0,
-            'capture_width': 640,
-            'capture_height': 480,
-            'output_width': 320,
-            'output_height': 240,
-            'jpeg_quality': 80,
-        }],
-        output='screen',
+    camera_node = ExecuteProcess(
+        cmd=[sys.executable, "-u", camera_script],
+        name="camera_publisher",
+        output="screen",
         condition=IfCondition(launch_camera)
     )
 
@@ -139,7 +145,8 @@ def generate_launch_description():
             'confidence_threshold': 0.50,
             'frame_skip': 5,
         }],
-        output='screen'
+        output='screen',
+        condition=IfCondition(require_face_auth)
     )
 
     # ── 5. Position-Invariant MediaPipe Gesture Classifier ──
