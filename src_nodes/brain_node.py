@@ -248,12 +248,12 @@ class BrainNode(Node):
 
                 # Filter strictly within the vehicle's driving corridor width
                 if abs(y) <= half_corridor:
-                    # Frontal corridor: x > 0
-                    if 0.05 <= x <= (self.lidar_clearance_distance + 0.20):
+                    # Frontal corridor: obstacle must be in front of physical chassis bumper (x >= 0.14m)
+                    if 0.14 <= x <= (self.lidar_clearance_distance + 0.20):
                         if x < min_frontal_dist:
                             min_frontal_dist = x
-                    # Rear corridor: x < 0 (evaluated for reverse safety)
-                    elif -(self.lidar_clearance_distance + 0.20) <= x <= -0.05:
+                    # Rear corridor: obstacle must be behind physical rear chassis plate (x <= -0.15m)
+                    elif -(self.lidar_clearance_distance + 0.20) <= x <= -0.15:
                         rear_d = abs(x)
                         if rear_d < min_rear_dist:
                             min_rear_dist = rear_d

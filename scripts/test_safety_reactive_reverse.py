@@ -308,8 +308,8 @@ class TestSafetyReactiveReverse(unittest.TestCase):
         """Verify that frontal breach when rear is blocked (< 0.25m) halts chassis without reversing."""
         self._send_detection()
         self._send_gesture(GESTURE_GO, "GO")
-        # Frontal obstacle at 0.20m (< 0.36m), Rear obstacle at 0.15m (< 0.25m)
-        self._inject_dual_obstacle(front_dist_m=0.20, rear_dist_m=0.15)
+        # Frontal obstacle at 0.20m (< 0.36m), Rear obstacle at 0.18m (< 0.25m, outside 0.15m chassis)
+        self._inject_dual_obstacle(front_dist_m=0.20, rear_dist_m=0.18)
 
         self.assertTrue(self.node.safety_halt_active)
         self.assertTrue(self.node.rear_safety_blocked)
@@ -320,7 +320,7 @@ class TestSafetyReactiveReverse(unittest.TestCase):
         self.assertTrue(len(self.published_twists) >= 1)
         self.assertAlmostEqual(self.published_twists[-1].linear.x, 0.0)
         self.assertAlmostEqual(self.published_twists[-1].angular.z, 0.0)
-        print("✓ Test 11: Blocked rear (0.15m < 0.25m) prevents reverse — chassis safely halts at 0.0 m/s")
+        print("✓ Test 11: Blocked rear (0.18m < 0.25m) prevents reverse — chassis safely halts at 0.0 m/s")
 
     def test_12_rear_obstacle_during_reverse_aborts_immediately(self):
         """Verify that an obstacle appearing behind the robot mid-reverse aborts maneuver instantly."""
@@ -330,8 +330,8 @@ class TestSafetyReactiveReverse(unittest.TestCase):
         self._inject_obstacle(distance_m=0.20, angle_deg=0.0)
         self.assertTrue(self.node.safety_reverse_active)
 
-        # Dynamic rear obstacle suddenly appears at 0.12m
-        self._inject_obstacle(distance_m=0.12, angle_deg=180.0)
+        # Dynamic rear obstacle suddenly appears at 0.18m (outside 0.15m chassis, inside 0.25m safety zone)
+        self._inject_obstacle(distance_m=0.18, angle_deg=180.0)
         self.assertTrue(self.node.rear_safety_blocked)
 
         self.published_twists.clear()
