@@ -101,7 +101,7 @@ PYEOF
 '
 
 # 3. Assert camera gimbal eye level
-echo "[Extra] Aligning 2-DOF camera gimbal to level horizon (+18°)..."
+echo "[Extra] Aligning 2-DOF camera gimbal to level horizon (+30°)..."
 docker exec "$CONTAINER" bash -c '
     export ROS_DOMAIN_ID=20
     export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
@@ -116,7 +116,7 @@ p1 = n.create_publisher(Int32, \"/servo_s1\", 10)
 p2 = n.create_publisher(Int32, \"/servo_s2\", 10)
 time.sleep(0.2)
 m1 = Int32(); m1.data = 0
-m2 = Int32(); m2.data = 18
+m2 = Int32(); m2.data = 30
 for _ in range(5):
     p1.publish(m1); p2.publish(m2)
     rclpy.spin_once(n, timeout_sec=0.05); time.sleep(0.05)

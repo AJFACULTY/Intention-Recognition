@@ -176,11 +176,11 @@ def generate_launch_description():
         name='active_vision_node',
         parameters=[{
             'pan_home': 0,
-            'tilt_home': 18,
+            'tilt_home': 30,
             'pan_min': -60,
             'pan_max': 60,
             'tilt_min': -15,
-            'tilt_max': 24,
+            'tilt_max': 36,
             'kp_pan': 18.0,
             'ki_pan': 1.2,
             'kd_pan': 2.5,
