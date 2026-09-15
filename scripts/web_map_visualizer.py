@@ -579,12 +579,19 @@ class MapVisualizerNode(BaseNode):
             cv2.circle(resized, (gu, gv), 9, (0, 140, 255), 2, cv2.LINE_AA)
             cv2.circle(resized, (gu, gv), 3, (0, 200, 255), -1)
 
-        # 6. Waypoint Corridor Landmarks
+        # 6. Waypoint Corridor Landmarks with Crisp Text Labels
         for wx, wy, label in self.corridor_landmarks:
             wu, wv = scale_pt(world_to_px(wx, wy))
             if 0 <= wu < resized.shape[1] and 0 <= wv < resized.shape[0]:
-                cv2.circle(resized, (wu, wv), 5, (180, 80, 240), -1)
-                cv2.circle(resized, (wu, wv), 8, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.circle(resized, (wu, wv), 6, (180, 80, 240), -1)
+                cv2.circle(resized, (wu, wv), 9, (255, 255, 255), 2, cv2.LINE_AA)
+                tag = label.split()[0] if label else "WP"
+                (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
+                tx = wu + 11
+                ty = wv + 4
+                cv2.rectangle(resized, (tx - 4, ty - th - 3), (tx + tw + 4, ty + 4), (16, 20, 30), -1)
+                cv2.rectangle(resized, (tx - 4, ty - th - 3), (tx + tw + 4, ty + 4), (180, 80, 240), 1, cv2.LINE_AA)
+                cv2.putText(resized, tag, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
 
         # 7. AMR Chassis Footprint & REP-103 Axes
         ru, rv = world_to_px(rx, ry)
@@ -711,7 +718,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       overflow-x: hidden;
     }
 
-    /* ── Top Header Island ── */
+    /* ── Top Header Island (Single locked pill row) ── */
     .header-island {
       width: 100%;
       max-width: 1360px;
@@ -723,16 +730,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--card-border);
       border-radius: 9999px;
-      padding: 8px 18px;
+      padding: 6px 16px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-      margin-bottom: 16px;
-      gap: 12px;
-      flex-wrap: wrap;
+      margin-bottom: 14px;
+      gap: 10px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
     }
     .brand-cluster {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      flex-shrink: 0;
     }
     .status-beacon {
       width: 10px;
@@ -747,7 +757,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       50% { opacity: 0.6; transform: scale(0.9); }
     }
     .brand-title {
-      font-size: 0.92rem;
+      font-size: 0.90rem;
       font-weight: 700;
       letter-spacing: 0.5px;
       color: var(--text-bright);
@@ -756,26 +766,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       align-items: center;
       gap: 6px;
     }
-    .brand-title span { color: var(--accent-cyan); font-weight: 500; font-size: 0.8rem; }
+    .brand-title span { color: var(--accent-cyan); font-weight: 500; font-size: 0.78rem; }
     
     .mode-pill {
       background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.25));
       border: 1px solid rgba(99, 102, 241, 0.4);
       color: #93c5fd;
-      padding: 6px 14px;
+      padding: 5px 12px;
       border-radius: 9999px;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       font-weight: 600;
       letter-spacing: 0.3px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      flex-shrink: 0;
     }
     
     .telemetry-cluster {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
+      flex-shrink: 0;
     }
     .battery-pill {
       display: flex;
@@ -994,29 +1006,43 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     /* ── Floating Bottom Dock Island ── */
     .bottom-dock-island {
       position: absolute;
-      bottom: 20px;
+      bottom: 18px;
       left: 50%;
       transform: translateX(-50%);
       background: var(--glass-dock);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--card-border);
-      border-radius: 18px;
-      padding: 10px 18px;
+      border-radius: 16px;
+      padding: 8px 16px;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 6px;
       z-index: 50;
       max-width: 95%;
-      flex-wrap: wrap;
     }
 
-    /* Dock Sections */
-    .dock-section {
+    /* Dock Rows */
+    .dock-waypoints-row {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .dock-telemetry-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      color: var(--text);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 5px;
+      width: 100%;
+      justify-content: center;
     }
     .dock-label {
       font-size: 0.7rem;
@@ -1025,11 +1051,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       letter-spacing: 0.5px;
       color: var(--text-muted);
       margin-right: 4px;
-    }
-    .dock-divider {
-      width: 1px;
-      height: 24px;
-      background: rgba(255, 255, 255, 0.1);
     }
 
     /* Waypoint Pill Buttons */
@@ -1255,13 +1276,23 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- ── Main Cockpit Island Card ── -->
   <main class="cockpit-island" id="cockpit-island">
 
-    <!-- Floating Map Control Tools (Top Left) -->
+    <!-- Floating Map Control Tools (Top Left with Aerospace SVG Icons) -->
     <div class="map-tools-island">
-      <button class="btn-map-tool active" id="tool-view" title="Pan & Zoom Mode" onclick="setToolMode('view')">✋</button>
-      <button class="btn-map-tool" id="tool-goal" title="2D Nav Goal (Click & Drag)" onclick="setToolMode('goal')">🎯</button>
-      <button class="btn-map-tool" id="tool-pose" title="2D Pose Estimate (Click & Drag)" onclick="setToolMode('pose')">📍</button>
-      <button class="btn-map-tool" id="tool-layers" title="Toggle Map Layers" onclick="toggleLayerDrawer()">🎛</button>
-      <button class="btn-map-tool" id="tool-reset" title="Reset View Center" onclick="resetMapTransform()">⌖</button>
+      <button class="btn-map-tool active" id="tool-view" title="Pan & Zoom Mode" onclick="setToolMode('view')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+      </button>
+      <button class="btn-map-tool" id="tool-goal" title="2D Nav Goal (Click & Drag)" onclick="setToolMode('goal')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      </button>
+      <button class="btn-map-tool" id="tool-pose" title="2D Pose Estimate (Click & Drag)" onclick="setToolMode('pose')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
+      </button>
+      <button class="btn-map-tool" id="tool-layers" title="Toggle Map Layers" onclick="toggleLayerDrawer()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      </button>
+      <button class="btn-map-tool" id="tool-reset" title="Reset View Center" onclick="resetMapTransform()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3m12 0h3M12 3v3m0 12v3"/><circle cx="12" cy="12" r="7"/></svg>
+      </button>
     </div>
 
     <!-- Layer Settings Popover -->
@@ -1327,9 +1358,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Floating Bottom Dock Island -->
+    <!-- Floating Bottom Dock Island (Clean 2-tier layout) -->
     <div class="bottom-dock-island">
-      <div class="dock-section">
+      <div class="dock-waypoints-row">
         <span class="dock-label">Waypoints</span>
         <button class="btn-dock" onclick="dispatchWaypoint('P1 Home Base', 0.08, 0.05, 0.0)">P1 Home</button>
         <button class="btn-dock" onclick="dispatchWaypoint('P2 Central Hub', 1.64, 1.62, 0.0)">P2 Center</button>
@@ -1338,16 +1369,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <button class="btn-dock primary" onclick="runPatrolCircuit()">🚀 4-Pt Patrol</button>
       </div>
 
-      <div class="dock-divider"></div>
-
-      <div class="dock-section">
-        <span class="dock-label">Telemetry</span>
-        <div class="dock-telemetry">
-          <div><span class="dim">X:</span> <span class="coord" id="val-x">0.08</span>m</div>
-          <div><span class="dim">Y:</span> <span class="coord" id="val-y">0.05</span>m</div>
-          <div><span class="dim">Yaw:</span> <span class="coord" id="val-yaw">0.0°</span></div>
-          <div><span class="dim">FastDDS:</span> <span class="coord" id="val-dds">12ms</span></div>
-        </div>
+      <div class="dock-telemetry-row">
+        <div><span class="dim">X:</span> <span class="coord" id="val-x">0.08</span>m</div>
+        <div><span class="dim">Y:</span> <span class="coord" id="val-y">0.05</span>m</div>
+        <div><span class="dim">Yaw:</span> <span class="coord" id="val-yaw">0.0°</span></div>
+        <div><span class="dim">FastDDS:</span> <span class="coord" id="val-dds">12ms</span></div>
       </div>
     </div>
 
