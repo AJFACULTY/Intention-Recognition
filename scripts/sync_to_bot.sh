@@ -51,6 +51,8 @@ scp \
     /home/j/ros2_cognition_ws/src_nodes/face_id_lib.py \
     /home/j/ros2_cognition_ws/src_nodes/brain_node.py \
     /home/j/ros2_cognition_ws/src_nodes/safety_audio_node.py \
+    /home/j/ros2_cognition_ws/scripts/master_demo_menu.py \
+    /home/j/ros2_cognition_ws/scripts/menu.sh \
     /home/j/ros2_cognition_ws/scripts/bench_autonomy_monitor.py \
     /home/j/ros2_cognition_ws/scripts/mission_manager.py \
     /home/j/ros2_cognition_ws/scripts/plot_multi_waypoint_trajectory.py \
@@ -68,6 +70,7 @@ scp \
     "${ROBOT_USER}@${ROBOT_HOST}:~/cognition_ws/"
 
 scp \
+    /home/j/ros2_cognition_ws/scripts/menu.sh \
     /home/j/ros2_cognition_ws/scripts/start_nav2.sh \
     /home/j/ros2_cognition_ws/scripts/start_bench_pipeline.sh \
     /home/j/ros2_cognition_ws/scripts/run_nav2_patrol.sh \
@@ -78,7 +81,7 @@ scp \
     /home/j/ros2_cognition_ws/src_nodes/brain_node.py \
     "${ROBOT_USER}@${ROBOT_HOST}:~/"
 
-ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py"
+ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/menu.sh ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/menu.sh ~/cognition_ws/master_demo_menu.py ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py"
 
 scp \
     /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \
@@ -122,6 +125,9 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     docker cp ~/cognition_ws/safety_audio_node.py \${CONTAINER}:\${PERCEPT_DIR}/safety_audio_node.py
     docker cp ~/cognition_ws/safety_audio_node.py \${CONTAINER}:/root/cognition_ws/safety_audio_node.py
     docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
+    docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/master_demo_menu.py
+    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/scripts
+    docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/scripts/master_demo_menu.py
 
     # Copy Brain Decision node, Mission Manager, Waypoint Navigator & Web Map Visualizer
     docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${BRAIN_DIR}/brain_node.py

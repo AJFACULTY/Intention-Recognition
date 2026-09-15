@@ -176,11 +176,11 @@ def generate_launch_description():
         name='active_vision_node',
         parameters=[{
             'pan_home': 0,
-            'tilt_home': 25,
+            'tilt_home': 18,
             'pan_min': -60,
             'pan_max': 60,
-            'tilt_min': 10,
-            'tilt_max': 55,
+            'tilt_min': -15,
+            'tilt_max': 24,
             'kp_pan': 18.0,
             'ki_pan': 1.2,
             'kd_pan': 2.5,
@@ -189,10 +189,10 @@ def generate_launch_description():
             'kd_tilt': 2.0,
             'alpha_ema': 0.35,
             'deadband': 0.05,
-            'max_slew_deg': 0.8,
+            'max_slew_deg': 0.6,
             'search_amplitude': 30.0,
             'search_freq': 0.2,
-            'control_rate_hz': 20.0,
+            'control_rate_hz': 30.0,
             'target_timeout': 1.5,
         }],
         output='screen',
@@ -275,8 +275,8 @@ def generate_launch_description():
                 condition=IfCondition(with_nav2)
             ),
             Node(
-                package='nav2_recoveries', executable='recoveries_server',
-                name='recoveries_server', output='screen',
+                package='nav2_behaviors', executable='behavior_server',
+                name='behavior_server', output='screen',
                 parameters=[nav2_params, {'use_sim_time': False}],
                 condition=IfCondition(with_nav2)
             ),
@@ -295,7 +295,7 @@ def generate_launch_description():
                     'node_names': [
                         'map_server', 'amcl',
                         'controller_server', 'planner_server',
-                        'recoveries_server', 'bt_navigator'
+                        'behavior_server', 'bt_navigator'
                     ]
                 }],
                 condition=IfCondition(with_nav2)
