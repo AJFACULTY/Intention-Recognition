@@ -88,6 +88,7 @@ scp \
     /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \
     /home/j/ros2_cognition_ws/ml_models/weights/scaler_features.pkl \
     /home/j/ros2_cognition_ws/ml_models/weights/label_encoder_features.pkl \
+    /home/j/ros2_cognition_ws/ml_models/weights/hand_landmarker.task \
     /home/j/ros2_cognition_ws/ml_models/weights/path_predictor.onnx \
     /home/j/ros2_cognition_ws/ml_models/weights/path_predictor.onnx.data \
     /home/j/ros2_cognition_ws/ml_models/weights/path_predictor_config.pkl \
@@ -179,26 +180,29 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     fi
 
     # Copy models into package models dir, container models dir, and share dir
-    docker exec \${CONTAINER} mkdir -p \${PERCEPT_DIR}/models /root/cognition_ws/models
-    docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
-    docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
-    docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
-    docker cp ~/cognition_ws/models/path_predictor.onnx \${CONTAINER}:\${PERCEPT_DIR}/models/
-    docker cp ~/cognition_ws/models/path_predictor.onnx.data \${CONTAINER}:\${PERCEPT_DIR}/models/
-    docker cp ~/cognition_ws/models/path_predictor_config.pkl \${CONTAINER}:\${PERCEPT_DIR}/models/
-    docker cp ~/cognition_ws/models/path_predictor.onnx \${CONTAINER}:/root/cognition_ws/models/
-    docker cp ~/cognition_ws/models/path_predictor.onnx.data \${CONTAINER}:/root/cognition_ws/models/
-    docker cp ~/cognition_ws/models/path_predictor_config.pkl \${CONTAINER}:/root/cognition_ws/models/
+    docker exec ${CONTAINER} mkdir -p ${PERCEPT_DIR}/models /root/cognition_ws/models
+    docker cp ~/cognition_ws/models/gesture_model_features.pkl ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/scaler_features.pkl ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/label_encoder_features.pkl ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/hand_landmarker.task ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx.data ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/path_predictor_config.pkl ${CONTAINER}:${PERCEPT_DIR}/models/
+    docker cp ~/cognition_ws/models/hand_landmarker.task ${CONTAINER}:/root/cognition_ws/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx ${CONTAINER}:/root/cognition_ws/models/
+    docker cp ~/cognition_ws/models/path_predictor.onnx.data ${CONTAINER}:/root/cognition_ws/models/
+    docker cp ~/cognition_ws/models/path_predictor_config.pkl ${CONTAINER}:/root/cognition_ws/models/
 
     # Also copy to installed share directory if present
     SHARE_DIR=/root/cognition_ws/install/cognition_perception/share/cognition_perception/models
-    if docker exec \${CONTAINER} test -d \${SHARE_DIR}; then
-        docker cp ~/cognition_ws/models/gesture_model_features.pkl \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/scaler_features.pkl \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/label_encoder_features.pkl \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/path_predictor.onnx \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/path_predictor.onnx.data \${CONTAINER}:\${SHARE_DIR}/
-        docker cp ~/cognition_ws/models/path_predictor_config.pkl \${CONTAINER}:\${SHARE_DIR}/
+    if docker exec ${CONTAINER} test -d ${SHARE_DIR}; then
+        docker cp ~/cognition_ws/models/gesture_model_features.pkl ${CONTAINER}:${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/scaler_features.pkl ${CONTAINER}:${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/label_encoder_features.pkl ${CONTAINER}:${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/hand_landmarker.task ${CONTAINER}:${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/path_predictor.onnx ${CONTAINER}:${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/path_predictor.onnx.data ${CONTAINER}:${SHARE_DIR}/
+        docker cp ~/cognition_ws/models/path_predictor_config.pkl ${CONTAINER}:${SHARE_DIR}/
     fi
 
     echo \">> All autonomy, mission, waypoint, and model files successfully injected into Docker container.\"
