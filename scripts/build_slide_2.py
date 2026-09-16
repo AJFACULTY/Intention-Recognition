@@ -58,10 +58,11 @@ def main():
         "03. System Architecture & 6-Phase Methodology",
         "04. Implementation & Intelligent Algorithms",
         "05. Testing, Results & Safety Analysis",
-        "06. Conclusion, Limitations & Recommendations"
+        "06. Conclusion, Limitations & Recommendations",
+        "07. Key References (IEEE Format)"
     ]
 
-    txBox = slide.shapes.add_textbox(Inches(1.5), Inches(1.8), Inches(10.33), Inches(4.5))
+    txBox = slide.shapes.add_textbox(Inches(1.5), Inches(1.6), Inches(10.33), Inches(4.9))
     txBox.name = "Outline_Box"
     tf = txBox.text_frame
     tf.word_wrap = True
@@ -74,11 +75,11 @@ def main():
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         p.text = itm
         p.font.name = "Calisto MT"
-        p.font.size = Pt(24)
+        p.font.size = Pt(21)
         p.font.bold = True
         p.font.color.rgb = c_navy
-        p.space_after = Pt(18)
-        p.line_spacing = 1.2
+        p.space_after = Pt(12)
+        p.line_spacing = 1.15
         p.alignment = PP_ALIGN.LEFT
 
     prs.save(PPTX_PATH)
