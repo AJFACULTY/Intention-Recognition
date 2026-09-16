@@ -44,7 +44,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "03. PROJECT OBJECTIVES", font_name="Calisto MT", size_pt=28, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "PROJECT OBJECTIVES", font_name="Calisto MT", size_pt=28, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -114,7 +114,7 @@ def main():
         {
             "num": "05",
             "title": "2D LiDAR SLAM & Nav2",
-            "desc": "Deploy real-time Cartographer mapping and the Nav2 navigation stack for socially aware, collision-free path execution."
+            "desc": "Deploy real-time SLAM Toolbox mapping and the Nav2 navigation stack for socially aware, collision-free path execution."
         },
         {
             "num": "06",

@@ -82,7 +82,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "08. VISION PERCEPTION & GESTURE AI PIPELINE", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "VISION PERCEPTION & GESTURE AI PIPELINE", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -114,7 +114,7 @@ def main():
         ("Tracking Hand Joints", "The camera tracks 21 points on the hand, including the wrist, knuckles, and fingertips, to capture the exact shape and motion of the fingers."),
         ("Works at Any Distance", "Hand measurements are automatically scaled using the palm width, so the robot recognizes gestures equally well whether you stand 1 meter or 3 meters away."),
         ("Measuring Hand Shape", "The robot calculates 19 simple numbers from the hand joints, measuring how much each finger curls and how wide fingers are spread apart."),
-        ("Instant AI Decision", "A compact artificial intelligence model reads the 19 hand numbers in just 1.2 milliseconds, identifying the gesture with 99.4% accuracy."),
+        ("Rapid AI Inference", "A compact neural network evaluates the 19 geometric hand features in just 1.8 milliseconds on the CPU, achieving 99.4% test accuracy."),
         ("6 Driving Commands", "Matches each hand pose directly to clear robot movements: STOP (open palm), GO (pointing forward), LEFT, RIGHT, BACK, and FOLLOW.")
     ]
 
@@ -187,7 +187,7 @@ def main():
 
     vocab_bullets = [
         ("6 Commands", "STOP, GO, LEFT, RIGHT, BACK, FOLLOW"),
-        ("Fast Reaction", "Decides in 1.2 milliseconds (faster than a blink)"),
+        ("Edge AI Speed", "Evaluates gestures in 1.8 milliseconds on the CPU"),
         ("High Accuracy", "99.4% correct across 6,000 test trials")
     ]
 

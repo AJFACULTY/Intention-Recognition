@@ -78,7 +78,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "11. TESTING & RESULTS: SYSTEM LATENCY & ACCURACY", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "TESTING & RESULTS: SYSTEM LATENCY & ACCURACY", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -106,8 +106,8 @@ def main():
     tf_left.margin_left = tf_left.margin_right = tf_left.margin_top = tf_left.margin_bottom = Inches(0.02)
 
     latency_points = [
-        ("132 ms Total Response Time", "From the camera seeing a hand gesture to the wheels turning takes only 132 milliseconds—twice as fast as an eye blink (300 ms) and well within the 150 ms safety limit."),
-        ("Fast AI on Low-Cost Hardware", "The compact neural network makes recognition decisions in just 1.8 milliseconds, proving intelligent AI runs smoothly on an affordable Raspberry Pi without graphics cards."),
+        ("132 ms Total Response Time", "From optical camera capture to physical wheel movement takes 132.0 milliseconds—comfortably within the 150 ms real-time safety deadline for collaborative mobile robots."),
+        ("1.8 ms AI Classification", "The compact neural network evaluates hand features in just 1.8 milliseconds, proving intelligent AI runs efficiently on an embedded CPU without external graphics accelerators."),
         ("96.67% Physical Driving Success", "In 180 real-world driving trials with operators walking in the lab, the robot correctly recognized and executed commands 96.67% of the time."),
         ("Reliable Operating Range", "Because hand features are scaled automatically by palm size, accuracy stays strong from 1.0 meter (100%) up to 2.5 meters (92.6%) away."),
         ("Consistent in Any Lighting", "The robot achieved identical 96.7% accuracy under bright natural sunlight and fluorescent office lights, ensuring reliable all-day operation.")

@@ -89,7 +89,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "05. 6-PHASE RESEARCH & IMPLEMENTATION METHODOLOGY", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "6-PHASE RESEARCH & IMPLEMENTATION METHODOLOGY", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -172,9 +172,9 @@ def main():
         },
         {
             "num": "PHASE 06",
-            "title": "Experimental Testing & Results",
+            "title": "Testing, Results & Analysis",
             "items": [
-                ("Fast Response", "End-to-end reaction time of 74.2 ms, comfortably below the 150 ms real-time limit."),
+                ("Fast Response", "End-to-end reaction time of 132.0 ms, comfortably below the 150 ms real-time limit."),
                 ("Live Driving Trials", "180 real-world physical tests achieving a 96.67% operational success rate."),
                 ("Safety Confirmed", "Verified that the robot reliably halts before coming into contact with any human or obstacle.")
             ]

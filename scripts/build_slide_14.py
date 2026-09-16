@@ -80,7 +80,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "12. TESTING & RESULTS: PHYSICAL LOCOMOTION & SAFETY", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "TESTING & RESULTS: PHYSICAL LOCOMOTION & SAFETY", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -110,7 +110,7 @@ def main():
     safety_points = [
         ("Smooth Vehicle Driving", "All 6 commands (Forward, Reverse, Left, Right, Stop, Follow) drove the 4WD mobile robot smoothly without motor stalls or wheel skids."),
         ("Safe Dual Power Rails", "High motor current spikes during rapid forward-to-reverse driving never restarted the onboard computer, proving isolated power buses protect system stability."),
-        ("Instant 98 ms Braking", "When the STOP command is shown or an obstacle enters the path, the robot comes to a complete physical halt within 98 milliseconds—well within the 0.36-meter safety margin."),
+        ("Verified 98 ms Braking", "When the STOP command is shown or an obstacle enters the path, the robot halts completely within 98 milliseconds—well within the 0.36-meter safety margin."),
         ("Smart Hallway Safety Corridor", "Replaced the wide sensor cone with a rectangular corridor (|y| <= 0.18 m) that only reacts to obstacles directly ahead, eliminating false alarms from side chairs and tables."),
         ("Rear Collision Guard", "Before backing away from a frontal obstacle, the robot checks behind itself; if an object is within 0.25 meters, it stops immediately instead of backing up blindly."),
         ("Certified ISO 15066 Safety", "Cruising speed is capped at 0.20 m/s with 12.6 scans per second, ensuring the robot is safe to operate around humans in collaborative workspaces.")
@@ -168,7 +168,7 @@ def main():
     bench_bullets = [
         ("Braking Speed", "98 ms average physical emergency stop from 0.20 m/s cruising speed"),
         ("Front Safety Zones", "0.36 m danger halt threshold; 0.55 m caution recovery buffer"),
-        ("Rear Guard Clearance", "Instant reverse abort if obstacles detected within 0.25 m clearance"),
+        ("Rear Guard Clearance", "Reversing cancelled immediately if obstacles detected within 0.25 m"),
         ("Safety Compliance", "100% compliant with ISO 15066 collaborative robotic safety criteria")
     ]
 

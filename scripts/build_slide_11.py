@@ -82,7 +82,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "09. HUMAN MOTION PREDICTION & SUPERVISORY CONTROL", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "HUMAN MOTION PREDICTION & SUPERVISORY CONTROL", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -115,7 +115,7 @@ def main():
         ("Central Software Brain", "A master controller (brain_node) coordinates all actions through distinct operational stages: Standing By, Confirming Command, Driving, Following User, and Safety Stop."),
         ("Preventing Accidental Starts", "To stop accidental hand waves or brief gestures from moving the robot, every command must be held consistently for at least 5 camera frames before motors turn."),
         ("Safe Distance Buffer", "When following a walking user, the robot automatically stays between 0.8 and 1.5 meters away; if the person stops or steps closer than 0.8 meters, it halts immediately."),
-        ("Instant Laser Safety Override", "The 360° laser distance sensor constantly scans the surroundings; if an obstacle or person enters within 0.36 meters, motor power cuts in 5 milliseconds, overriding all AI.")
+        ("Reactive Laser Safety Override", "The 360° laser sensor constantly scans the surroundings; if an obstacle enters within 0.36 meters, motor power is preempted in 5 milliseconds, overriding all AI.")
     ]
 
     for idx, (tag, desc) in enumerate(control_points):
@@ -189,7 +189,7 @@ def main():
         ("4 Safe Modes", "Standby → Confirming → Driving → Safety Halt"),
         ("5-Frame Filter", "Requires 5 matching frames to stop accidental wave triggers"),
         ("Safe Gap (0.8m)", "Stops immediately if user approaches closer than 0.8 meters"),
-        ("Instant E-Stop", "Laser barrier (< 0.36m) cuts motor power within 5 milliseconds")
+        ("Emergency Safety Stop", "Laser barrier (< 0.36m) halts motors within 5 milliseconds")
     ]
 
     for s_idx, (s_tag, s_desc) in enumerate(safety_bullets):

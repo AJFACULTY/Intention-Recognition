@@ -111,7 +111,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "06. SOFTWARE ARCHITECTURE & INTER-NODE DATAFLOW", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "SOFTWARE ARCHITECTURE & INTER-NODE DATAFLOW", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -140,11 +140,11 @@ def main():
     tf_left.margin_left = tf_left.margin_right = tf_left.margin_top = tf_left.margin_bottom = Inches(0.02)
 
     software_pipeline = [
-        ("System Software (ROS 2)", "Connects all camera, artificial intelligence, and motor programs so they exchange data instantly without delays."),
+        ("System Software (ROS 2)", "Connects all camera, artificial intelligence, and motor programs so they exchange data reliably with low communication latency."),
         ("Live Sensor Feeds", "The camera captures live video at 20 frames per second while the laser sensor constantly scans 360 degrees for obstacles."),
         ("Vision & Hand Tracking", "Focuses on the person standing in front of the robot, locates 21 finger joints, and identifies the gesture being shown."),
         ("Gesture Confirmation", "The robot checks that it sees the exact same gesture 5 times in a row before moving, ignoring accidental hand motions."),
-        ("Safety Override", "If the laser detects any obstacle closer than 0.36 meters, it instantly overrides driving commands and halts the robot immediately."),
+        ("Safety Override", "If the laser detects any obstacle closer than 0.36 meters, it automatically preempts driving commands and halts the vehicle."),
         ("Smooth Wheel Control", "Approved movement commands are transmitted directly to the motor controller board, which drives the 4 wheels smoothly.")
     ]
 

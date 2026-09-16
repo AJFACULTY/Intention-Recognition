@@ -71,7 +71,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "07. MECHATRONIC HARDWARE & POWER DISTRIBUTION", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "MECHATRONIC HARDWARE & POWER DISTRIBUTION", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -101,7 +101,7 @@ def main():
     hardware_points = [
         ("Onboard Computer (Raspberry Pi 5)", "8GB RAM single-board computer running all camera tracking, gesture artificial intelligence, and navigation programs directly on the robot."),
         ("Motor Controller (ESP32-S3)", "Dedicated microcontroller that manages wheel speed and reads motor sensors smoothly without overloading the main computer."),
-        ("Laser Scanner (MS200 LiDAR)", "360-degree laser sensor measuring room distances up to 12 meters for indoor mapping and instant emergency stops."),
+        ("Laser Scanner (MS200 LiDAR)", "360-degree laser sensor measuring room distances up to 12 meters for indoor mapping and reactive emergency halts."),
         ("Motorized Camera Mount", "2-axis motorized camera gimbal that tilts and pans automatically to keep the operator's face and hands centered in view."),
         ("4-Wheel Drive Chassis", "Sturdy aluminium robot base powered by 4 geared DC motors with wheel sensors for smooth and steady movement."),
         ("Dual-Rail Power System", "Separate battery power circuits for the computer and motors to prevent electrical interference and sudden power shutdowns.")
