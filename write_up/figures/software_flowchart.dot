@@ -1,0 +1,45 @@
+
+digraph SoftwareDataflow {
+    rankdir=TB;
+    nodesep=0.40;
+    ranksep=0.34;
+    splines=true;
+    bgcolor="transparent";
+
+    node [fontname="DejaVu Sans", fontsize=9.0, penwidth=1.6, color="black", fillcolor="white", style="filled"];
+    edge [fontname="DejaVu Sans", fontsize=8.0, color="black", penwidth=1.4, arrowhead="vee"];
+
+    // Inputs (Top Row)
+    { rank=same;
+        cam [label="Monocular USB Camera\n(/camera/image_raw, 20 FPS)", shape=box, style="rounded,filled"];
+        lidar [label="MS200 2D LiDAR\n(/scan, 12.5 Hz)", shape=box, style="rounded,filled"];
+    }
+
+    // Vision Pipeline
+    person [label="person_detection_node\n(Isolate Operator in Center HUD)", shape=box];
+    gesture [label="gesture_node\n(MediaPipe + 19D MLP Model)", shape=box];
+    consensus [label="5-Frame Gesture\nConsensus Verified?", shape=diamond];
+    
+    // Control & Safety
+    brain [label="brain_node (Supervisory Logic)\n(State Machine & Nav2 Dispatch)", shape=box];
+    safety [label="Obstacle Detected?\n(Distance < 0.36 m)", shape=diamond];
+    mux [label="twist_mux (Priority Arbitrator)\n(Safety Stop > Manual > Gesture)", shape=box];
+
+    // Bridge & Output
+    bridge [label="micro_ros_agent (Pi 5)\n(921,600 baud UART Bridge)", shape=box];
+    esp32 [label="ESP32-S3 Microcontroller\n(4WD Motor PWM & Encoders)", shape=box, style="rounded,filled"];
+
+    // Connections
+    cam -> person [label=" RGB frames "];
+    person -> gesture [label=" Hand ROI "];
+    gesture -> consensus [label=" /cognition/gesture "];
+    
+    consensus -> brain [label=" Yes (Valid) "];
+    
+    lidar -> safety [label=" Laser scans "];
+    safety -> mux [label=" Yes (E-Stop: Pri 100) "];
+    brain -> mux [label=" /cmd_vel (Pri 40) "];
+
+    mux -> bridge [label=" Arbitrated /cmd_vel "];
+    bridge -> esp32 [label=" UART Serial "];
+}
