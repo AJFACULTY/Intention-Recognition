@@ -100,9 +100,9 @@ def main():
     tf_sub.word_wrap = True
     tf_sub.margin_left = tf_sub.margin_right = tf_sub.margin_top = tf_sub.margin_bottom = 0
     p_sub = tf_sub.paragraphs[0]
-    set_para(p_sub, "OPERATOR ISOLATION, 21-POINT SKELETON TRACKING & 19D NEURAL CLASSIFIER", font_name="Calisto MT", size_pt=11, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
+    set_para(p_sub, "HOW THE ROBOT SEES HAND GESTURES, IGNORES BYSTANDERS, AND DECIDES TO MOVE", font_name="Calisto MT", size_pt=11, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 3. Left Column: 6 Structured Vision & AI Points in Plain English (11 pt)
+    # 3. Left Column: 6 Structured Vision & AI Points in Pure Plain English (11 pt)
     tx_left = slide.shapes.add_textbox(Inches(0.85), Inches(1.38), Inches(5.85), Inches(4.70))
     tx_left.name = "Vision_Points_Text"
     tf_left = tx_left.text_frame
@@ -110,12 +110,12 @@ def main():
     tf_left.margin_left = tf_left.margin_right = tf_left.margin_top = tf_left.margin_bottom = Inches(0.02)
 
     vision_points = [
-        ("Operator Spatial Focus", "The camera strictly accepts commands from an operator centered in front of the robot, automatically blurring and ignoring passersby in the background."),
-        ("21-Point Skeletal Tracking", "Once focused, MediaPipe extracts 21 finger and palm joint landmarks in 3D coordinates from the live video stream in real time."),
-        ("Distance-Proof Scaling", "Joint coordinates are centered on the wrist and divided by palm width, ensuring gestures look identical whether the user stands 1 meter or 3 meters away."),
-        ("19-D Feature Extraction", "Compresses the 21 joints into 19 geometric measurements: 5 finger curl angles, 5 fingertip distances, 4 spread angles, 3D thumb vector, and 2 palm angles."),
-        ("Fast Neural Classifier", "A 4-layer neural network (MLP) evaluates the 19 features in just 1.2 ms on the Raspberry Pi 5 CPU, achieving 99.38% test accuracy."),
-        ("6 Discrete Motion Commands", "Translates recognized hand poses into unambiguous motion intents: STOP (open palm), GO (point forward), LEFT, RIGHT, BACK, and FOLLOW.")
+        ("Focusing on One Person", "The robot only listens to the person standing directly in front of it, while automatically blurring and ignoring anyone walking by in the background."),
+        ("Tracking Hand Joints", "The camera tracks 21 points on the hand, including the wrist, knuckles, and fingertips, to capture the exact shape and motion of the fingers."),
+        ("Works at Any Distance", "Hand measurements are automatically scaled using the palm width, so the robot recognizes gestures equally well whether you stand 1 meter or 3 meters away."),
+        ("Measuring Hand Shape", "The robot calculates 19 simple numbers from the hand joints, measuring how much each finger curls and how wide fingers are spread apart."),
+        ("Instant AI Decision", "A compact artificial intelligence model reads the 19 hand numbers in just 1.2 milliseconds, identifying the gesture with 99.4% accuracy."),
+        ("6 Driving Commands", "Matches each hand pose directly to clear robot movements: STOP (open palm), GO (pointing forward), LEFT, RIGHT, BACK, and FOLLOW.")
     ]
 
     for idx, (tag, desc) in enumerate(vision_points):
@@ -155,7 +155,7 @@ def main():
         tf_hud_cap.word_wrap = True
         tf_hud_cap.margin_left = tf_hud_cap.margin_right = tf_hud_cap.margin_top = tf_hud_cap.margin_bottom = 0
         p_hc = tf_hud_cap.paragraphs[0]
-        set_para(p_hc, "Figure 3.4: Operator Acceptance HUD & Bystander Blur", font_name="Calisto MT", size_pt=8.5, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
+        set_para(p_hc, "Figure 3.4: Camera View Locking on User & Blurring Bystanders", font_name="Calisto MT", size_pt=8.5, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
 
     # 4B. 21-Joint Hand Landmark Model (Right of right half: Left: 10.45", Top: 1.38", Width: 2.15", Height: 4.10")
     if os.path.exists(HAND_IMG):
@@ -173,7 +173,7 @@ def main():
         tf_hand_cap.word_wrap = True
         tf_hand_cap.margin_left = tf_hand_cap.margin_right = tf_hand_cap.margin_top = tf_hand_cap.margin_bottom = 0
         p_hnc = tf_hand_cap.paragraphs[0]
-        set_para(p_hnc, "Figure 3.5: 21-Joint 3D Hand Model", font_name="Calisto MT", size_pt=8.5, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
+        set_para(p_hnc, "Figure 3.5: 21 Tracked Hand Points", font_name="Calisto MT", size_pt=8.5, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
 
     # 4C. Summary Block of 6 Gestures (Bottom-Left of right half: Left: 6.95", Top: 4.35", Width: 3.40", Height: 1.65")
     tx_vocab = slide.shapes.add_textbox(Inches(6.95), Inches(4.35), Inches(3.40), Inches(1.65))
@@ -183,12 +183,12 @@ def main():
     tf_vocab.margin_left = tf_vocab.margin_right = tf_vocab.margin_top = tf_vocab.margin_bottom = 0
 
     p_vh = tf_vocab.paragraphs[0]
-    set_para(p_vh, "CLASSIFIER VOCABULARY & BENCHMARKS:", font_name="Calisto MT", size_pt=9.5, bold=True, color_rgb=c_gold, space_after_pt=3)
+    set_para(p_vh, "GESTURE VOCABULARY & AI SPEED:", font_name="Calisto MT", size_pt=9.5, bold=True, color_rgb=c_gold, space_after_pt=3)
 
     vocab_bullets = [
-        ("Commands", "STOP, GO, LEFT, RIGHT, BACK, FOLLOW"),
-        ("Inference Speed", "1.2 ms on Raspberry Pi 5 CPU (100x real-time)"),
-        ("Model Accuracy", "99.38% test accuracy (6,000 verified samples)")
+        ("6 Commands", "STOP, GO, LEFT, RIGHT, BACK, FOLLOW"),
+        ("Fast Reaction", "Decides in 1.2 milliseconds (faster than a blink)"),
+        ("High Accuracy", "99.4% correct across 6,000 test trials")
     ]
 
     for v_idx, (v_tag, v_desc) in enumerate(vocab_bullets):
