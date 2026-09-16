@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 """
 build_slide_6.py — Formal Academic Slide 6 (Literature Review & Research Gaps)
-- Strictly academic formatting (zero emojis).
-- Full author and co-author names (no generic 'et al.').
-- Explicit structured fields for each paper:
-  1. Author & Co-Authors (Year)
-  2. Objective of the Study
-  3. Methodology
-  4. Research Gap
-  5. Project Resolution (How this thesis solves it)
-- 100% plain-English clarity on the very first read.
-- Harmonized 2-tone university palette (Navy, Gold, Charcoal).
+- Full author and co-author names.
+- Exact publication titles from thesis Chapter 2.
+- Readable font size (10.5 pt body, 12 pt authors) with strict anti-crowding geometry.
+- 4 academic fields per paper: Objective, Methodology, Research Gap, Project Resolution.
+- 100% plain-English first-read clarity; calm 2-tone university palette.
 """
 
 import pptx
@@ -20,7 +15,7 @@ from pptx.enum.text import PP_ALIGN
 
 PPTX_PATH = "write_up/Project Final Defense Slides_FINAL.pptx"
 
-def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=False, color_rgb=None, space_before_pt=0, space_after_pt=2, line_spacing=1.15, align=PP_ALIGN.LEFT):
+def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=False, color_rgb=None, space_before_pt=0, space_after_pt=2, line_spacing=1.12, align=PP_ALIGN.LEFT):
     p.text = text
     p.font.name = font_name
     p.font.size = Pt(size_pt)
@@ -61,7 +56,7 @@ def main():
     else:
         slide = prs.slides[5]
 
-    # Harmonious color palette
+    # Theme colors
     c_navy   = RGBColor(0, 32, 96)       # #002060 GCTU Deep Navy
     c_dark   = RGBColor(30, 41, 59)      # #1E293B High-Contrast Charcoal
     c_body   = RGBColor(51, 65, 85)      # #334155 Slate Charcoal
@@ -90,8 +85,8 @@ def main():
         el.getparent().remove(el)
 
     # 2. Section Subhead: Left-aligned Gold Eyebrow
-    # Left=0.90", Top=1.15", Width=11.50", Height=0.25"
-    tx_sub = slide.shapes.add_textbox(Inches(0.90), Inches(1.15), Inches(11.50), Inches(0.25))
+    # Left=0.90", Top=1.12", Width=11.50", Height=0.25"
+    tx_sub = slide.shapes.add_textbox(Inches(0.90), Inches(1.12), Inches(11.50), Inches(0.25))
     tx_sub.name = "Lit_Subhead"
     tf_sub = tx_sub.text_frame
     tf_sub.word_wrap = True
@@ -99,37 +94,37 @@ def main():
     p_sub = tf_sub.paragraphs[0]
     set_para(p_sub, "CRITICAL APPRAISAL OF CORE BENCHMARK STUDIES (THESIS CHAPTER 2)", font_name="Calisto MT", size_pt=11.5, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 3. Three Comprehensive Columns for the Benchmark Papers
-    # Lefts: 0.90", 4.90", 8.90", Width: 3.53", Top: 1.42", Height: 4.70"
+    # 3. Three Columns for Benchmark Papers
+    # Lefts: 0.90", 4.90", 8.90", Width: 3.53", Top: 1.38", Height: 4.80"
     lefts = [Inches(0.90), Inches(4.90), Inches(8.90)]
     col_w = Inches(3.53)
-    col_top = Inches(1.42)
-    col_h = Inches(4.70)
+    col_top = Inches(1.38)
+    col_h = Inches(4.80)
 
     papers = [
         {
             "authors": "Athanasios Tsitos, Maria Dagioglou & Theodoros Giannakopoulos (2022)",
-            "paper": "Competitive Reaching Intention Game",
-            "objective": "Predict human reaching intent early to govern robot arm trajectories within a 150 ms reaction threshold.",
-            "method": "RGB-D camera + OpenPose wrist tracking + SVM on a 6-DOF UR3 industrial robotic arm.",
-            "gap": "Confined to a stationary desk — lacks mobile base movement and provides no explicit hand gesture command channel.",
+            "title": "Real-Time Feasibility of a Human Intention Method Evaluated Through a Competitive Human-Robot Reaching Game",
+            "objective": "Predict human reaching intent early to guide robot arm trajectories within a 150 ms reaction threshold.",
+            "method": "RGB-D camera tracking wrist kinematics with SVM on a 6-DOF UR3 industrial robotic arm.",
+            "gap": "Confined to a static desk — lacks mobile base movement and provides no explicit hand gesture command channel.",
             "resolution": "Direct vision-to-wheels coupling for mobile navigation guided by 6 touchless hand gestures."
         },
         {
             "authors": "Jubayer Al Mahmud (2022)",
-            "paper": "3D Gesture Recognition & Adaptation",
+            "title": "3D Gesture Recognition and Adaptation for Human–Robot Interaction",
             "objective": "Classify 3D pointing and dynamic hand gestures in real time to guide robot interaction across age groups.",
             "method": "Kinect v2 depth sensor + 3D skeletal normalization + CNN / SVM classifiers on 3,600 samples.",
-            "gap": "Relies on heavy cloud / GPU computers; vulnerable to network latency (>200 ms) and Wi-Fi connection drops.",
+            "gap": "Relies on heavy cloud / GPU computing clusters; vulnerable to network lag (>200 ms) and connection drops.",
             "resolution": "Executes 100% of vision AI directly onboard a low-cost Raspberry Pi 5 with zero cloud dependency."
         },
         {
             "authors": "Y. Li, H. Zhang, Guang Yang & Shuoyu Wang (2023)",
-            "paper": "Intention-Aware Motion Planning",
-            "objective": "Plan mobile robot paths around moving site workers by predicting whether obstacles will clear the hallway.",
-            "method": "2D LiDAR + camera CNN object detection + costmap updates in Isaac Sim virtual simulation.",
-            "gap": "Tested only in computer simulation — never validated on physical robot hardware; lacks touchless gesture steering.",
-            "resolution": "Physically validated on a real mobile robot with 2D LiDAR SLAM, active visual servoing, and ISO 15066 safety stops."
+            "title": "Safe and Efficient Motion Planning for Material Transportation Robots Considering Intention Prediction of Obstacles",
+            "objective": "Plan collision-free mobile robot paths by predicting whether human workers will clear the hallway.",
+            "method": "2D LiDAR + CNN obstacle prediction dynamically updating ROS 2 Nav2 costmaps in Isaac Sim.",
+            "gap": "Tested only in computer simulation — never validated on physical robot hardware; lacks touchless gesture control.",
+            "resolution": "Physically validated on a real mobile robot with 2D LiDAR SLAM, active visual servoing, and ISO safety stops."
         }
     ]
 
@@ -140,24 +135,24 @@ def main():
         tf.word_wrap = True
         tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Inches(0.02)
 
-        # 1. Author Full Names & Year (12 pt Bold Navy)
+        # 1. Author Full Names & Year (11.5 pt Bold Navy)
         p_auth = tf.paragraphs[0]
-        set_para(p_auth, p["authors"], font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_navy, space_after_pt=1, line_spacing=1.12, align=PP_ALIGN.LEFT)
+        set_para(p_auth, p["authors"], font_name="Calisto MT", size_pt=11.5, bold=True, color_rgb=c_navy, space_after_pt=1, line_spacing=1.10, align=PP_ALIGN.LEFT)
 
-        # 2. Paper Focus / Subtitle
-        p_focus = tf.add_paragraph()
-        set_para(p_focus, p["paper"], font_name="Calisto MT", size_pt=10, italic=True, color_rgb=c_muted, space_after_pt=5, align=PP_ALIGN.LEFT)
+        # 2. Actual Paper Title in Quotes (9.5 pt Italic Slate)
+        p_title = tf.add_paragraph()
+        set_para(p_title, f'"{p["title"]}"', font_name="Calisto MT", size_pt=9.5, italic=True, color_rgb=c_muted, space_after_pt=5, line_spacing=1.10, align=PP_ALIGN.LEFT)
 
-        # 3. Objective
-        add_labeled_block(tf, "Objective", p["objective"], c_dark, c_body, size_pt=10.2, space_after_pt=4)
+        # 3. Objective (10.5 pt)
+        add_labeled_block(tf, "Objective", p["objective"], c_dark, c_body, size_pt=10.5, space_after_pt=4)
 
-        # 4. Methodology
-        add_labeled_block(tf, "Methodology", p["method"], c_dark, c_body, size_pt=10.2, space_after_pt=4)
+        # 4. Methodology (10.5 pt)
+        add_labeled_block(tf, "Methodology", p["method"], c_dark, c_body, size_pt=10.5, space_after_pt=4)
 
-        # 5. Research Gap
-        add_labeled_block(tf, "Research Gap", p["gap"], c_dark, c_body, size_pt=10.2, space_after_pt=5)
+        # 5. Research Gap (10.5 pt)
+        add_labeled_block(tf, "Research Gap", p["gap"], c_dark, c_body, size_pt=10.5, space_after_pt=5)
 
-        # 6. Project Resolution (Formal Academic Header — No Emoji)
+        # 6. Project Resolution (10.5 pt Bold Navy Header)
         p_sol = tf.add_paragraph()
         p_sol.space_after = Pt(0)
         p_sol.line_spacing = 1.12
@@ -166,19 +161,19 @@ def main():
         r_sol_lbl = p_sol.add_run()
         r_sol_lbl.text = "• Project Resolution: "
         r_sol_lbl.font.name = "Calisto MT"
-        r_sol_lbl.font.size = Pt(10.2)
+        r_sol_lbl.font.size = Pt(10.5)
         r_sol_lbl.font.bold = True
         r_sol_lbl.font.color.rgb = c_navy
 
         r_sol_txt = p_sol.add_run()
         r_sol_txt.text = p["resolution"]
         r_sol_txt.font.name = "Calisto MT"
-        r_sol_txt.font.size = Pt(10.2)
+        r_sol_txt.font.size = Pt(10.5)
         r_sol_txt.font.bold = False
         r_sol_txt.font.color.rgb = c_dark
 
     prs.save(PPTX_PATH)
-    print(f"Slide 6 rebuilt with full author names and formal academic styling in {PPTX_PATH}")
+    print(f"Slide 6 rebuilt with actual paper titles and 10.5 pt font in {PPTX_PATH}")
 
 if __name__ == "__main__":
     main()
