@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-build_slide_6.py — Open Editorial Slide 6 (Literature Review & Critical Research Gaps)
+build_slide_6.py — Clean 2-Tone, Plain-English Slide 6 (Literature Review & Gaps)
 - Title: 04. LITERATURE REVIEW & RESEARCH GAPS
-- Top Half: 3 Core Benchmark Studies (Tsitos et al., Mahmud et al., Li et al.) with strengths & gaps.
-- Subtle Divider Rule.
-- Bottom Half: 3 Critical Research Gaps Solved in this project.
-- Open Editorial layout: zero box outlines, zero heavy cards, spacious and legible.
+- Palette: Restricted strictly to GCTU Deep Navy (#002060), Accent Gold (#B8860B), and Charcoal (#1E293B).
+- Zero traffic-light red/green coloring — calm, mature, and academic.
+- Plain English text: 100% understandable on the first read.
+- Grounded in Chapter 2 core benchmark literature (Tsitos et al., Mahmud et al., Li et al.).
 """
 
 import pptx
@@ -32,20 +32,19 @@ def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=Fal
 def main():
     prs = pptx.Presentation(PPTX_PATH)
 
-    # If slide 6 does not exist yet, add it using Layout 1 (Title and Content)
+    # If slide 6 does not exist yet, add it using Layout 1
     if len(prs.slides) < 6:
         slide = prs.slides.add_slide(prs.slide_layouts[1])
     else:
         slide = prs.slides[5]
 
-    # Theme colors
+    # Theme colors — Strictly harmonized 2-tone palette
     c_navy   = RGBColor(0, 32, 96)       # #002060 GCTU Deep Navy
     c_body   = RGBColor(51, 65, 85)      # #334155 Slate Charcoal
-    c_dark   = RGBColor(30, 41, 59)      # #1E293B Dark Charcoal
+    c_dark   = RGBColor(30, 41, 59)      # #1E293B High-Contrast Charcoal
     c_gold   = RGBColor(184, 134, 11)    # #B8860B Accent Gold
     c_border = RGBColor(203, 213, 225)   # #CBD5E1 Subtle Slate
-    c_red    = RGBColor(185, 28, 28)     # #B91C1C Refined Crimson (Gap)
-    c_green  = RGBColor(21, 128, 61)     # #15803D Forest Green (Strength)
+    c_muted  = RGBColor(100, 116, 139)   # #64748B Muted Slate
 
     # 1. Slide Title (28 pt Bold Navy)
     for shape in slide.shapes:
@@ -68,7 +67,7 @@ def main():
         el = s._element
         el.getparent().remove(el)
 
-    # 2. Top Section Label: Left-aligned
+    # 2. Top Section Label: Left-aligned Gold Eyebrow
     # Left=1.00", Top=1.20", Width=4.50", Height=0.28"
     tx_bench_lbl = slide.shapes.add_textbox(Inches(1.00), Inches(1.20), Inches(4.50), Inches(0.28))
     tx_bench_lbl.name = "Lit_Bench_Label"
@@ -78,31 +77,31 @@ def main():
     p_lbl = tf_lbl.paragraphs[0]
     set_para(p_lbl, "BENCHMARK LITERATURE EVALUATION", font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 3. Top Section: 3 Benchmark Studies
-    # 3 Columns: Lefts = 1.00", 4.90", 8.80", Width = 3.53", Top = 1.50", Height = 1.85"
+    # 3. Top Section: 3 Benchmark Studies (Plain English & Calm Colors)
+    # 3 Columns: Lefts = 1.00", 4.90", 8.80", Width = 3.53", Top = 1.48", Height = 1.90"
     lefts = [Inches(1.00), Inches(4.90), Inches(8.80)]
     col_w = Inches(3.53)
-    bench_top = Inches(1.50)
-    bench_h = Inches(1.85)
+    bench_top = Inches(1.48)
+    bench_h = Inches(1.90)
 
     studies = [
         {
             "author": "Tsitos et al. (2022)",
-            "focus": "Kinematic Intention on Robotic Arm",
-            "strength": "Proved sub-150 ms latency threshold on industrial UR3 manipulator.",
-            "limitation": "Confined to stationary tabletop; zero mobile navigation or explicit gestures."
+            "focus": "Fast Reaching Intention (Robotic Arm)",
+            "strength": "Strength: Fast reaction time under 150 ms threshold.",
+            "limitation": "Limitation: Fixed on a desk — cannot drive on wheels or accept hand gestures."
         },
         {
-            "author": "Mahmud et al. (2023)",
-            "focus": "3D Skeletal Tracking & Gesture AI",
-            "strength": "High multi-gesture classification accuracy using deep vision models.",
-            "limitation": "Relies on heavy GPU / cloud servers; vulnerable to network lag & dropouts."
+            "author": "Mahmud et al. (2022)",
+            "focus": "3D Deep Gesture Tracking",
+            "strength": "Strength: High accuracy across multi-class hand gestures.",
+            "limitation": "Limitation: Relies on cloud servers — suffers from network lag and Wi-Fi dropouts."
         },
         {
-            "author": "Li et al. (2024)",
-            "focus": "Predictive Costmaps & ROS 2 Nav2",
-            "strength": "Adapted ROS 2 costmaps dynamically based on obstacle movement.",
-            "limitation": "Simulation-only (Isaac Sim); unverified on physical embedded edge hardware."
+            "author": "Li et al. (2023)",
+            "focus": "Intention-Aware Navigation",
+            "strength": "Strength: Smart path planning around moving humans.",
+            "limitation": "Limitation: Computer simulation only — never tested on a real physical robot."
         }
     ]
 
@@ -119,15 +118,43 @@ def main():
 
         # Focus / Scope
         p_foc = tf.add_paragraph()
-        set_para(p_foc, s["focus"], font_name="Calisto MT", size_pt=11, italic=True, color_rgb=RGBColor(100, 116, 139), space_after_pt=4, align=PP_ALIGN.LEFT)
+        set_para(p_foc, s["focus"], font_name="Calisto MT", size_pt=11, italic=True, color_rgb=c_muted, space_after_pt=4, align=PP_ALIGN.LEFT)
 
-        # Strength
+        # Strength (Charcoal body, bold prefix)
         p_str = tf.add_paragraph()
-        set_para(p_str, f"[+] {s['strength']}", font_name="Calisto MT", size_pt=11, color_rgb=c_green, space_after_pt=3, line_spacing=1.12, align=PP_ALIGN.LEFT)
+        p_str.space_after = Pt(3)
+        p_str.line_spacing = 1.15
+        p_str.alignment = PP_ALIGN.LEFT
+        r_str_lbl = p_str.add_run()
+        r_str_lbl.text = "• Strength: "
+        r_str_lbl.font.name = "Calisto MT"
+        r_str_lbl.font.size = Pt(11.5)
+        r_str_lbl.font.bold = True
+        r_str_lbl.font.color.rgb = c_dark
+        r_str_txt = p_str.add_run()
+        r_str_txt.text = s["strength"].replace("Strength: ", "")
+        r_str_txt.font.name = "Calisto MT"
+        r_str_txt.font.size = Pt(11.5)
+        r_str_txt.font.bold = False
+        r_str_txt.font.color.rgb = c_body
 
-        # Limitation
+        # Limitation (Charcoal body, bold prefix)
         p_lim = tf.add_paragraph()
-        set_para(p_lim, f"[-] {s['limitation']}", font_name="Calisto MT", size_pt=11, color_rgb=c_red, space_after_pt=0, line_spacing=1.12, align=PP_ALIGN.LEFT)
+        p_lim.space_after = Pt(0)
+        p_lim.line_spacing = 1.15
+        p_lim.alignment = PP_ALIGN.LEFT
+        r_lim_lbl = p_lim.add_run()
+        r_lim_lbl.text = "• Limitation: "
+        r_lim_lbl.font.name = "Calisto MT"
+        r_lim_lbl.font.size = Pt(11.5)
+        r_lim_lbl.font.bold = True
+        r_lim_lbl.font.color.rgb = c_dark
+        r_lim_txt = p_lim.add_run()
+        r_lim_txt.text = s["limitation"].replace("Limitation: ", "")
+        r_lim_txt.font.name = "Calisto MT"
+        r_lim_txt.font.size = Pt(11.5)
+        r_lim_txt.font.bold = False
+        r_lim_txt.font.color.rgb = c_body
 
     # 4. Subtle Horizontal Divider Rule
     # Y = 3.55", spanning from X=1.00" to X=12.33"
@@ -136,7 +163,7 @@ def main():
     line.line.color.rgb = c_border
     line.line.width = Pt(0.8)
 
-    # 5. Bottom Section Label: Left-aligned
+    # 5. Bottom Section Label: Left-aligned Gold Eyebrow
     # Left=1.00", Top=3.75", Width=5.50", Height=0.28"
     tx_gap_lbl = slide.shapes.add_textbox(Inches(1.00), Inches(3.75), Inches(5.50), Inches(0.28))
     tx_gap_lbl.name = "Lit_Gap_Label"
@@ -146,7 +173,7 @@ def main():
     p_gap_hdr = tf_gap.paragraphs[0]
     set_para(p_gap_hdr, "CRITICAL RESEARCH GAPS RESOLVED IN THIS WORK", font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 6. Bottom Section: 3 Research Gaps Addressed
+    # 6. Bottom Section: 3 Research Gaps Addressed (Clean Plain English)
     # Top = 4.08", Height = 1.95", Bottom = 6.03" (clean 0.72" margin above footer)
     gap_top = Inches(4.08)
     gap_h = Inches(1.95)
@@ -154,18 +181,18 @@ def main():
     gaps = [
         {
             "num": "01",
-            "title": "Edge-Native Processing",
-            "desc": "Eliminates remote cloud latency (>200 ms) and connection dropouts by executing the entire vision pipeline onboard an embedded Raspberry Pi 5."
+            "title": "All-Onboard Edge AI",
+            "desc": "All computer vision runs directly on the robot (Raspberry Pi 5) without cloud lag, internet dependency, or Wi-Fi dropouts."
         },
         {
             "num": "02",
-            "title": "Perception-Action Coupling",
-            "desc": "Bridges isolated vision AI to real-time wheel actuation via ROS 2 DDS middleware, active visual servoing, and a 5-frame rolling consensus FSM."
+            "title": "Direct Vision-to-Wheels",
+            "desc": "Hand gestures directly guide the robot's physical wheel motors in real time through an active visual-tracking camera gimbal."
         },
         {
             "num": "03",
-            "title": "Dual-Modality HRI & Safety",
-            "desc": "Unifies discrete hand gestures with continuous LSTM trajectory prediction and 2D LiDAR SLAM, strictly complying with ISO 15066 safety stopping margins."
+            "title": "Dual-Modality & Safety",
+            "desc": "Unifies 6 deliberate hand gestures with continuous human tracking and automatic 360° LiDAR collision safety stops."
         }
     ]
 
@@ -191,7 +218,7 @@ def main():
         set_para(p_desc, g["desc"], font_name="Calisto MT", size_pt=11.5, color_rgb=c_body, line_spacing=1.15, align=PP_ALIGN.LEFT)
 
     prs.save(PPTX_PATH)
-    print(f"Slide 6 built successfully in {PPTX_PATH}")
+    print(f"Slide 6 rebuilt with clean 2-tone plain-English layout in {PPTX_PATH}")
 
 if __name__ == "__main__":
     main()
