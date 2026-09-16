@@ -43,7 +43,7 @@ docker exec -d "$CONTAINER" bash -c "
     export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     source /opt/ros/humble/setup.bash
     source /root/cognition_ws/install/setup.bash
-    python3 /root/cognition_ws/web_map_visualizer.py > /tmp/web_vis.log 2>&1
+    python3 /root/cognition_ws/web_map_visualizer.py --mode 'MODE 2: MAPPED NAV2 AUTONOMY' --mapped --view map > /tmp/web_vis.log 2>&1
 "
 
 # Launch industrial acoustic safety audio node (/beep)

@@ -81,3 +81,4 @@ write_up/compile.log
 Thumbs.db
 *.swp
 *~
+.~lock.*

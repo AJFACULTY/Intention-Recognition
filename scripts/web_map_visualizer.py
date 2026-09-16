@@ -5,17 +5,19 @@ Platform: ROS 2 / Standalone (Raspberry Pi 5 & x86_64 Host Workstation)
 Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu (GCTU)
 
 Features:
-  - Option 3: Island Minimalist Cockpit Design System:
-      * Centered dark-carbon floating card container with soft glassmorphic depth.
-      * Top frosted status island: AMR Cognition OS LED, active mode pill, battery charge gauge, and E-Stop.
-      * Floating top-right Picture-in-Picture (PiP) HD camera stream with AI detection HUD & gesture chips.
-      * Floating bottom glass dock with 4-waypoint dispatching, patrol circuits, tool switchers, and coordinate telemetry.
-      * Collapsible layer settings drawer (Costmap, LiDAR, Particles, REP-103 Axes, Trajectory Trail).
-  - Dual-Mode Operation (Offline / Charging Preview & Live ROS 2 Link):
-      * Works seamlessly while the physical robot is powered off and charging.
-      * Automatically serves simulated room SLAM map, laboratory camera stream, simulated LiDAR scans, and patrol telemetry.
-      * Automatically and seamlessly transitions to live ROS 2 hardware topics (/map, /camera/image_raw, /battery) when online.
-  - Ultra-low memory footprint (<35MB RAM), pure HTML5/CSS3/ES6 JS with zero external framework dependencies.
+  - Dynamic Dual-Mode Architecture (Unmapped HRI & Mapped Facility Autonomy):
+      * Automatically detects when an unmapped task is selected (e.g. 6-Gesture Suite, Safety Bubble).
+      * When unmapped: HIDES the static room map and features the full HRI & Gesture Teleoperation Cockpit
+        with central HD camera stream, canonical 6-gesture live matrix, active gimbal telemetry, and kinematics.
+      * When mapped: Displays the pre-calibrated room map with Nav2 waypoints (P1–P4), AMCL particles, and costmaps.
+      * When in SLAM mode: Displays live real-time SLAM occupancy grid as explored.
+  - Multi-Channel Runtime Mode Synchronization:
+      * CLI parameters (--mode, --unmapped, --mapped, --view)
+      * Shared state files (/tmp/amr_active_mode.json, /root/cognition_ws/current_mode.json)
+      * REST API (POST /api/mode)
+      * ROS 2 topic (/cognition/mode)
+  - Real-time 6-Gesture Matrix HUD with active glowing indicators and confidence chips.
+  - Ultra-low memory footprint (<35MB RAM), pure HTML5/CSS3/ES6 JS with zero external dependencies.
 """
 
 import os
@@ -26,6 +28,7 @@ import time
 import json
 import argparse
 import threading
+import urllib.request
 from typing import Optional, Tuple, List
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -42,7 +45,7 @@ try:
     from nav_msgs.msg import OccupancyGrid, Path
     from sensor_msgs.msg import LaserScan, CompressedImage
     from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, Twist
-    from std_msgs.msg import UInt16, String
+    from std_msgs.msg import UInt16, String, Int32
     from tf2_ros import Buffer, TransformListener, TransformException
     HAS_ROS2 = True
     try:
@@ -54,12 +57,11 @@ except ImportError:
     HAS_ROS2 = False
 
 
-# Base class for the visualizer node
 BaseNode = Node if HAS_ROS2 else object
 
 
 class MapVisualizerNode(BaseNode):
-    def __init__(self, force_mock=False):
+    def __init__(self, force_mock=False, initial_mode="MODE 1.2: 6-GESTURE TELEOP SUITE", is_mapped=False, active_view="gesture"):
         if HAS_ROS2:
             try:
                 super().__init__('web_map_visualizer')
@@ -71,6 +73,24 @@ class MapVisualizerNode(BaseNode):
         self.is_preview_mode = True  # Defaults to preview until live data arrives
         self.has_received_live_map = False
         self.has_received_live_camera = False
+
+        # ── Mode & View State Tracking ───────────────────────────────────────
+        self.is_mapped = is_mapped
+        self.current_mode_name = initial_mode
+        self.active_view = active_view  # "gesture", "slam", or "map"
+        self._offline_room_map = None   # Loaded pre-calibrated room map
+        self.last_state_file_mtime = 0.0
+
+        # ── Kinematics & Active Vision Telemetry ──────────────────────────────
+        self.cmd_vel_linear = 0.0
+        self.cmd_vel_angular = 0.0
+        self.gimbal_pan = 0
+        self.gimbal_tilt = 18
+        self.gimbal_state_str = "SEARCH"
+        self.corridor_clearance = 1.85
+        self.rear_clearance = 2.10
+        self.last_gesture_token = "FOLLOW"
+        self.last_gesture_conf = 0.99
 
         # ── Map & Coordinates ────────────────────────────────────────────────
         self.map_img = None
@@ -99,7 +119,6 @@ class MapVisualizerNode(BaseNode):
         self.latest_gesture = "FOLLOW (0.99)"
         self.detected_person = True
         self.person_centroid = [-1.89, -0.58]
-        self.current_mode_name = "MODE 1: FOLLOW-TO-MAP SLAM"
 
         # ── Navigation Waypoints ─────────────────────────────────────────────
         self.corridor_landmarks = [
@@ -142,8 +161,11 @@ class MapVisualizerNode(BaseNode):
         else:
             self._workspace_root = curr_dir
 
-        # Load offline fallback map and camera preview
+        # Load offline preview assets
         self._load_offline_assets()
+
+        # Initial check of state file if present
+        self._check_state_file()
 
         # ── Initialize ROS 2 Subscriptions if Available ──────────────────────
         if HAS_ROS2 and not self.force_mock:
@@ -182,17 +204,60 @@ class MapVisualizerNode(BaseNode):
         if map_path and os.path.exists(map_path):
             raw = cv2.imread(map_path)
             if raw is not None:
-                self.map_img = raw
-                self.map_height, self.map_width = raw.shape[:2]
-                self.map_origin_x = -2.40
-                self.map_origin_y = -3.84
-                self.map_res = 0.05
+                self._offline_room_map = raw
+                if self.is_mapped:
+                    self.map_img = raw
+                    self.map_height, self.map_width = raw.shape[:2]
+                    self.map_origin_x = -2.40
+                    self.map_origin_y = -3.84
+                    self.map_res = 0.05
+                else:
+                    self.map_img = None
 
         cam_path = self._find_asset_path('assets/preview_camera.jpg')
         if cam_path and os.path.exists(cam_path):
             cam_raw = cv2.imread(cam_path)
             if cam_raw is not None:
                 self._cached_camera_jpeg = self._annotate_preview_camera(cam_raw)
+
+    def _check_state_file(self):
+        """Polls shared state files (/tmp/amr_active_mode.json, /root/cognition_ws/current_mode.json)."""
+        candidates = [
+            "/tmp/amr_active_mode.json",
+            "/root/cognition_ws/current_mode.json",
+            os.path.join(self._workspace_root, "current_mode.json")
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                try:
+                    mtime = os.path.getmtime(p)
+                    if mtime > self.last_state_file_mtime:
+                        self.last_state_file_mtime = mtime
+                        with open(p, "r") as f:
+                            data = json.load(f)
+                        with self.lock:
+                            mode = data.get("mode")
+                            if mode:
+                                self.current_mode_name = str(mode)
+                            if "is_mapped" in data:
+                                self.is_mapped = bool(data["is_mapped"])
+                                if self.is_mapped and self.map_img is None and self._offline_room_map is not None:
+                                    self.map_img = self._offline_room_map
+                                    self.map_height, self.map_width = self._offline_room_map.shape[:2]
+                                    self.map_origin_x = -2.40
+                                    self.map_origin_y = -3.84
+                                    self.map_res = 0.05
+                                elif not self.is_mapped and self.active_view != "slam":
+                                    self.map_img = None
+                            if "view" in data:
+                                self.active_view = str(data["view"])
+                            elif not self.is_mapped:
+                                self.active_view = "gesture"
+                            else:
+                                self.active_view = "map"
+                except Exception:
+                    pass
+                break
 
     def _annotate_preview_camera(self, frame: np.ndarray) -> bytes:
         """Adds sleek MediaPipe hand skeleton & AI bounding box overlays to preview frame."""
@@ -216,7 +281,7 @@ class MapVisualizerNode(BaseNode):
         # Draw HUD badge
         cv2.rectangle(annotated, (20, h - 50), (280, h - 18), (15, 20, 30), -1)
         cv2.rectangle(annotated, (20, h - 50), (280, h - 18), (0, 240, 180), 1)
-        cv2.putText(annotated, "GESTURE: FOLLOW (0.99)", (32, h - 28),
+        cv2.putText(annotated, f"GESTURE: {self.latest_gesture}", (32, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 240, 180), 2)
 
         _, buf = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
@@ -252,6 +317,11 @@ class MapVisualizerNode(BaseNode):
             if HAS_COGNITION_MSGS:
                 self.create_subscription(Gesture, '/cognition/gesture', self._cognition_gesture_cb, 10)
             self.create_subscription(String, '/hand_gesture_cmd', self._gesture_cb, 10)
+            self.create_subscription(Twist, '/cmd_vel', self._cmd_vel_cb, 10)
+            self.create_subscription(String, '/cognition/gimbal_state', self._gimbal_state_cb, 10)
+            self.create_subscription(String, '/cognition/mode', self._mode_topic_cb, 10)
+            self.create_subscription(Int32, '/servo_s1', self._servo1_cb, 10)
+            self.create_subscription(Int32, '/servo_s2', self._servo2_cb, 10)
 
             self.create_timer(0.1, self._poll_tf_pose)
         except Exception as ex:
@@ -281,9 +351,79 @@ class MapVisualizerNode(BaseNode):
             self.has_received_live_camera = True
             self.latest_camera_jpeg = bytes(msg.data)
 
+    def _cmd_vel_cb(self, msg):
+        with self.lock:
+            self.cmd_vel_linear = float(msg.linear.x)
+            self.cmd_vel_angular = float(msg.angular.z)
+
+    def _gimbal_state_cb(self, msg):
+        with self.lock:
+            raw = str(msg.data).strip()
+            self.gimbal_state_str = raw
+            if '|' in raw:
+                parts = raw.split('|')
+                self.gimbal_state_str = parts[0]
+                for p in parts[1:]:
+                    if p.startswith('pan:'):
+                        try: self.gimbal_pan = int(p.split(':')[1])
+                        except ValueError: pass
+                    elif p.startswith('tilt:'):
+                        try: self.gimbal_tilt = int(p.split(':')[1])
+                        except ValueError: pass
+
+    def _servo1_cb(self, msg):
+        with self.lock:
+            self.gimbal_pan = int(msg.data)
+
+    def _servo2_cb(self, msg):
+        with self.lock:
+            self.gimbal_tilt = int(msg.data)
+
+    def _mode_topic_cb(self, msg):
+        with self.lock:
+            text = str(msg.data).strip()
+            if text.startswith('{') and text.endswith('}'):
+                try:
+                    data = json.loads(text)
+                    if "mode" in data: self.current_mode_name = data["mode"]
+                    if "is_mapped" in data: self.is_mapped = bool(data["is_mapped"])
+                    if "view" in data: self.active_view = data["view"]
+                    return
+                except Exception:
+                    pass
+            if '|' in text:
+                parts = text.split('|')
+                self.current_mode_name = parts[0]
+                if len(parts) > 1:
+                    mapped_str = parts[1].lower()
+                    self.is_mapped = (mapped_str in ('mapped', 'true', '1'))
+                    self.active_view = 'map' if self.is_mapped else 'gesture'
+            else:
+                self.current_mode_name = text
+
+    def _parse_gesture_token(self, text: str):
+        if not text:
+            return
+        t = str(text).strip()
+        token = "NONE"
+        conf = 1.0
+        for canonical in ["STOP", "GO", "FOLLOW", "LEFT", "RIGHT", "BACK"]:
+            if canonical in t.upper():
+                token = canonical
+                break
+        if "(" in t and ")" in t:
+            try:
+                conf_str = t.split("(")[1].split(")")[0].strip()
+                conf = float(conf_str)
+            except Exception:
+                conf = 0.95
+        self.last_gesture_token = token
+        self.last_gesture_conf = conf
+
     def _gesture_cb(self, msg):
         with self.lock:
             self.latest_gesture = msg.data
+            self._parse_gesture_token(msg.data)
 
     def _cognition_gesture_cb(self, msg):
         with self.lock:
@@ -291,6 +431,8 @@ class MapVisualizerNode(BaseNode):
             conf = getattr(msg, 'confidence', 0.0) or 0.0
             if label and label not in ('NONE', 'TOO_FAR'):
                 self.latest_gesture = f"{label} ({conf:.2f})"
+                self.last_gesture_token = label
+                self.last_gesture_conf = conf
 
     def _global_costmap_cb(self, msg):
         with self.lock:
@@ -406,20 +548,33 @@ class MapVisualizerNode(BaseNode):
         r_min, r_max = msg.range_min, msg.range_max
         with self.lock:
             rx, ry, ryaw = self.robot_x, self.robot_y, self.robot_yaw
+        
+        front_dists = []
+        rear_dists = []
         for r in msg.ranges:
             if r_min < r < r_max and not math.isinf(r) and not math.isnan(r):
+                deg = math.degrees(angle)
+                if -35.0 <= deg <= 35.0:
+                    front_dists.append(r)
+                elif deg >= 145.0 or deg <= -145.0:
+                    rear_dists.append(r)
                 total_angle = ryaw + angle
                 ox = rx + r * math.cos(total_angle)
                 oy = ry + r * math.sin(total_angle)
                 pts.append((ox, oy))
             angle += msg.angle_increment
+
         with self.lock:
             self.lidar_points_map = pts
+            if front_dists:
+                self.corridor_clearance = float(min(front_dists))
+            if rear_dists:
+                self.rear_clearance = float(min(rear_dists))
 
     # ── Simulation Engine (Offline & Charging Preview) ────────────────────────
 
     def _offline_simulation_loop(self):
-        """Simulates smooth robot navigation along corridor waypoints while bot is offline/charging."""
+        """Simulates realistic robot navigation along corridor waypoints while bot is offline/charging."""
         t = 0.0
         circuit = [
             (0.08, 0.05),
@@ -431,14 +586,57 @@ class MapVisualizerNode(BaseNode):
         target_idx = 1
         progress = 0.0
 
+        gesture_cycle = ["FOLLOW (0.99)", "LEFT (1.00)", "GO (0.98)", "RIGHT (0.97)", "STOP (0.99)", "BACK (0.96)"]
+        gesture_idx = 0
+
         while True:
             time.sleep(0.05)
             t += 0.05
+
+            # Periodic state file check
+            if int(t * 10) % 5 == 0:
+                self._check_state_file()
 
             if not self.is_preview_mode and self.has_received_live_map:
                 continue  # Live ROS 2 mode active; suspend mock simulation
 
             with self.lock:
+                # When in unmapped gesture mode: simulate gesture interactions & kinematics
+                if not self.is_mapped:
+                    if int(t) % 4 == 0 and int(t * 20) % 80 == 0:
+                        gesture_idx = (gesture_idx + 1) % len(gesture_cycle)
+                        self.latest_gesture = gesture_cycle[gesture_idx]
+                        self._parse_gesture_token(self.latest_gesture)
+
+                        tok = self.last_gesture_token
+                        if tok == "STOP":
+                            self.cmd_vel_linear = 0.0
+                            self.cmd_vel_angular = 0.0
+                        elif tok == "GO":
+                            self.cmd_vel_linear = 0.25
+                            self.cmd_vel_angular = 0.0
+                        elif tok == "FOLLOW":
+                            self.cmd_vel_linear = 0.20
+                            self.cmd_vel_angular = 0.05 * math.sin(t)
+                        elif tok == "LEFT":
+                            self.cmd_vel_linear = 0.0
+                            self.cmd_vel_angular = 0.40
+                        elif tok == "RIGHT":
+                            self.cmd_vel_linear = 0.0
+                            self.cmd_vel_angular = -0.40
+                        elif tok == "BACK":
+                            self.cmd_vel_linear = -0.15
+                            self.cmd_vel_angular = 0.0
+
+                    self.gimbal_pan = int(12 * math.sin(t * 0.8))
+                    self.gimbal_tilt = 18 + int(5 * math.cos(t * 0.5))
+                    self.gimbal_state_str = "TRACKING"
+                    self.battery_pct = 74 + int(1 * math.sin(t * 0.2))
+                    self.battery_voltage = 8.1
+                    self.battery_charging = True
+                    continue
+
+                # When in mapped mode: simulate patrol traversal on room map
                 p_from = circuit[curr_idx]
                 p_to = circuit[target_idx]
 
@@ -450,7 +648,6 @@ class MapVisualizerNode(BaseNode):
                     p_from = circuit[curr_idx]
                     p_to = circuit[target_idx]
 
-                # Interpolate pose
                 nx = p_from[0] + (p_to[0] - p_from[0]) * progress
                 ny = p_from[1] + (p_to[1] - p_from[1]) * progress
                 dy = p_to[1] - p_from[1]
@@ -458,6 +655,8 @@ class MapVisualizerNode(BaseNode):
                 nyaw = math.atan2(dy, dx)
 
                 self._update_pose(nx, ny, nyaw)
+                self.cmd_vel_linear = 0.22
+                self.cmd_vel_angular = 0.0
 
                 # Simulated planned path
                 self.global_plan_points = [
@@ -504,6 +703,8 @@ class MapVisualizerNode(BaseNode):
             self.goal_y = None
             self.global_plan_points = []
             self.local_plan_points = []
+            self.cmd_vel_linear = 0.0
+            self.cmd_vel_angular = 0.0
         if hasattr(self, 'cmd_vel_pub'):
             zero = Twist()
             for _ in range(5):
@@ -524,7 +725,7 @@ class MapVisualizerNode(BaseNode):
             msg.pose.orientation.w = math.cos(yaw / 2.0)
             self.goal_pub.publish(msg)
 
-    # ── Rendering Pipeline (RViz Equivalents) ────────────────────────────────
+    # ── Dynamic Map Renderer ─────────────────────────────────────────────────
 
     def render_map_jpeg(self) -> bytes:
         buf = self._cached_map_jpeg
@@ -544,13 +745,28 @@ class MapVisualizerNode(BaseNode):
             time.sleep(0.08)  # ~12.5 FPS render loop
 
     def _render_canvas_jpeg(self) -> bytes:
-        """Renders high-resolution top-down visualizer image."""
+        """Renders high-resolution visualizer canvas."""
         with self.lock:
             if self.map_img is None:
-                blank = np.full((500, 700, 3), 18, dtype=np.uint8)
-                cv2.putText(blank, "Initializing Island Minimalist Map...", (90, 250),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 220, 180), 2)
-                _, buf = cv2.imencode('.jpg', blank)
+                blank = np.full((600, 800, 3), 12, dtype=np.uint8)
+                # Draw high-tech blueprint grid
+                for gx in range(0, 800, 40):
+                    cv2.line(blank, (gx, 0), (gx, 600), (22, 28, 40), 1)
+                for gy in range(0, 600, 40):
+                    cv2.line(blank, (0, gy), (800, gy), (22, 28, 40), 1)
+
+                if self.active_view == 'slam':
+                    cv2.putText(blank, "SLAM TOOLBOX ONLINE — REAL-TIME MAPPING ACTIVE", (130, 270),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 240, 180), 2)
+                    cv2.putText(blank, "Dynamic 2D metric occupancy grid constructs live as AMR translates", (120, 310),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 180, 200), 1)
+                else:
+                    cv2.putText(blank, "UNMAPPED ENVIRONMENT — TOUCHLESS TELEOP ACTIVE", (135, 270),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 210, 255), 2)
+                    cv2.putText(blank, "Map suppressed for unmapped task. Use camera stage & gesture matrix.", (125, 310),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 180, 200), 1)
+
+                _, buf = cv2.imencode('.jpg', blank, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
                 return buf.tobytes()
 
             canvas = self.map_img.copy()
@@ -566,6 +782,7 @@ class MapVisualizerNode(BaseNode):
             show_ax = self.show_axes
             show_p = self.show_paths
             show_tr = self.show_trail
+            is_mapped_flag = self.is_mapped
 
         h_orig, w_orig = canvas.shape[:2]
 
@@ -598,8 +815,8 @@ class MapVisualizerNode(BaseNode):
                 p1, p2 = scaled_plan[i], scaled_plan[i + 1]
                 cv2.line(resized, p1, p2, (50, 220, 80), 3, cv2.LINE_AA)
 
-        # 3. AMCL Particles
-        if show_part and particles_list:
+        # 3. AMCL Particles (only in mapped mode)
+        if is_mapped_flag and show_part and particles_list:
             for px, py, pyaw in particles_list:
                 pu, pv = scale_pt(world_to_px(px, py))
                 if 0 <= pu < resized.shape[1] and 0 <= pv < resized.shape[0]:
@@ -618,19 +835,20 @@ class MapVisualizerNode(BaseNode):
             cv2.circle(resized, (gu, gv), 9, (0, 140, 255), 2, cv2.LINE_AA)
             cv2.circle(resized, (gu, gv), 3, (0, 200, 255), -1)
 
-        # 6. Waypoint Corridor Landmarks with Crisp Text Labels
-        for wx, wy, label in self.corridor_landmarks:
-            wu, wv = scale_pt(world_to_px(wx, wy))
-            if 0 <= wu < resized.shape[1] and 0 <= wv < resized.shape[0]:
-                cv2.circle(resized, (wu, wv), 6, (180, 80, 240), -1)
-                cv2.circle(resized, (wu, wv), 9, (255, 255, 255), 2, cv2.LINE_AA)
-                tag = label.split()[0] if label else "WP"
-                (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
-                tx = wu + 11
-                ty = wv + 4
-                cv2.rectangle(resized, (tx - 4, ty - th - 3), (tx + tw + 4, ty + 4), (16, 20, 30), -1)
-                cv2.rectangle(resized, (tx - 4, ty - th - 3), (tx + tw + 4, ty + 4), (180, 80, 240), 1, cv2.LINE_AA)
-                cv2.putText(resized, tag, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
+        # 6. Waypoint Corridor Landmarks (ONLY in Mapped Mode)
+        if is_mapped_flag:
+            for wx, wy, label in self.corridor_landmarks:
+                wu, wv = scale_pt(world_to_px(wx, wy))
+                if 0 <= wu < resized.shape[1] and 0 <= wv < resized.shape[0]:
+                    cv2.circle(resized, (wu, wv), 6, (180, 80, 240), -1)
+                    cv2.circle(resized, (wu, wv), 9, (255, 255, 255), 2, cv2.LINE_AA)
+                    tag = label.split()[0] if label else "WP"
+                    (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
+                    tx = wu + 11
+                    ty = wv + 4
+                    cv2.rectangle(resized, (tx - 4, ty - th - 3), (tx + tw + 4, ty + 4), (16, 20, 30), -1)
+                    cv2.rectangle(resized, (tx - 4, ty - th - 3), (tx + tw + 4, ty + 4), (180, 80, 240), 1, cv2.LINE_AA)
+                    cv2.putText(resized, tag, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
 
         # 7. AMR Chassis Footprint & REP-103 Axes
         ru, rv = world_to_px(rx, ry)
@@ -674,6 +892,21 @@ class MapVisualizerNode(BaseNode):
 
     def get_telemetry_dict(self):
         with self.lock:
+            tok = self.last_gesture_token
+            # Determine drive state
+            if abs(self.cmd_vel_linear) < 0.02 and abs(self.cmd_vel_angular) < 0.05:
+                drive_state = "PARKED / HALTED"
+            elif self.cmd_vel_linear > 0.05:
+                drive_state = f"FORWARD (+{self.cmd_vel_linear:.2f} m/s)"
+            elif self.cmd_vel_linear < -0.05:
+                drive_state = f"REVERSE ({self.cmd_vel_linear:.2f} m/s)"
+            elif self.cmd_vel_angular > 0.1:
+                drive_state = f"PIVOT CCW (+{self.cmd_vel_angular:.2f} rad/s)"
+            elif self.cmd_vel_angular < -0.1:
+                drive_state = f"PIVOT CW ({self.cmd_vel_angular:.2f} rad/s)"
+            else:
+                drive_state = "STANDBY"
+
             return {
                 "x": round(self.robot_x, 3),
                 "y": round(self.robot_y, 3),
@@ -691,7 +924,19 @@ class MapVisualizerNode(BaseNode):
                 "battery_charging": self.battery_charging,
                 "is_preview_mode": self.is_preview_mode,
                 "current_mode": self.current_mode_name,
+                "is_mapped": self.is_mapped,
+                "active_view": self.active_view,
                 "gesture": self.latest_gesture,
+                "gesture_token": tok,
+                "gesture_conf": round(self.last_gesture_conf, 2),
+                "linear_vel": round(self.cmd_vel_linear, 2),
+                "angular_vel": round(self.cmd_vel_angular, 2),
+                "drive_state": drive_state,
+                "gimbal_pan": self.gimbal_pan,
+                "gimbal_tilt": self.gimbal_tilt,
+                "gimbal_state": self.gimbal_state_str,
+                "corridor_clearance": round(self.corridor_clearance, 2),
+                "rear_clearance": round(self.rear_clearance, 2),
                 "fastdds_domain": 20,
                 "latency_ms": 12,
                 "toggles": {
@@ -728,7 +973,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       --bg: #070a10;
       --card-bg: rgba(14, 18, 28, 0.78);
       --card-border: rgba(255, 255, 255, 0.08);
-      --glass-dock: rgba(18, 24, 38, 0.82);
+      --glass-dock: rgba(18, 24, 38, 0.86);
       --text: #c9d1d9;
       --text-bright: #ffffff;
       --text-muted: #8b949e;
@@ -740,6 +985,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       --accent-purple: #8b5cf6;
       --glow-emerald: rgba(16, 185, 129, 0.35);
       --glow-crimson: rgba(239, 68, 68, 0.4);
+      --glow-cyan: rgba(6, 182, 212, 0.4);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -753,11 +999,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 16px 20px;
+      padding: 14px 18px;
       overflow-x: hidden;
     }
 
-    /* ── Top Header Island (Single locked pill row) ── */
+    /* ── Top Header Island ── */
     .header-island {
       width: 100%;
       max-width: 1360px;
@@ -771,7 +1017,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       border-radius: 9999px;
       padding: 6px 16px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       gap: 10px;
       flex-wrap: nowrap;
       white-space: nowrap;
@@ -796,7 +1042,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       50% { opacity: 0.6; transform: scale(0.9); }
     }
     .brand-title {
-      font-size: 0.90rem;
+      font-size: 0.88rem;
       font-weight: 700;
       letter-spacing: 0.5px;
       color: var(--text-bright);
@@ -808,20 +1054,61 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .brand-title span { color: var(--accent-cyan); font-weight: 500; font-size: 0.78rem; }
     
     .mode-pill {
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.25));
-      border: 1px solid rgba(99, 102, 241, 0.4);
-      color: #93c5fd;
-      padding: 5px 12px;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(16, 185, 129, 0.25));
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: #67e8f9;
+      padding: 5px 14px;
       border-radius: 9999px;
       font-size: 0.76rem;
-      font-weight: 600;
-      letter-spacing: 0.3px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
       display: flex;
       align-items: center;
       gap: 6px;
       flex-shrink: 0;
+      box-shadow: 0 0 14px var(--glow-cyan);
+      transition: all 0.3s ease;
+    }
+    .mode-pill.mode-mapped {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.25));
+      border-color: rgba(139, 92, 246, 0.4);
+      color: #c4b5fd;
+      box-shadow: 0 0 14px rgba(139, 92, 246, 0.35);
+    }
+    .mode-pill.mode-slam {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(6, 182, 212, 0.25));
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+      box-shadow: 0 0 14px rgba(59, 130, 246, 0.35);
+    }
+    .mode-pill.mode-alert {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(245, 158, 11, 0.25));
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      box-shadow: 0 0 14px var(--glow-crimson);
     }
     
+    .btn-view-toggle {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-bright);
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+    .btn-view-toggle:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+
     .telemetry-cluster {
       display: flex;
       align-items: center;
@@ -836,17 +1123,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       border: 1px solid var(--card-border);
       border-radius: 9999px;
       padding: 5px 12px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-family: 'JetBrains Mono', monospace;
       color: var(--text-bright);
     }
-    .battery-icon-wrap {
-      color: var(--accent-emerald);
-      display: flex;
-      align-items: center;
-    }
     .charge-badge {
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       padding: 2px 6px;
       border-radius: 6px;
       background: rgba(245, 158, 11, 0.2);
@@ -875,7 +1157,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       color: #fff;
       padding: 6px 18px;
       border-radius: 9999px;
-      font-size: 0.82rem;
+      font-size: 0.80rem;
       font-weight: 700;
       letter-spacing: 0.5px;
       cursor: pointer;
@@ -883,20 +1165,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       align-items: center;
       gap: 6px;
       box-shadow: 0 0 16px var(--glow-crimson);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.2s ease;
     }
     .btn-estop:hover {
-      transform: translateY(-1px) scale(1.02);
-      box-shadow: 0 0 22px rgba(239, 68, 68, 0.6);
+      transform: translateY(-1px);
+      box-shadow: 0 0 22px rgba(239, 68, 68, 0.7);
     }
     .btn-estop:active { transform: scale(0.97); }
 
-    /* ── Main Cockpit Card ── */
+    /* ── Main Cockpit Card Container ── */
     .cockpit-island {
       width: 100%;
       max-width: 1360px;
-      height: calc(100vh - 110px);
-      min-height: 640px;
+      height: calc(100vh - 105px);
+      min-height: 620px;
       background: #090c14;
       border: 1px solid var(--card-border);
       border-radius: 20px;
@@ -908,7 +1190,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       align-items: center;
     }
 
-    /* ── Map Canvas Viewport ── */
+    /* ── 1. Map Viewport Container (Shown only when in Map/SLAM mode) ── */
     .viewport-container {
       width: 100%;
       height: 100%;
@@ -940,25 +1222,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       pointer-events: none;
     }
 
-    /* ── Floating Top-Right Picture-in-Picture Video Card ── */
+    /* Floating Top-Right Picture-in-Picture Video Card (Map Mode Only) */
     .pip-camera-card {
       position: absolute;
       top: 16px;
       right: 16px;
-      width: 290px;
-      background: rgba(14, 18, 28, 0.85);
+      width: 300px;
+      background: rgba(14, 18, 28, 0.88);
       backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 14px;
       box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
       overflow: hidden;
       z-index: 50;
-      transition: width 0.25s ease, height 0.25s ease;
+      transition: width 0.25s ease;
     }
-    .pip-camera-card.expanded {
-      width: 440px;
-    }
+    .pip-camera-card.expanded { width: 440px; }
     .pip-header {
       display: flex;
       justify-content: space-between;
@@ -984,25 +1263,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       background: var(--accent-emerald);
       box-shadow: 0 0 6px var(--accent-emerald);
     }
-    .pip-controls {
-      display: flex;
-      gap: 6px;
-    }
-    .pip-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: none;
-      color: var(--text-muted);
-      border-radius: 4px;
-      width: 22px;
-      height: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-      cursor: pointer;
-    }
-    .pip-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.16); }
-
     .pip-viewport {
       position: relative;
       width: 100%;
@@ -1027,7 +1287,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       pointer-events: none;
     }
     .hud-chip {
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.1);
       padding: 3px 8px;
@@ -1042,104 +1302,184 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       border-color: rgba(16, 185, 129, 0.3);
     }
 
-    /* ── Floating Bottom Dock Island ── */
-    .bottom-dock-island {
-      position: absolute;
-      bottom: 18px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--glass-dock);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 8px 16px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    /* ── 2. UNMAPPED GESTURE & TELEOPERATION COCKPIT VIEW ── */
+    .unmapped-cockpit-container {
+      width: 100%;
+      height: 100%;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      z-index: 50;
-      max-width: 95%;
+      padding: 16px 20px 80px 20px;
+      gap: 18px;
+      box-sizing: border-box;
+      z-index: 10;
+      align-items: stretch;
     }
 
-    /* Dock Rows */
-    .dock-waypoints-row {
+    /* Left Stage: Large HD Camera Stream Card */
+    .cockpit-cam-stage {
+      flex: 1.25;
+      background: rgba(13, 17, 26, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
+    .cam-stage-header {
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.4);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cam-stage-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-bright);
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
-      justify-content: center;
     }
-    .dock-telemetry-row {
+    .cam-stage-viewport {
+      flex: 1;
+      position: relative;
+      background: #000;
       display: flex;
-      align-items: center;
-      gap: 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.76rem;
-      color: var(--text);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding-top: 5px;
-      width: 100%;
       justify-content: center;
+      align-items: center;
+      overflow: hidden;
     }
-    .dock-label {
-      font-size: 0.7rem;
-      font-weight: 600;
+    #cam-main-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .cam-stage-overlay {
+      position: absolute;
+      bottom: 12px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    /* Right Deck: Canonical 6-Gesture Matrix & Real-Time Telemetry */
+    .cockpit-telemetry-deck {
+      flex: 1.0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+    .deck-card {
+      background: rgba(13, 17, 26, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+    .deck-card-title {
+      font-size: 0.76rem;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: var(--text-muted);
-      margin-right: 4px;
-    }
-
-    /* Waypoint Pill Buttons */
-    .btn-dock {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      color: var(--text-bright);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 0.78rem;
-      font-weight: 500;
-      cursor: pointer;
-      display: inline-flex;
+      color: var(--accent-cyan);
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 6px;
-      transition: all 0.15s ease;
     }
-    .btn-dock:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: var(--accent-blue);
-      transform: translateY(-1px);
-    }
-    .btn-dock:active { transform: scale(0.97); }
-    .btn-dock.primary {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2));
-      border-color: rgba(16, 185, 129, 0.4);
-      color: #34d399;
-      font-weight: 600;
-    }
-    .btn-dock.active {
-      background: rgba(59, 130, 246, 0.3);
-      border-color: var(--accent-blue);
-      color: #93c5fd;
-      box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    .deck-card-subtitle {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
     }
 
-    /* Telemetry Pill Cluster */
-    .dock-telemetry {
+    /* 6-Gesture Interactive Grid */
+    .gesture-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .gesture-cell {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .gesture-cell .cell-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .gesture-cell .cell-name {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-bright);
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 6px;
+    }
+    .gesture-cell .cell-act {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      color: var(--text);
+      font-size: 0.70rem;
+      color: var(--accent-cyan);
     }
-    .dock-telemetry .coord {
-      color: #fff;
-      font-weight: 600;
+    .gesture-cell .cell-action-desc {
+      font-size: 0.66rem;
+      color: var(--text-muted);
     }
-    .dock-telemetry span.dim { color: var(--text-muted); font-size: 0.7rem; }
+    .gesture-cell .active-beacon {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: transparent;
+    }
+
+    /* Active Highlight state for current detected gesture */
+    .gesture-cell.active-gesture {
+      background: rgba(16, 185, 129, 0.16);
+      border-color: var(--accent-emerald);
+      box-shadow: 0 0 14px var(--glow-emerald);
+      transform: scale(1.02);
+    }
+    .gesture-cell.active-gesture .cell-name { color: #34d399; }
+    .gesture-cell.active-gesture .cell-act { color: #6ee7b7; font-weight: 600; }
+    .gesture-cell.active-gesture .active-beacon {
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+    }
+
+    /* Telemetry Row Clusters */
+    .telemetry-row-cluster {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .stat-chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-chip .lbl { font-size: 0.64rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.3px; }
+    .stat-chip .val { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 600; color: #fff; }
+    .stat-chip .val.highlight { color: var(--accent-emerald); }
 
     /* ── Floating Map Tools (Top Left) ── */
     .map-tools-island {
@@ -1171,17 +1511,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       cursor: pointer;
       transition: all 0.15s ease;
     }
-    .btn-map-tool:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-    }
+    .btn-map-tool:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
     .btn-map-tool.active {
       background: rgba(59, 130, 246, 0.25);
       border-color: var(--accent-blue);
       color: #93c5fd;
     }
 
-    /* ── Layer Settings Drawer / Popover ── */
+    /* Layer Drawer Popover */
     .layer-popover {
       position: absolute;
       top: 16px;
@@ -1207,7 +1544,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       color: var(--text-bright);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding-bottom: 6px;
-      margin-bottom: 2px;
     }
     .layer-item {
       display: flex;
@@ -1216,7 +1552,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       font-size: 0.78rem;
       color: var(--text);
       cursor: pointer;
-      padding: 4px 0;
+      padding: 3px 0;
     }
     .layer-item:hover { color: #fff; }
     .toggle-switch {
@@ -1241,25 +1577,82 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
     .toggle-switch.on::after { transform: translateX(14px); }
 
-    /* ── Instruction Hint Banner ── */
-    .hint-banner {
+    /* ── Floating Bottom Dock Island ── */
+    .bottom-dock-island {
       position: absolute;
-      top: 16px;
+      bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(14, 18, 28, 0.85);
-      backdrop-filter: blur(14px);
+      background: var(--glass-dock);
+      backdrop-filter: blur(20px);
       border: 1px solid var(--card-border);
-      border-radius: 9999px;
-      padding: 6px 16px;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      z-index: 40;
-      pointer-events: none;
-      display: none;
+      border-radius: 16px;
+      padding: 8px 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      z-index: 50;
+      max-width: 95%;
     }
-    .hint-banner.show { display: block; }
-    .hint-banner b { color: var(--accent-cyan); }
+    .dock-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .dock-telemetry-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      color: var(--text);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 5px;
+      width: 100%;
+      justify-content: center;
+    }
+    .dock-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+    .btn-dock {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-bright);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-dock:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+    .btn-dock.primary {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.25));
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      font-weight: 600;
+    }
+    .btn-dock.amber {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2));
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fcd34d;
+    }
 
     /* Toast Notification */
     .toast {
@@ -1276,11 +1669,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
       z-index: 100;
       display: none;
-      animation: slideUp 0.2s ease-out;
-    }
-    @keyframes slideUp {
-      from { transform: translateY(12px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
     }
   </style>
 </head>
@@ -1293,13 +1681,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="brand-title">AMR Cognition OS <span>v3.2</span></div>
     </div>
 
+    <!-- Dynamically Updated Mission Mode Badge -->
     <div class="mode-pill" id="mode-display">
-      <span>●</span> MODE 1: FOLLOW-TO-MAP SLAM
+      <span>●</span> MODE 1.2: 6-GESTURE TELEOP SUITE
     </div>
+
+    <button class="btn-view-toggle" id="btn-toggle-view" onclick="toggleViewMode()">
+      <span id="view-toggle-icon">🗺️</span> <span id="view-toggle-label">Switch View</span>
+    </button>
 
     <div class="telemetry-cluster">
       <div class="battery-pill">
-        <span class="battery-icon-wrap" id="bat-icon">⚡</span>
+        <span id="bat-icon">⚡</span>
         <span id="bat-val">74% • 8.1V</span>
         <span class="charge-badge" id="charge-badge">CHARGING</span>
       </div>
@@ -1315,78 +1708,52 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- ── Main Cockpit Island Card ── -->
   <main class="cockpit-island" id="cockpit-island">
 
-    <!-- Floating Map Control Tools (Top Left with Aerospace SVG Icons) -->
-    <div class="map-tools-island">
+    <!-- 1. MAP VIEWPORT & TOOLS (Active in Map / SLAM views) -->
+    <div class="map-tools-island" id="map-tools-island" style="display: none;">
       <button class="btn-map-tool active" id="tool-view" title="Pan & Zoom Mode" onclick="setToolMode('view')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
       </button>
-      <button class="btn-map-tool" id="tool-goal" title="2D Nav Goal (Click & Drag)" onclick="setToolMode('goal')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <button class="btn-map-tool" id="tool-goal" title="2D Nav Goal" onclick="setToolMode('goal')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
       </button>
-      <button class="btn-map-tool" id="tool-pose" title="2D Pose Estimate (Click & Drag)" onclick="setToolMode('pose')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
+      <button class="btn-map-tool" id="tool-pose" title="2D Pose Estimate" onclick="setToolMode('pose')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
       </button>
-      <button class="btn-map-tool" id="tool-layers" title="Toggle Map Layers" onclick="toggleLayerDrawer()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      <button class="btn-map-tool" id="tool-layers" title="Toggle Layers" onclick="toggleLayerDrawer()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
       </button>
-      <button class="btn-map-tool" id="tool-reset" title="Reset View Center" onclick="resetMapTransform()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3m12 0h3M12 3v3m0 12v3"/><circle cx="12" cy="12" r="7"/></svg>
+      <button class="btn-map-tool" id="tool-reset" title="Reset View" onclick="resetMapTransform()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3m12 0h3M12 3v3m0 12v3"/><circle cx="12" cy="12" r="7"/></svg>
       </button>
     </div>
 
-    <!-- Layer Settings Popover -->
+    <!-- Map Layers Popover -->
     <div class="layer-popover" id="layer-drawer">
       <div class="layer-popover-header">Map Layers</div>
-      <div class="layer-item" onclick="toggleLayer('costmap')">
-        <span>Dynamic Costmap</span>
-        <div class="toggle-switch on" id="tgl-costmap"></div>
-      </div>
-      <div class="layer-item" onclick="toggleLayer('lidar')">
-        <span>LiDAR Scan Rays</span>
-        <div class="toggle-switch on" id="tgl-lidar"></div>
-      </div>
-      <div class="layer-item" onclick="toggleLayer('particles')">
-        <span>AMCL Particles</span>
-        <div class="toggle-switch on" id="tgl-particles"></div>
-      </div>
-      <div class="layer-item" onclick="toggleLayer('axes')">
-        <span>REP-103 Axes</span>
-        <div class="toggle-switch on" id="tgl-axes"></div>
-      </div>
-      <div class="layer-item" onclick="toggleLayer('paths')">
-        <span>Nav2 Global Path</span>
-        <div class="toggle-switch on" id="tgl-paths"></div>
-      </div>
-      <div class="layer-item" onclick="toggleLayer('trail')">
-        <span>Odometry Trail</span>
-        <div class="toggle-switch on" id="tgl-trail"></div>
-      </div>
-      <div style="margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px;">
-        <button class="btn-dock" style="width: 100%; justify-content: center;" onclick="clearTrail()">🧹 Clear Trail</button>
-      </div>
+      <div class="layer-item" onclick="toggleLayer('costmap')"><span>Costmap</span><div class="toggle-switch on" id="tgl-costmap"></div></div>
+      <div class="layer-item" onclick="toggleLayer('lidar')"><span>LiDAR Rays</span><div class="toggle-switch on" id="tgl-lidar"></div></div>
+      <div class="layer-item" onclick="toggleLayer('particles')"><span>AMCL Particles</span><div class="toggle-switch on" id="tgl-particles"></div></div>
+      <div class="layer-item" onclick="toggleLayer('axes')"><span>REP-103 Axes</span><div class="toggle-switch on" id="tgl-axes"></div></div>
+      <div class="layer-item" onclick="toggleLayer('paths')"><span>Nav2 Path</span><div class="toggle-switch on" id="tgl-paths"></div></div>
+      <div class="layer-item" onclick="toggleLayer('trail')"><span>Odometry Trail</span><div class="toggle-switch on" id="tgl-trail"></div></div>
     </div>
 
-    <!-- Mode Hint Banner -->
-    <div class="hint-banner" id="hint-banner"></div>
-
-    <!-- Map Canvas Viewport (Pannable & Zoomable) -->
-    <div class="viewport-container" id="viewport">
+    <!-- Viewport for Map/SLAM (Hidden during unmapped tasks) -->
+    <div class="viewport-container" id="viewport" style="display: none;">
       <div id="transform-layer">
-        <img id="map-img" alt="AMR Occupancy Grid Map" />
+        <img id="map-img" alt="AMR Occupancy Grid" />
         <canvas id="overlay-canvas"></canvas>
       </div>
     </div>
 
-    <!-- Floating Top-Right Picture-in-Picture Camera Stream -->
-    <div class="pip-camera-card" id="pip-card">
+    <!-- Floating Top-Right PiP Video (Only visible in Map/SLAM view) -->
+    <div class="pip-camera-card" id="pip-card" style="display: none;">
       <div class="pip-header">
         <div class="pip-live-badge" id="cam-badge">
           <div class="pip-live-dot"></div>
           <span id="cam-badge-text">LIVE 20 FPS</span>
         </div>
-        <div class="pip-controls">
-          <button class="pip-btn" onclick="togglePipExpand()" title="Expand/Collapse">⤢</button>
-        </div>
+        <button class="btn-dock" style="padding: 2px 6px; font-size: 0.65rem;" onclick="togglePipExpand()">⤢</button>
       </div>
       <div class="pip-viewport">
         <img id="cam-img" alt="Camera Stream" />
@@ -1397,9 +1764,140 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Floating Bottom Dock Island (Clean 2-tier layout) -->
+    <!-- 2. UNMAPPED HRI & GESTURE TELEOPERATION COCKPIT (Active during unmapped tasks) -->
+    <div class="unmapped-cockpit-container" id="unmapped-cockpit">
+      
+      <!-- Primary HD Camera Stage -->
+      <div class="cockpit-cam-stage">
+        <div class="cam-stage-header">
+          <div class="cam-stage-title">
+            <span class="pip-live-dot"></span>
+            <span>HD Neural Vision Feed & Optical Tracking HUD</span>
+          </div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.70rem; color: var(--accent-cyan);">
+            YOLOv8n + LSTM + MediaPipe 21
+          </div>
+        </div>
+        <div class="cam-stage-viewport">
+          <img id="cam-main-img" alt="Primary Camera Stream" />
+          <div class="cam-stage-overlay">
+            <div class="hud-chip" id="cam-stage-centroid">Operator Centroid: -1.89, -0.58</div>
+            <div class="hud-chip gesture" id="cam-stage-gesture">ACTIVE GESTURE: FOLLOW (0.99)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teleoperation & AI Verification Deck -->
+      <div class="cockpit-telemetry-deck">
+        
+        <!-- Canonical 6-Gesture Matrix Card -->
+        <div class="deck-card">
+          <div class="deck-card-title">
+            <span>Canonical 6-Gesture Teleop Matrix</span>
+            <span style="font-size: 0.65rem; color: var(--accent-emerald);">Live MLP Consensus</span>
+          </div>
+          <div class="deck-card-subtitle">Stand ~1.5m in front of camera • Touchless Control Protocol</div>
+          
+          <div class="gesture-grid">
+            <div class="gesture-cell" id="gest-card-STOP">
+              <div class="cell-top">
+                <span class="cell-name">🛑 STOP</span>
+                <span class="active-beacon"></span>
+              </div>
+              <span class="cell-act">/cmd_vel = 0.0 m/s</span>
+              <span class="cell-action-desc">Instant wheel halt (Open Palm)</span>
+            </div>
+
+            <div class="gesture-cell" id="gest-card-GO">
+              <div class="cell-top">
+                <span class="cell-name">👍 GO</span>
+                <span class="active-beacon"></span>
+              </div>
+              <span class="cell-act">+0.25 m/s Forward</span>
+              <span class="cell-action-desc">Translates forward (Thumbs Up)</span>
+            </div>
+
+            <div class="gesture-cell" id="gest-card-FOLLOW">
+              <div class="cell-top">
+                <span class="cell-name">✌️ FOLLOW</span>
+                <span class="active-beacon"></span>
+              </div>
+              <span class="cell-act">Visual Servoing</span>
+              <span class="cell-action-desc">Shadows footsteps (Peace Sign)</span>
+            </div>
+
+            <div class="gesture-cell" id="gest-card-LEFT">
+              <div class="cell-top">
+                <span class="cell-name">👈 LEFT</span>
+                <span class="active-beacon"></span>
+              </div>
+              <span class="cell-act">+0.40 rad/s CCW</span>
+              <span class="cell-action-desc">Pivot left (Point Left)</span>
+            </div>
+
+            <div class="gesture-cell" id="gest-card-RIGHT">
+              <div class="cell-top">
+                <span class="cell-name">👉 RIGHT</span>
+                <span class="active-beacon"></span>
+              </div>
+              <span class="cell-act">-0.40 rad/s CW</span>
+              <span class="cell-action-desc">Pivot right (Point Right)</span>
+            </div>
+
+            <div class="gesture-cell" id="gest-card-BACK">
+              <div class="cell-top">
+                <span class="cell-name">👇 BACK</span>
+                <span class="active-beacon"></span>
+              </div>
+              <span class="cell-act">-0.15 m/s Reverse</span>
+              <span class="cell-action-desc">Reverse retreat (Point Down)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gimbal & Chassis Kinematics Card -->
+        <div class="deck-card">
+          <div class="deck-card-title">
+            <span>2-DOF Gimbal & Chassis Kinematics</span>
+            <span id="gimbal-state-tag" style="font-size: 0.65rem; color: var(--accent-cyan);">TRACKING</span>
+          </div>
+          <div class="deck-card-subtitle">Real-time servo angles, wheel velocities, and drive arbitration</div>
+          <div class="telemetry-row-cluster">
+            <div class="stat-chip">
+              <span class="lbl">Gimbal Pan</span>
+              <span class="val" id="val-pan">0°</span>
+            </div>
+            <div class="stat-chip">
+              <span class="lbl">Gimbal Tilt</span>
+              <span class="val" id="val-tilt">+18°</span>
+            </div>
+            <div class="stat-chip">
+              <span class="lbl">Drive State</span>
+              <span class="val highlight" id="val-drive-state">PARKED</span>
+            </div>
+            <div class="stat-chip">
+              <span class="lbl">Linear Speed</span>
+              <span class="val" id="val-linear">0.00 m/s</span>
+            </div>
+            <div class="stat-chip">
+              <span class="lbl">Angular Rate</span>
+              <span class="val" id="val-angular">0.00 rad/s</span>
+            </div>
+            <div class="stat-chip">
+              <span class="lbl">LiDAR Clear</span>
+              <span class="val highlight" id="val-clearance">1.85m</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 3. FLOATING BOTTOM DOCK ISLAND -->
     <div class="bottom-dock-island">
-      <div class="dock-waypoints-row">
+      
+      <!-- Waypoints Dispatch Row (Only visible in Mapped Mode) -->
+      <div class="dock-row" id="dock-waypoints-row" style="display: none;">
         <span class="dock-label">Waypoints</span>
         <button class="btn-dock" onclick="dispatchWaypoint('P1 Home Base', 0.08, 0.05, 0.0)">P1 Home</button>
         <button class="btn-dock" onclick="dispatchWaypoint('P2 Central Hub', 1.64, 1.62, 0.0)">P2 Center</button>
@@ -1408,12 +1906,30 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <button class="btn-dock primary" onclick="runPatrolCircuit()">🚀 4-Pt Patrol</button>
       </div>
 
-      <div class="dock-telemetry-row">
-        <div><span class="dim">X:</span> <span class="coord" id="val-x">0.08</span>m</div>
-        <div><span class="dim">Y:</span> <span class="coord" id="val-y">0.05</span>m</div>
-        <div><span class="dim">Yaw:</span> <span class="coord" id="val-yaw">0.0°</span></div>
-        <div><span class="dim">FastDDS:</span> <span class="coord" id="val-dds">12ms</span></div>
+      <!-- Unmapped / Gesture Action Row (Visible in Unmapped Mode) -->
+      <div class="dock-row" id="dock-gesture-row">
+        <span class="dock-label">Touchless HRI</span>
+        <button class="btn-dock" onclick="triggerEStop()">🛑 Halt Chassis</button>
+        <button class="btn-dock" onclick="centerGimbal()">🎯 Recenter Gimbal</button>
+        <button class="btn-dock amber" onclick="triggerBeep()">🔊 Safety Horn Test</button>
       </div>
+
+      <!-- SLAM Controls Row (Visible in SLAM Mode) -->
+      <div class="dock-row" id="dock-slam-row" style="display: none;">
+        <span class="dock-label">SLAM Actions</span>
+        <button class="btn-dock primary" onclick="saveActiveMap()">💾 Save Generated Map</button>
+        <button class="btn-dock" onclick="clearTrail()">🧹 Clear Trail</button>
+      </div>
+
+      <!-- Shared Telemetry Status Row -->
+      <div class="dock-telemetry-row">
+        <div><span style="color:var(--text-muted);">X:</span> <span style="color:#fff; font-weight:600;" id="val-x">0.08</span>m</div>
+        <div><span style="color:var(--text-muted);">Y:</span> <span style="color:#fff; font-weight:600;" id="val-y">0.05</span>m</div>
+        <div><span style="color:var(--text-muted);">Yaw:</span> <span style="color:#fff; font-weight:600;" id="val-yaw">0.0°</span></div>
+        <div><span style="color:var(--text-muted);">FastDDS:</span> <span style="color:#fff; font-weight:600;" id="val-dds">12ms</span></div>
+        <div><span style="color:var(--text-muted);">Mode State:</span> <span style="color:var(--accent-cyan); font-weight:600;" id="val-mode-status">Unmapped Teleop</span></div>
+      </div>
+
     </div>
 
   </main>
@@ -1424,6 +1940,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <script>
     let activeTool = 'view';
     let mapInfo = null;
+    let currentModeName = 'MODE 1.2: 6-GESTURE TELEOP SUITE';
+    let isMappedMode = false;
+    let activeView = 'gesture'; // 'gesture', 'slam', 'map'
 
     // Viewport Pan & Zoom State
     let zoomScale = 1.0;
@@ -1433,7 +1952,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     let startPanX = 0;
     let startPanY = 0;
 
-    // Interactive Drag Arrow (Goal / Pose)
     let isDraggingArrow = false;
     let dragStart = null;
     let dragEnd = null;
@@ -1443,7 +1961,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const imgElem = document.getElementById('map-img');
     const overlay = document.getElementById('overlay-canvas');
     const ctx = overlay.getContext('2d');
-    const hintBanner = document.getElementById('hint-banner');
+    const pipCard = document.getElementById('pip-card');
+    const unmappedCockpit = document.getElementById('unmapped-cockpit');
+    const mapTools = document.getElementById('map-tools-island');
+    const dockWaypoints = document.getElementById('dock-waypoints-row');
+    const dockGesture = document.getElementById('dock-gesture-row');
+    const dockSlam = document.getElementById('dock-slam-row');
 
     function applyTransform() {
       transformLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
@@ -1465,6 +1988,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     // Stream Map
     let firstLoad = true;
     function streamMap() {
+      if (activeView === 'gesture') {
+        setTimeout(streamMap, 1000);
+        return;
+      }
       const nextImg = new Image();
       nextImg.onload = function() {
         imgElem.src = nextImg.src;
@@ -1476,27 +2003,238 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           resetMapTransform();
           firstLoad = false;
         }
-        setTimeout(streamMap, 100);
+        setTimeout(streamMap, 120);
       };
-      nextImg.onerror = function() { setTimeout(streamMap, 500); };
+      nextImg.onerror = function() { setTimeout(streamMap, 800); };
       nextImg.src = '/map.jpg?t=' + Date.now();
     }
     streamMap();
 
-    // Stream Camera
-    const camElem = document.getElementById('cam-img');
+    // Stream Camera (Streams both PiP and Main Stage)
+    const camPip = document.getElementById('cam-img');
+    const camMain = document.getElementById('cam-main-img');
     function streamCam() {
       const nextCam = new Image();
       nextCam.onload = function() {
-        camElem.src = nextCam.src;
-        setTimeout(streamCam, 100);
+        if (camPip) camPip.src = nextCam.src;
+        if (camMain) camMain.src = nextCam.src;
+        setTimeout(streamCam, 90);
       };
       nextCam.onerror = function() { setTimeout(streamCam, 1000); };
       nextCam.src = '/camera.jpg?t=' + Date.now();
     }
     streamCam();
 
-    // Viewport Pan / Zoom / Touch Handlers
+    // Update Layout between Gesture Cockpit and Spatial Map View
+    function syncLayoutView(view, mapped) {
+      activeView = view;
+      isMappedMode = mapped;
+
+      if (view === 'gesture') {
+        viewport.style.display = 'none';
+        pipCard.style.display = 'none';
+        mapTools.style.display = 'none';
+        unmappedCockpit.style.display = 'flex';
+
+        dockWaypoints.style.display = 'none';
+        dockSlam.style.display = 'none';
+        dockGesture.style.display = 'flex';
+
+        document.getElementById('view-toggle-icon').textContent = '🗺️';
+        document.getElementById('view-toggle-label').textContent = 'Map View';
+      } else {
+        unmappedCockpit.style.display = 'none';
+        viewport.style.display = 'block';
+        pipCard.style.display = 'block';
+        mapTools.style.display = 'flex';
+
+        if (view === 'slam') {
+          dockWaypoints.style.display = 'none';
+          dockGesture.style.display = 'none';
+          dockSlam.style.display = 'flex';
+        } else {
+          dockSlam.style.display = 'none';
+          dockGesture.style.display = 'none';
+          dockWaypoints.style.display = 'flex';
+        }
+
+        document.getElementById('view-toggle-icon').textContent = '📹';
+        document.getElementById('view-toggle-label').textContent = 'Gesture Cockpit';
+        resetMapTransform();
+      }
+    }
+
+    function toggleViewMode() {
+      const next = activeView === 'gesture' ? (isMappedMode ? 'map' : 'slam') : 'gesture';
+      syncLayoutView(next, isMappedMode);
+      fetch('/api/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ view: next, is_mapped: isMappedMode, mode: currentModeName })
+      });
+    }
+
+    // Telemetry Polling (4 Hz)
+    function updateTelemetry() {
+      fetch('/telemetry')
+        .then(r => r.json())
+        .then(data => {
+          mapInfo = data.map_info;
+          currentModeName = data.current_mode;
+          isMappedMode = data.is_mapped;
+
+          // Sync View if not overridden locally
+          if (data.active_view && data.active_view !== activeView) {
+            syncLayoutView(data.active_view, data.is_mapped);
+          }
+
+          // Header Mode Pill
+          const modePill = document.getElementById('mode-display');
+          modePill.innerHTML = `<span>●</span> ${data.current_mode}`;
+          modePill.className = 'mode-pill';
+          if (!data.is_mapped && data.active_view === 'slam') {
+            modePill.classList.add('mode-slam');
+          } else if (!data.is_mapped) {
+            modePill.classList.add('mode-unmapped');
+          } else if (data.current_mode.includes('PATROL') || data.current_mode.includes('ESCORT')) {
+            modePill.classList.add('mode-mapped');
+          }
+
+          // Coordinates & DDS Latency
+          document.getElementById('val-x').textContent = data.x.toFixed(2);
+          document.getElementById('val-y').textContent = data.y.toFixed(2);
+          document.getElementById('val-yaw').textContent = data.yaw.toFixed(1) + '°';
+          document.getElementById('val-dds').textContent = data.latency_ms + 'ms';
+          document.getElementById('val-mode-status').textContent = data.is_mapped ? "Mapped Facility" : "Unmapped HRI";
+
+          // Battery
+          document.getElementById('bat-val').textContent = `${data.battery_pct}% • ${data.battery_voltage.toFixed(1)}V`;
+          document.getElementById('charge-badge').style.display = data.battery_charging ? 'inline-block' : 'none';
+
+          // Link Status
+          const linkBadge = document.getElementById('link-badge');
+          if (data.is_preview_mode) {
+            linkBadge.className = 'link-badge preview';
+            linkBadge.textContent = 'OFFLINE (PREVIEW)';
+            document.getElementById('cam-badge-text').textContent = 'PREVIEW 20 FPS';
+          } else {
+            linkBadge.className = 'link-badge';
+            linkBadge.textContent = 'LIVE FAST-DDS LINK';
+            document.getElementById('cam-badge-text').textContent = 'LIVE 20 FPS';
+          }
+
+          // Gesture & HUD Chips
+          if (data.gesture) {
+            document.getElementById('hud-gesture').textContent = data.gesture;
+            document.getElementById('cam-stage-gesture').textContent = `ACTIVE GESTURE: ${data.gesture}`;
+          }
+
+          // 6-Gesture Matrix Highlights
+          const tokens = ["STOP", "GO", "FOLLOW", "LEFT", "RIGHT", "BACK"];
+          tokens.forEach(tok => {
+            const card = document.getElementById(`gest-card-${tok}`);
+            if (card) {
+              const isActive = (data.gesture_token === tok);
+              card.classList.toggle('active-gesture', isActive);
+            }
+          });
+
+          // Kinematics & Active Gimbal telemetry
+          document.getElementById('val-pan').textContent = (data.gimbal_pan >= 0 ? '+' : '') + data.gimbal_pan + '°';
+          document.getElementById('val-tilt').textContent = (data.gimbal_tilt >= 0 ? '+' : '') + data.gimbal_tilt + '°';
+          document.getElementById('val-drive-state').textContent = data.drive_state;
+          document.getElementById('val-linear').textContent = (data.linear_vel >= 0 ? '+' : '') + data.linear_vel.toFixed(2) + ' m/s';
+          document.getElementById('val-angular').textContent = (data.angular_vel >= 0 ? '+' : '') + data.angular_vel.toFixed(2) + ' rad/s';
+          document.getElementById('val-clearance').textContent = data.corridor_clearance.toFixed(2) + 'm';
+          document.getElementById('gimbal-state-tag').textContent = data.gimbal_state;
+        })
+        .catch(() => {});
+    }
+    setInterval(updateTelemetry, 250);
+
+    // Initial Layout Sync
+    syncLayoutView('gesture', false);
+
+    // Actions & Handlers
+    function setToolMode(mode) {
+      activeTool = mode;
+      document.getElementById('tool-view').classList.toggle('active', mode === 'view');
+      document.getElementById('tool-goal').classList.toggle('active', mode === 'goal');
+      document.getElementById('tool-pose').classList.toggle('active', mode === 'pose');
+      viewport.classList.toggle('tool-active', mode !== 'view');
+    }
+
+    function toggleLayerDrawer() {
+      document.getElementById('layer-drawer').classList.toggle('open');
+    }
+
+    function togglePipExpand() {
+      pipCard.classList.toggle('expanded');
+    }
+
+    function toggleLayer(layer) {
+      const tgl = document.getElementById('tgl-' + layer);
+      const active = !tgl.classList.contains('on');
+      tgl.classList.toggle('on', active);
+      fetch('/api/toggles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layer: layer, value: active })
+      });
+    }
+
+    function clearTrail() {
+      fetch('/api/cleartrail', { method: 'POST' })
+        .then(() => showToast('🧹 Odometry trail cleared.'));
+    }
+
+    function triggerEStop() {
+      fetch('/api/estop', { method: 'POST' })
+        .then(() => showToast('🛑 EMERGENCY STOP: Zero velocity dispatched!', true));
+    }
+
+    function centerGimbal() {
+      fetch('/api/gimbal_center', { method: 'POST' })
+        .then(() => showToast('🎯 Gimbal Servos Recentered (Pan: 0°, Tilt: +18°)'));
+    }
+
+    function triggerBeep() {
+      fetch('/api/beep', { method: 'POST' })
+        .then(() => showToast('🔊 Safety Acoustic Horn Dispatched (/beep)'));
+    }
+
+    function saveActiveMap() {
+      fetch('/api/save_map', { method: 'POST' })
+        .then(() => showToast('💾 2D Metric Map Saved to /root/cognition_ws/maps_new/'));
+    }
+
+    function dispatchWaypoint(name, x, y, yaw) {
+      fetch('/api/waypoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: x, y: y, yaw: yaw })
+      }).then(() => showToast(`🎯 Nav2 Goal dispatched to ${name}`));
+    }
+
+    function runPatrolCircuit() {
+      fetch('/api/patrol', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'unattended' })
+      })
+      .then(r => r.json())
+      .then(d => showToast(`🚀 4-Point Unattended Patrol active (Starting at ${d.start_wp})`));
+    }
+
+    function showToast(msg, isAlert = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.borderColor = isAlert ? 'var(--accent-crimson)' : 'var(--accent-blue)';
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    // Viewport Pan/Zoom & Drag Arrow Handlers for Map Mode
     viewport.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
@@ -1559,13 +2297,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ x: wx, y: wy, yaw: yaw })
-          }).then(() => showToast(`🎯 Nav2 Goal sent: (${wx.toFixed(2)}m, ${wy.toFixed(2)}m)`));
+          }).then(() => showToast(`🎯 Nav2 Goal dispatched: (${wx.toFixed(2)}m, ${wy.toFixed(2)}m)`));
         } else if (activeTool === 'pose') {
           fetch('/api/initialpose', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ x: wx, y: wy, yaw: yaw })
-          }).then(() => showToast(`📍 2D Pose estimate sent to AMCL: (${wx.toFixed(2)}m, ${wy.toFixed(2)}m)`));
+          }).then(() => showToast(`📍 2D Pose estimate sent: (${wx.toFixed(2)}m, ${wy.toFixed(2)}m)`));
         }
         setToolMode('view');
       }
@@ -1575,21 +2313,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       const rect = viewport.getBoundingClientRect();
       const vx = e.clientX - rect.left;
       const vy = e.clientY - rect.top;
-      return {
-        x: (vx - panX) / zoomScale,
-        y: (vy - panY) / zoomScale
-      };
+      return { x: (vx - panX) / zoomScale, y: (vy - panY) / zoomScale };
     }
 
     function drawArrow() {
       ctx.clearRect(0, 0, overlay.width, overlay.height);
       if (!dragStart || !dragEnd) return;
-
       ctx.beginPath();
       ctx.arc(dragStart.x, dragStart.y, 6, 0, 2 * Math.PI);
       ctx.fillStyle = activeTool === 'pose' ? '#f59e0b' : '#3b82f6';
       ctx.fill();
-
       ctx.beginPath();
       ctx.moveTo(dragStart.x, dragStart.y);
       ctx.lineTo(dragEnd.x, dragEnd.y);
@@ -1597,119 +2330,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       ctx.lineWidth = 4;
       ctx.stroke();
     }
-
-    function setToolMode(mode) {
-      activeTool = mode;
-      document.getElementById('tool-view').classList.toggle('active', mode === 'view');
-      document.getElementById('tool-goal').classList.toggle('active', mode === 'goal');
-      document.getElementById('tool-pose').classList.toggle('active', mode === 'pose');
-      viewport.classList.toggle('tool-active', mode !== 'view');
-
-      if (mode === 'goal') {
-        hintBanner.innerHTML = 'Mode: <b>2D Nav Goal</b> — Click & drag forward on map to dispatch robot';
-        hintBanner.classList.add('show');
-      } else if (mode === 'pose') {
-        hintBanner.innerHTML = 'Mode: <b>2D Pose Estimate</b> — Click & drag forward to align AMCL';
-        hintBanner.classList.add('show');
-      } else {
-        hintBanner.classList.remove('show');
-      }
-    }
-
-    function toggleLayerDrawer() {
-      const drawer = document.getElementById('layer-drawer');
-      drawer.classList.toggle('open');
-    }
-
-    function togglePipExpand() {
-      document.getElementById('pip-card').classList.toggle('expanded');
-    }
-
-    function toggleLayer(layer) {
-      const tgl = document.getElementById('tgl-' + layer);
-      const active = !tgl.classList.contains('on');
-      tgl.classList.toggle('on', active);
-      fetch('/api/toggles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ layer: layer, value: active })
-      });
-    }
-
-    function clearTrail() {
-      fetch('/api/cleartrail', { method: 'POST' })
-        .then(() => showToast('🧹 Odometry trail cleared.'));
-    }
-
-    function triggerEStop() {
-      fetch('/api/estop', { method: 'POST' })
-        .then(() => showToast('🛑 EMERGENCY STOP: Zero velocity dispatched!', true));
-    }
-
-    function dispatchWaypoint(name, x, y, yaw) {
-      fetch('/api/waypoint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: x, y: y, yaw: yaw })
-      }).then(() => showToast(`🎯 Nav2 Goal dispatched to ${name}`));
-    }
-
-    function runPatrolCircuit() {
-      fetch('/api/patrol', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'unattended' })
-      })
-      .then(r => r.json())
-      .then(d => showToast(`🚀 4-Point Unattended Patrol active (Starting at ${d.start_wp})`));
-    }
-
-    function showToast(msg, isAlert = false) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.style.borderColor = isAlert ? 'var(--accent-crimson)' : 'var(--accent-blue)';
-      t.style.display = 'block';
-      setTimeout(() => { t.style.display = 'none'; }, 3500);
-    }
-
-    // Telemetry Polling (4 Hz)
-    function updateTelemetry() {
-      fetch('/telemetry')
-        .then(r => r.json())
-        .then(data => {
-          mapInfo = data.map_info;
-          document.getElementById('val-x').textContent = data.x.toFixed(2);
-          document.getElementById('val-y').textContent = data.y.toFixed(2);
-          document.getElementById('val-yaw').textContent = data.yaw.toFixed(1) + '°';
-          document.getElementById('val-dds').textContent = data.latency_ms + 'ms';
-
-          // Mode
-          document.getElementById('mode-display').innerHTML = `<span>●</span> ${data.current_mode}`;
-
-          // Battery
-          document.getElementById('bat-val').textContent = `${data.battery_pct}% • ${data.battery_voltage.toFixed(1)}V`;
-          document.getElementById('charge-badge').style.display = data.battery_charging ? 'inline-block' : 'none';
-
-          // Link Status
-          const linkBadge = document.getElementById('link-badge');
-          if (data.is_preview_mode) {
-            linkBadge.className = 'link-badge preview';
-            linkBadge.textContent = 'OFFLINE (PREVIEW)';
-            document.getElementById('cam-badge-text').textContent = 'PREVIEW 20 FPS';
-          } else {
-            linkBadge.className = 'link-badge';
-            linkBadge.textContent = 'LIVE FAST-DDS LINK';
-            document.getElementById('cam-badge-text').textContent = 'LIVE 20 FPS';
-          }
-
-          // Gesture & HUD
-          if (data.gesture) {
-            document.getElementById('hud-gesture').textContent = data.gesture;
-          }
-        })
-        .catch(() => {});
-    }
-    setInterval(updateTelemetry, 250);
   </script>
 </body>
 </html>
@@ -1787,7 +2407,36 @@ class WebHandler(BaseHTTPRequestHandler):
         except Exception:
             req_data = {}
 
-        if self.path == '/api/initialpose':
+        if self.path == '/api/mode':
+            mode = req_data.get('mode')
+            is_mapped = req_data.get('is_mapped')
+            view = req_data.get('view')
+
+            with self.node_ref.lock:
+                if mode is not None:
+                    self.node_ref.current_mode_name = str(mode)
+                if is_mapped is not None:
+                    self.node_ref.is_mapped = bool(is_mapped)
+                    if self.node_ref.is_mapped and self.node_ref.map_img is None and self.node_ref._offline_room_map is not None:
+                        self.node_ref.map_img = self.node_ref._offline_room_map
+                    elif not self.node_ref.is_mapped and self.node_ref.active_view != 'slam':
+                        self.node_ref.map_img = None
+                if view is not None:
+                    self.node_ref.active_view = str(view)
+
+            resp = json.dumps({
+                "status": "ok",
+                "mode": self.node_ref.current_mode_name,
+                "is_mapped": self.node_ref.is_mapped,
+                "active_view": self.node_ref.active_view
+            }).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+        elif self.path == '/api/initialpose':
             wx = float(req_data.get('x', 0.08))
             wy = float(req_data.get('y', 0.05))
             wyaw = float(req_data.get('yaw', 0.0))
@@ -1859,6 +2508,41 @@ class WebHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(resp)
 
+        elif self.path == '/api/gimbal_center':
+            with self.node_ref.lock:
+                self.node_ref.gimbal_pan = 0
+                self.node_ref.gimbal_tilt = 18
+            if HAS_ROS2:
+                try:
+                    p1 = self.node_ref.create_publisher(Int32, '/servo_s1', 10)
+                    p2 = self.node_ref.create_publisher(Int32, '/servo_s2', 10)
+                    m1 = Int32(); m1.data = 0
+                    m2 = Int32(); m2.data = 18
+                    p1.publish(m1); p2.publish(m2)
+                except Exception:
+                    pass
+            resp = json.dumps({"status": "ok", "action": "gimbal_center"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+        elif self.path == '/api/beep':
+            if HAS_ROS2:
+                try:
+                    bp = self.node_ref.create_publisher(UInt16, '/beep', 10)
+                    bm = UInt16(); bm.data = 40
+                    bp.publish(bm)
+                except Exception:
+                    pass
+            resp = json.dumps({"status": "ok", "action": "beep"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
         elif self.path == '/api/cleartrail':
             with self.node_ref.lock:
                 self.node_ref.trajectory_history.clear()
@@ -1908,6 +2592,10 @@ def main():
     parser.add_argument('--port', type=int, default=8080, help='Port to bind the visualizer to (default: 8080)')
     parser.add_argument('--mock', '--offline', action='store_true', help='Force offline charging preview mode')
     parser.add_argument('--standalone', action='store_true', help='Run without initializing ROS 2')
+    parser.add_argument('--mode', type=str, default="MODE 1.2: 6-GESTURE TELEOP SUITE", help='Active mission mode label')
+    parser.add_argument('--unmapped', action='store_true', help='Start in unmapped mode (suppresses room map)')
+    parser.add_argument('--mapped', action='store_true', help='Start in mapped mode (shows room map & waypoints)')
+    parser.add_argument('--view', type=str, choices=['gesture', 'slam', 'map'], default=None, help='Initial cockpit view')
     args = parser.parse_args()
 
     use_ros = HAS_ROS2 and not args.standalone
@@ -1917,7 +2605,30 @@ def main():
         except Exception:
             use_ros = False
 
-    node = MapVisualizerNode(force_mock=args.mock or not use_ros)
+    # Determine mapped/unmapped state
+    if args.mapped:
+        is_mapped = True
+    elif args.unmapped:
+        is_mapped = False
+    else:
+        # Default based on mode string or fallback to unmapped for safety
+        is_mapped = ("MODE 2" in args.mode.upper() or "PATROL" in args.mode.upper() or "ESCORT" in args.mode.upper())
+
+    # Determine active view
+    if args.view:
+        active_view = args.view
+    else:
+        if not is_mapped:
+            active_view = "slam" if "SLAM" in args.mode.upper() else "gesture"
+        else:
+            active_view = "map"
+
+    node = MapVisualizerNode(
+        force_mock=args.mock or not use_ros,
+        initial_mode=args.mode,
+        is_mapped=is_mapped,
+        active_view=active_view
+    )
     WebHandler.node_ref = node
 
     if use_ros:
@@ -1926,10 +2637,11 @@ def main():
 
     server = HTTPServer(('0.0.0.0', args.port), WebHandler)
     mode_str = "OFFLINE CHARGING PREVIEW" if (args.mock or not use_ros) else "LIVE ROS 2 LINK"
-    print("=" * 70)
+    print("=" * 75)
     print(f"   AMR COGNITION — ISLAND MINIMALIST COCKPIT ({mode_str})")
+    print(f"   Mode: {args.mode} | Mapped: {is_mapped} | View: {active_view}")
     print(f"   Open Visualizer in Browser: http://localhost:{args.port}")
-    print("=" * 70)
+    print("=" * 75)
 
     try:
         server.serve_forever()

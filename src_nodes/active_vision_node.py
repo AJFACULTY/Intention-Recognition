@@ -35,11 +35,11 @@ class ActiveVisionNode(Node):
 
         # Configurable Parameters (Yahboom 0-Centric Hardware Protocol: 0 deg = Center Forward)
         self.declare_parameter("pan_home", 0)          # Hardware neutral center forward (0 deg)
-        self.declare_parameter("tilt_home", 30)        # Forward elevated horizon (+30 deg for standing/seated operator)
+        self.declare_parameter("tilt_home", 30)        # Elevated horizon (+30 deg for standing operator chest/face framing)
         self.declare_parameter("pan_min", -60)         # Max left pan (-60 deg)
         self.declare_parameter("pan_max", 60)          # Max right pan (+60 deg)
         self.declare_parameter("tilt_min", -15)        # Lower tilt limit (-15 deg)
-        self.declare_parameter("tilt_max", 36)         # Upper tilt limit (+36 deg, prevents hitting motor)
+        self.declare_parameter("tilt_max", 48)         # Upper tilt limit (+48 deg)
 
         # Control Gains
         self.declare_parameter("kp_pan", 18.0)         # Deg per normalized unit error
@@ -377,19 +377,18 @@ class ActiveVisionNode(Node):
                 self.integral_tilt = self.clamp(self.integral_tilt + e_y * dt, -0.5, 0.5)
 
             # Decoupled PID control law with derivative damping
-            # 0-Centric kinematics: positive pan turns right; increasing tilt tilts up
+            # 0-Centric kinematics: positive pan turns right; tilt locked at 30 deg elevated horizon
             delta_pan = +(self.kp_pan * e_x + self.ki_pan * self.integral_pan + self.kd_pan * deriv_x)
-            delta_tilt = -(self.kp_tilt * e_y + self.ki_tilt * self.integral_tilt + self.kd_tilt * deriv_y)
 
             target_pan = self.current_pan + delta_pan
-            target_tilt = self.current_tilt + delta_tilt
+            target_tilt = float(self.tilt_home)  # Locked at +30 deg elevated horizon for operator perception
 
         elif self.state == self.STATE_MEMORY_HOLD:
             # Maintain last commanded heading, bleed off integrator terms
             self.integral_pan *= 0.90
-            self.integral_tilt *= 0.90
+            self.integral_tilt = 0.0
             target_pan = self.current_pan
-            target_tilt = self.current_tilt
+            target_tilt = float(self.tilt_home)
 
         elif self.state == self.STATE_SEARCH:
             # Symmetrical sinusoidal search sweep centered around 0 deg (neutral forward)

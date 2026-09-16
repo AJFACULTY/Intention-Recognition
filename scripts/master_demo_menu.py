@@ -23,9 +23,12 @@ Usage:
 import os
 import sys
 import time
+import json
 import signal
 import subprocess
 import shutil
+import threading
+import urllib.request
 from typing import Dict, Tuple, List, Optional
 
 # ── ANSI Terminal Styling ──
@@ -134,6 +137,57 @@ def emergency_halt():
         subprocess.run(stop_cmd, shell=True)
     print(f"{C_GREEN}>> All drive velocities forced to 0.0 m/s. Chassis halted.{C_RESET}")
     time.sleep(1.0)
+
+
+def set_active_mission_mode(mode_name: str, is_mapped: bool, view: str = "gesture"):
+    """
+    Synchronizes the active mode across the visualizer, state files, and runtime endpoints.
+    """
+    state_payload = {
+        "mode": mode_name,
+        "is_mapped": is_mapped,
+        "view": view,
+        "timestamp": time.time()
+    }
+
+    # 1. Write local state file
+    try:
+        with open("/tmp/amr_active_mode.json", "w") as f:
+            json.dump(state_payload, f)
+    except Exception:
+        pass
+
+    # 2. If running on Pi host, copy state file into the container
+    if IS_ON_PI:
+        try:
+            json_str = json.dumps(state_payload)
+            cmd = f"docker exec {CONTAINER_GESTURE} python3 -c \"import json; json.dump({json_str}, open('/tmp/amr_active_mode.json', 'w'))\""
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    # 3. Non-blocking HTTP POST to visualizer if active on port 8080
+    def _notify_http():
+        urls = ["http://127.0.0.1:8080/api/mode"]
+        if IS_DEV_WORKSTATION:
+            robot_ip = get_robot_ip()
+            if robot_ip:
+                urls.append(f"http://{robot_ip}:8080/api/mode")
+        for u in urls:
+            try:
+                data_bytes = json.dumps(state_payload).encode('utf-8')
+                req = urllib.request.Request(
+                    u,
+                    data=data_bytes,
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=0.35):
+                    pass
+            except Exception:
+                pass
+
+    threading.Thread(target=_notify_http, daemon=True).start()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -308,6 +362,7 @@ class SystemHealthChecker:
 
 def dispatch_collaborative_follow_slam():
     """Unmapped Mode 1: Collaborative Follow-to-Map SLAM."""
+    set_active_mission_mode("MODE 1.1: FOLLOW-TO-MAP SLAM", is_mapped=False, view="slam")
     print_header("COLLABORATIVE FOLLOW-TO-MAP SLAM (MODE 1)", "Chapter 5 (§5.4 Dual-Mode Architecture)")
     print(f"{C_WHITE}Mission Overview:{C_RESET}")
     print("  1. The robot launches SLAM Toolbox, Active Vision tracking, and Audio Safety.")
@@ -332,6 +387,7 @@ def dispatch_collaborative_follow_slam():
 
 def dispatch_interactive_gesture_hri():
     """Unmapped Mode 2: Full 6-Gesture Evaluation Suite & Touchless Teleoperation."""
+    set_active_mission_mode("MODE 1.2: 6-GESTURE TELEOP SUITE", is_mapped=False, view="gesture")
     print_header("FULL 6-GESTURE EVALUATION & TELEOPERATION SUITE", "Test GO, STOP, FOLLOW, LEFT, RIGHT, BACK + Live Visualizer (:8080)")
     robot_ip = get_robot_ip()
     print(f"{C_WHITE}Gesture Verification Protocol:{C_RESET}")
@@ -359,6 +415,7 @@ def dispatch_interactive_gesture_hri():
 
 def dispatch_safety_bubble_test():
     """ISO 15066 Multimodal Safety Bubble & Reactive Reverse Test."""
+    set_active_mission_mode("MODE 1.3: ISO 15066 SAFETY BUBBLE", is_mapped=False, view="gesture")
     print_header("ISO 15066 MULTIMODAL SAFETY BUBBLE TEST", "Planar LiDAR Frontal Corridor & Rear Collision Guard")
     print(f"{C_WHITE}Test Protocol:{C_RESET}")
     print("  1. Frontal Breach: Walk into the robot's front corridor (<0.35m).")
@@ -377,6 +434,7 @@ def dispatch_safety_bubble_test():
 
 def dispatch_save_map():
     """Saves the active SLAM map permanently."""
+    set_active_mission_mode("MODE 1.5: SAVE GENERATED 2D MAP", is_mapped=False, view="slam")
     print_header("EXPORT & PERMANENTLY SAVE GENERATED 2D MAP", "Occupancy Grid YAML + PNG Serializer")
     map_name = input(f"{C_BOLD}Enter map filename (e.g. room_map_new): {C_RESET}").strip()
     if not map_name:
@@ -396,6 +454,7 @@ def dispatch_save_map():
 
 def dispatch_collaborative_escort_mapped():
     """Mapped Mode: Collaborative Co-Worker Escort with Live AMCL Localization."""
+    set_active_mission_mode("MODE 2.1: CO-WORKER ESCORT (AMCL)", is_mapped=True, view="map")
     print_header("COLLABORATIVE CO-WORKER ESCORT (MAPPED MODE)", "Real-Time Metric AMCL Localization + Follow Gesture")
     print(f"{C_WHITE}Mission Overview:{C_RESET}")
     print("  1. Nav2 and AMCL localize the robot within the pre-calibrated facility map.")
@@ -421,6 +480,7 @@ def dispatch_collaborative_escort_mapped():
 
 def dispatch_capstone_patrol_preemption():
     """Mapped Mode: Milestone 10 Capstone Autonomous Patrol + Dynamic Gesture Preemption."""
+    set_active_mission_mode("MODE 2.2: DEFENSE CAPSTONE PATROL", is_mapped=True, view="map")
     print_header("DEFENSE CAPSTONE: PATROL + DYNAMIC PREEMPTION", "Milestone 10 Full Integration Benchmark")
     print(f"{C_WHITE}Mission Protocol:{C_RESET}")
     print("  1. Robot executes autonomous multi-waypoint inspection route (Home -> P2 -> P3 -> Home).")
@@ -440,6 +500,8 @@ def dispatch_capstone_patrol_preemption():
 
 def dispatch_waypoint_mission(mission_name: str):
     """Dispatches a named waypoint mission via mission_manager.py."""
+    readable_name = mission_name.replace('_', ' ')
+    set_active_mission_mode(f"MODE 2: {readable_name}", is_mapped=True, view="map")
     print_header(f"DISPATCHING MISSION: {mission_name}", "Nav2 Autonomous Action Client")
     cmd = (
         f"docker exec -it yahboom_gesture bash -c '"
@@ -535,6 +597,7 @@ def dispatch_standalone_web_visualizer():
 # ════════════════════════════════════════════════════════════════════════════════
 
 def menu_unmapped_environment():
+    set_active_mission_mode("CATEGORY 1: UNMAPPED ENVIRONMENT", is_mapped=False, view="gesture")
     while True:
         print_header("CATEGORY [1]: UNMAPPED ENVIRONMENT (COLLABORATIVE SLAM & HRI)", "Mode 1: Zero Prior Map Required — Exploration & Touchless Interaction")
         print(f"  {C_BOLD}[1.1]{C_RESET} Collaborative 'Follow-to-Map' SLAM (Live Map Construction on :8080)")
@@ -562,6 +625,7 @@ def menu_unmapped_environment():
         elif choice in ["3", "1.3"]:
             dispatch_safety_bubble_test()
         elif choice in ["4", "1.4"]:
+            set_active_mission_mode("MODE 1.4: GAMEPAD SLAM MAPPING", is_mapped=False, view="slam")
             run_interactive_command("ros2 launch launch/slam_real.launch.py")
         elif choice in ["5", "1.5"]:
             dispatch_save_map()
@@ -571,6 +635,7 @@ def menu_unmapped_environment():
 
 
 def menu_mapped_environment():
+    set_active_mission_mode("CATEGORY 2: MAPPED ENVIRONMENT", is_mapped=True, view="map")
     while True:
         print_header("CATEGORY [2]: MAPPED ENVIRONMENT (FACILITY AUTONOMY & DEFENSE)", "Mode 2: Pre-Calibrated Map Active — AMCL Localization & Navigation")
         print(f"  {C_BOLD}[2.1]{C_RESET} Collaborative Co-Worker Escort ('Follow-Me' with Live AMCL Localization)")

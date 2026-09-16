@@ -1,0 +1,84 @@
+
+digraph SoftwareDataflow {
+    rankdir=TB;
+    nodesep=0.5;
+    ranksep=0.4;
+    splines=ortho;
+    bgcolor="transparent";
+
+    node [fontname="DejaVu Sans", fontsize=10, penwidth=1.6, color="black", fillcolor="white", style="filled"];
+    edge [fontname="DejaVu Sans", fontsize=8.5, color="black", penwidth=1.4, arrowhead="vee"];
+
+    // Sensors
+    subgraph cluster_input {
+        label="Sensory Input Layer";
+        fontname="DejaVu Sans-Bold";
+        fontsize=11;
+        color="black";
+        penwidth=1.2;
+        style="dashed";
+        cam [label="Monocular USB Camera
+(/camera/image_raw, 20 FPS)", shape=box, style="rounded,filled"];
+        lidar [label="MS200 2D LiDAR
+(/scan, 12.5 Hz)", shape=box, style="rounded,filled"];
+    }
+
+    // Perception & AI
+    subgraph cluster_ai {
+        label="Perception & Classification (ROS 2 Humble)";
+        fontname="DejaVu Sans-Bold";
+        fontsize=11;
+        color="black";
+        penwidth=1.2;
+        style="dashed";
+        person [label="person_detection_node
+(YOLOv8: Central HUD Filter)", shape=box];
+        gesture [label="gesture_node
+(MediaPipe + 19D MLP Model)", shape=box];
+        consensus [label="5-Frame Rolling
+Consensus Verified?", shape=diamond];
+    }
+
+    // Decision & Safety
+    subgraph cluster_control {
+        label="Supervisory Decision & Safety Layer";
+        fontname="DejaVu Sans-Bold";
+        fontsize=11;
+        color="black";
+        penwidth=1.2;
+        style="dashed";
+        brain [label="brain_node (State Machine)
+(Nav2 Trajectory Dispatch)", shape=box];
+        safety [label="Obstacle Detected?
+(Laser Distance < 0.36 m)", shape=diamond];
+        mux [label="twist_mux (Priority Arbitrator)
+(Safety Stop > Manual > Gesture)", shape=box];
+    }
+
+    // Actuation
+    subgraph cluster_actuation {
+        label="Real-Time Embedded Actuation";
+        fontname="DejaVu Sans-Bold";
+        fontsize=11;
+        color="black";
+        penwidth=1.2;
+        style="dashed";
+        bridge [label="micro_ros_agent (Pi 5)
+(921,600 baud UART Bridge)", shape=box];
+        esp32 [label="ESP32-S3 Microcontroller
+(FreeRTOS PID Motor Control)", shape=box, style="rounded,filled"];
+    }
+
+    // Flow
+    cam -> person [label="Raw frames"];
+    person -> gesture [label="Cropped hand"];
+    gesture -> consensus [label="/cognition/gesture"];
+    consensus -> brain [label="Yes (Valid)"];
+    
+    lidar -> safety [label="Laser scans"];
+    safety -> mux [label="Yes: Stop (Pri 100)"];
+    brain -> mux [label="No obstacle: /cmd_vel (Pri 40)"];
+
+    mux -> bridge [label="Arbitrated /cmd_vel"];
+    bridge -> esp32 [label="UART Packets"];
+}

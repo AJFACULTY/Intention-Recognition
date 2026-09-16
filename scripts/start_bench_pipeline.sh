@@ -20,7 +20,7 @@ cleanup() {
         . /opt/ros/humble/setup.bash >/dev/null 2>&1
         timeout 1s ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}' >/dev/null 2>&1 || true
         timeout 1s ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 '{data: 0}' >/dev/null 2>&1 || true
-        timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 30}' >/dev/null 2>&1 || true
+        timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 40}' >/dev/null 2>&1 || true
         pkill -2 -f 'ros2 bag record' 2>/dev/null || true
         sleep 1
         pkill -9 -f 'camera_pub|person_detection_node|gesture_node|active_vision_node|face_recognition_node|brain_node|twist_mux|bench_autonomy_monitor|web_map_visualizer|ros2 bag record' 2>/dev/null || true
@@ -90,9 +90,11 @@ docker exec yahboom_gesture bash -c "
 "
 sleep 2
 
-echo "[4/8] Starting Active Vision Gimbal Tracking Node..."
+echo "[4/8] Starting Active Vision Gimbal Tracking Node (Camera Tilt Locked at +40°)..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
+    timeout 1s ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 '{data: 0}' >/dev/null 2>&1 || true
+    timeout 1s ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 '{data: 40}' >/dev/null 2>&1 || true
     nohup python3 -u /root/cognition_ws/src/cognition_perception/cognition_perception/active_vision_node.py > /tmp/active_vision.log 2>&1 &
 "
 sleep 1
@@ -126,8 +128,10 @@ sleep 1
 echo "[8/8] Starting Live Web Map & Camera Visualizer Dashboard on Port :8080..."
 docker exec yahboom_gesture bash -c "
     $ROS_ENV
+    mkdir -p /tmp
+    echo '{\"mode\": \"MODE 1.2: 6-GESTURE TELEOP SUITE\", \"is_mapped\": false, \"view\": \"gesture\"}' > /tmp/amr_active_mode.json
     VIS_SCRIPT=\$(test -f /root/cognition_ws/web_map_visualizer.py && echo /root/cognition_ws/web_map_visualizer.py || echo /root/cognition_ws/scripts/web_map_visualizer.py)
-    nohup python3 -u \"\$VIS_SCRIPT\" > /tmp/web_vis.log 2>&1 &
+    nohup python3 -u \"\$VIS_SCRIPT\" --mode 'MODE 1.2: 6-GESTURE TELEOP SUITE' --unmapped --view gesture > /tmp/web_vis.log 2>&1 &
 "
 sleep 1
 

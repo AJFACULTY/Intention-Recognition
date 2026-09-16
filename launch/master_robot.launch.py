@@ -147,7 +147,7 @@ def generate_launch_description():
         period=6.0,
         actions=[
             ExecuteProcess(
-                cmd=[sys.executable, visualizer_script],
+                cmd=[sys.executable, visualizer_script, '--mode', 'MODE 2.1: CO-WORKER ESCORT (AMCL)', '--mapped', '--view', 'map'],
                 name="web_map_visualizer",
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("enable_visualizer")),

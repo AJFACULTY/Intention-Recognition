@@ -141,7 +141,7 @@ def generate_launch_description():
         period=5.0,
         actions=[
             ExecuteProcess(
-                cmd=[sys.executable, visualizer_script],
+                cmd=[sys.executable, visualizer_script, '--mode', 'MODE 1.1: FOLLOW-TO-MAP SLAM', '--unmapped', '--view', 'slam'],
                 name="web_map_visualizer",
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("enable_visualizer")),
