@@ -20,16 +20,18 @@ PPTX_PATH = "write_up/Project Final Defense Slides_FINAL.pptx"
 SRC_IMG = "write_up/figures/assembled_robot_real.jpg"
 ROBOT_IMG = "write_up/figures/assembled_robot_cropped.jpg"
 
-def prepare_robot_image():
-    """Crops the robot photo cleanly and adds a subtle 1px frame border."""
-    if os.path.exists(SRC_IMG):
-        im = Image.open(SRC_IMG)
-        # Tight, centered crop of the robot
-        cropped = im.crop((180, 80, 1120, 740))
-        # Add subtle 1px border (#CBD5E1 - 203, 213, 225)
-        bordered = ImageOps.expand(cropped, border=2, fill=(203, 213, 225))
-        bordered.save(ROBOT_IMG, quality=95)
-        print(f"Prepared bordered robot image: {ROBOT_IMG}")
+def prepare_robot_images():
+    """Crops both robot photos cleanly to exact matching 1.15 aspect ratio and adds a subtle 1px frame border."""
+    im_wired = Image.open("write_up/figures/chassis_wired_cropped.jpg")
+    crop_wired = im_wired.crop((0, 7, 575, 507)) # 575 x 500 -> aspect 1.15
+    b_wired = ImageOps.expand(crop_wired, border=2, fill=(203, 213, 225))
+    b_wired.save("write_up/figures/wired_bot_side.jpg", quality=95)
+
+    im_asm = Image.open("write_up/figures/assembled_robot_real.jpg")
+    crop_asm = im_asm.crop((250, 80, 1010, 740)) # 760 x 660 -> aspect 1.151
+    b_asm = ImageOps.expand(crop_asm, border=2, fill=(203, 213, 225))
+    b_asm.save("write_up/figures/assembled_bot_side.jpg", quality=95)
+    print("Prepared undistorted side-by-side images.")
 
 def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=False, color_rgb=None, space_before_pt=0, space_after_pt=2, line_spacing=1.14, align=PP_ALIGN.LEFT):
     p.text = text
@@ -45,7 +47,7 @@ def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=Fal
     p.alignment = align
 
 def main():
-    prepare_robot_image()
+    prepare_robot_images()
     prs = pptx.Presentation(PPTX_PATH)
 
     if len(prs.slides) < 9:
@@ -90,7 +92,7 @@ def main():
     set_para(p_sub, "PHYSICAL EMBEDDED COMPUTING, SENSORS, CHASSIS & POWER ISOLATION", font_name="Calisto MT", size_pt=11, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
     # 3. Left Column: 6 Structured Hardware Points in Plain English (11 pt)
-    tx_left = slide.shapes.add_textbox(Inches(0.85), Inches(1.38), Inches(6.45), Inches(4.70))
+    tx_left = slide.shapes.add_textbox(Inches(0.85), Inches(1.38), Inches(5.90), Inches(4.70))
     tx_left.name = "Hw_Points_Text"
     tf_left = tx_left.text_frame
     tf_left.word_wrap = True
@@ -125,57 +127,44 @@ def main():
         r_desc.font.bold = False
         r_desc.font.color.rgb = c_body
 
-    # 4. Right Column: Assembled Physical Robot Photograph & Specifications
-    if os.path.exists(ROBOT_IMG):
-        # Image dimensions: Width = 5.00", Height = 3.51", Left = 7.48", Top = 1.38"
-        pic = slide.shapes.add_picture(
-            ROBOT_IMG,
-            Inches(7.48), Inches(1.38),
-            width=Inches(5.00), height=Inches(3.51)
+    # 4. Right Column: Side-by-Side Images (Wired Stack vs Fully Assembled)
+    img_wired = "write_up/figures/wired_bot_side.jpg"
+    img_asm   = "write_up/figures/assembled_bot_side.jpg"
+
+    if os.path.exists(img_wired) and os.path.exists(img_asm):
+        # Photo 1: Internal Wiring Stack (Left: 7.10", Top: 1.50", Width: 2.88", Height: 2.50")
+        pic1 = slide.shapes.add_picture(
+            img_wired,
+            Inches(7.10), Inches(1.50),
+            width=Inches(2.88), height=Inches(2.50)
         )
-        pic.name = "Hw_Photo_Img"
+        pic1.name = "Hw_Photo_Wired"
 
-        # Caption underneath photograph (Top: 4.94", Height: 0.22")
-        tx_cap = slide.shapes.add_textbox(Inches(7.48), Inches(4.94), Inches(5.00), Inches(0.22))
-        tx_cap.name = "Hw_Caption"
-        tf_cap = tx_cap.text_frame
-        tf_cap.word_wrap = True
-        tf_cap.margin_left = tf_cap.margin_right = tf_cap.margin_top = tf_cap.margin_bottom = 0
-        p_cap = tf_cap.paragraphs[0]
-        set_para(p_cap, "Figure 3.2: Assembled 4WD Mobile Robot with Active Vision & 2D LiDAR", font_name="Calisto MT", size_pt=9.0, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
+        # Caption 1 (Top: 4.10", Height: 0.45")
+        tx_c1 = slide.shapes.add_textbox(Inches(7.10), Inches(4.10), Inches(2.88), Inches(0.45))
+        tx_c1.name = "Hw_Cap_Wired"
+        tf_c1 = tx_c1.text_frame
+        tf_c1.word_wrap = True
+        tf_c1.margin_left = tf_c1.margin_right = tf_c1.margin_top = tf_c1.margin_bottom = 0
+        p_c1 = tf_c1.paragraphs[0]
+        set_para(p_c1, "Figure 3.2: Internal Electronics Stack\n(Raspberry Pi 5, ESP32-S3 & Motor Drivers)", font_name="Calisto MT", size_pt=9.0, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
 
-        # Specifications Block underneath Caption (Top: 5.22", Height: 0.88", Bottom: 6.10")
-        tx_spec = slide.shapes.add_textbox(Inches(7.48), Inches(5.22), Inches(5.00), Inches(0.88))
-        tx_spec.name = "Hw_Specs_Text"
-        tf_spec = tx_spec.text_frame
-        tf_spec.word_wrap = True
-        tf_spec.margin_left = tf_spec.margin_right = tf_spec.margin_top = tf_spec.margin_bottom = 0
+        # Photo 2: Fully Assembled Robot (Left: 10.18", Top: 1.50", Width: 2.88", Height: 2.50")
+        pic2 = slide.shapes.add_picture(
+            img_asm,
+            Inches(10.18), Inches(1.50),
+            width=Inches(2.88), height=Inches(2.50)
+        )
+        pic2.name = "Hw_Photo_Assembled"
 
-        specs_list = [
-            ("Dimensions & Mass", "220 × 180 × 165 mm | Total Platform Weight: 1.65 kg"),
-            ("Operating Speeds", "0.20 m/s cruise speed | ±0.50 rad/s rotation | 98 ms halt"),
-            ("Power Isolation", "7.4V Li-ion (2000 mAh) with dedicated 5V/5A buck converter")
-        ]
-
-        for s_idx, (s_tag, s_desc) in enumerate(specs_list):
-            p_s = tf_spec.paragraphs[0] if s_idx == 0 else tf_spec.add_paragraph()
-            p_s.space_after = Pt(3 if s_idx < len(specs_list) - 1 else 0)
-            p_s.line_spacing = 1.12
-            p_s.alignment = PP_ALIGN.LEFT
-
-            r_s_tag = p_s.add_run()
-            r_s_tag.text = f"• {s_tag}: "
-            r_s_tag.font.name = "Calisto MT"
-            r_s_tag.font.size = Pt(9.5)
-            r_s_tag.font.bold = True
-            r_s_tag.font.color.rgb = c_navy
-
-            r_s_desc = p_s.add_run()
-            r_s_desc.text = s_desc
-            r_s_desc.font.name = "Calisto MT"
-            r_s_desc.font.size = Pt(9.5)
-            r_s_desc.font.bold = False
-            r_s_desc.font.color.rgb = c_body
+        # Caption 2 (Top: 4.10", Height: 0.45")
+        tx_c2 = slide.shapes.add_textbox(Inches(10.18), Inches(4.10), Inches(2.88), Inches(0.45))
+        tx_c2.name = "Hw_Cap_Assembled"
+        tf_c2 = tx_c2.text_frame
+        tf_c2.word_wrap = True
+        tf_c2.margin_left = tf_c2.margin_right = tf_c2.margin_top = tf_c2.margin_bottom = 0
+        p_c2 = tf_c2.paragraphs[0]
+        set_para(p_c2, "Figure 3.3: Fully Enclosed Platform\n(360° MS200 LiDAR & Active Gimbal)", font_name="Calisto MT", size_pt=9.0, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
 
     prs.save(PPTX_PATH)
     print(f"Slide 9 successfully added and compiled in {PPTX_PATH}")
