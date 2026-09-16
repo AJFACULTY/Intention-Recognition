@@ -61,6 +61,7 @@ scp \
     /home/j/ros2_cognition_ws/scripts/setup_joystick_service.sh \
     /home/j/ros2_cognition_ws/scripts/test_safety_audio.py \
     /home/j/ros2_cognition_ws/scripts/diagnostics/test_camera_stream.py \
+    /home/j/ros2_cognition_ws/scripts/diagnostics/show_system_resources.py \
     /home/j/ros2_cognition_ws/launch/nav2.launch.py \
     /home/j/ros2_cognition_ws/launch/demo_system.launch.py \
     /home/j/ros2_cognition_ws/launch/cognition_autonomy.launch.py \
@@ -82,7 +83,7 @@ scp \
     /home/j/ros2_cognition_ws/src_nodes/brain_node.py \
     "${ROBOT_USER}@${ROBOT_HOST}:~/"
 
-ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/menu.sh ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/menu.sh ~/cognition_ws/master_demo_menu.py ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py"
+ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/menu.sh ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/menu.sh ~/cognition_ws/master_demo_menu.py ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py ~/cognition_ws/show_system_resources.py"
 
 scp \
     /home/j/ros2_cognition_ws/ml_models/weights/gesture_model_features.pkl \
@@ -124,7 +125,7 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     cp ~/cognition_ws/brain_node.py ~/cognition_ws/src/cognition_brain/cognition_brain/
 
     # Copy Perception & Audio nodes into container across all fallback locations
-    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/assets /root/cognition_ws/maps_new /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts
+    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/assets /root/cognition_ws/maps_new /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/scripts/diagnostics /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts
     docker cp ~/cognition_ws/assets/preview_camera.jpg \${CONTAINER}:/root/cognition_ws/assets/preview_camera.jpg
     docker cp ~/maps_new/room_map_20260812_0826.png \${CONTAINER}:/root/cognition_ws/maps_new/room_map_20260812_0826.png
     docker cp ~/maps_new/room_map_20260812_0826.yaml \${CONTAINER}:/root/cognition_ws/maps_new/room_map_20260812_0826.yaml
@@ -143,6 +144,8 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
     docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/master_demo_menu.py
     docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/scripts/master_demo_menu.py
+    docker cp ~/cognition_ws/show_system_resources.py \${CONTAINER}:/root/cognition_ws/scripts/diagnostics/show_system_resources.py
+    docker cp ~/cognition_ws/show_system_resources.py \${CONTAINER}:/root/cognition_ws/show_system_resources.py
 
     # Copy Brain Decision node, Mission Manager, Waypoint Navigator & Web Map Visualizer
     docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${BRAIN_DIR}/brain_node.py

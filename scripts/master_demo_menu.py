@@ -688,6 +688,7 @@ def menu_diagnostics_suite():
         print(f"  {C_BOLD}[3.6]{C_RESET} Clean FastDDS Shared Memory Lockfiles & Process Reset")
         print(f"  {C_BOLD}[3.7]{C_RESET} Test Live Camera Feed & V4L2 Devices (FPS & Snapshot)")
         print(f"  {C_BOLD}[3.8]{C_RESET} Launch Standalone Web Visualizer Dashboard (Port :8080)")
+        print(f"  {C_BOLD}[3.9]{C_RESET} {C_GREEN}Embedded Hardware Resource Profiler & Scientific Benchmark Audit{C_RESET}")
         print()
         print(f"  {C_BOLD}[H]{C_RESET}   {C_RED}EMERGENCY CHASSIS HALT (/cmd_vel = 0.0){C_RESET}")
         print(f"  {C_BOLD}[B]{C_RESET}   {C_CYAN}Back to Main Menu{C_RESET}")
@@ -717,6 +718,11 @@ def menu_diagnostics_suite():
             dispatch_camera_diagnostic()
         elif choice in ["8", "3.8"]:
             dispatch_standalone_web_visualizer()
+        elif choice in ["9", "3.9"]:
+            prof_cmd = "python3 scripts/diagnostics/show_system_resources.py" if IS_DEV_WORKSTATION else "python3 /root/cognition_ws/scripts/diagnostics/show_system_resources.py"
+            if not os.path.exists("scripts/diagnostics/show_system_resources.py") and not IS_DEV_WORKSTATION:
+                prof_cmd = "python3 /home/pi/cognition_ws/show_system_resources.py"
+            run_interactive_command(prof_cmd)
         else:
             print(f"{C_RED}Invalid selection.{C_RESET}")
             time.sleep(0.8)
