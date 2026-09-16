@@ -106,7 +106,7 @@ def main():
             "authors": "Athanasios Tsitos, Maria Dagioglou & Theodoros Giannakopoulos (2022)",
             "title": "Real-Time Feasibility of a Human Intention Method Evaluated Through a Competitive Human-Robot Reaching Game",
             "objective": "Predict human reaching intent early to guide robot arm trajectories within a 150 ms reaction threshold.",
-            "method": "RGB-D camera tracking wrist kinematics with SVM on a 6-DOF UR3 industrial robotic arm.",
+            "method": "Tracked hand movements with a depth camera and trained machine learning (SVM) to guide a robot arm.",
             "gap": "Confined to a static desk — lacks mobile base movement and provides no explicit hand gesture command channel.",
             "resolution": "Direct vision-to-wheels coupling for mobile navigation guided by 6 touchless hand gestures."
         },
@@ -114,7 +114,7 @@ def main():
             "authors": "Jubayer Al Mahmud (2022)",
             "title": "3D Gesture Recognition and Adaptation for Human–Robot Interaction",
             "objective": "Classify 3D pointing and dynamic hand gestures in real time to guide robot interaction across age groups.",
-            "method": "Kinect v2 depth sensor + 3D skeletal normalization + CNN / SVM classifiers on 3,600 samples.",
+            "method": "Tracked full-body joints using a Kinect sensor and trained deep learning models on 3,600 gestures.",
             "gap": "Relies on heavy cloud / GPU computing clusters; vulnerable to network lag (>200 ms) and connection drops.",
             "resolution": "Executes 100% of vision AI directly onboard a low-cost Raspberry Pi 5 with zero cloud dependency."
         },
@@ -122,7 +122,7 @@ def main():
             "authors": "Y. Li, H. Zhang, Guang Yang & Shuoyu Wang (2023)",
             "title": "Safe and Efficient Motion Planning for Material Transportation Robots Considering Intention Prediction of Obstacles",
             "objective": "Plan collision-free mobile robot paths by predicting whether human workers will clear the hallway.",
-            "method": "2D LiDAR + CNN obstacle prediction dynamically updating ROS 2 Nav2 costmaps in Isaac Sim.",
+            "method": "Fused LiDAR and camera vision to predict worker paths and adjust navigation maps in a simulator.",
             "gap": "Tested only in computer simulation — never validated on physical robot hardware; lacks touchless gesture control.",
             "resolution": "Physically validated on a real mobile robot with 2D LiDAR SLAM, active visual servoing, and ISO safety stops."
         }
