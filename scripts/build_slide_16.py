@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-build_slide_16.py — Formal Academic Slide 16 (Key References in IEEE Format)
+build_slide_16.py — Full-Width High-Visibility Academic Slide 16 (Key References in IEEE Format)
 Platform: Yahboom Micro-ROS Pi 5 Autonomous Mobile Robot
 Thesis: GCTU BSc Computer Engineering Defense
 
-Addresses Scoring Rubric:
-"Conclusion (5 Points): The presenter draws appropriate conclusions from the
-work presented and supports them with relevant references cited in IEEE format (4 pts)"
+Layout:
+- Single full-width column (no split columns) for maximum readability on projection screens.
+- Increased font sizes: 13 pt bold labels, 12.5 pt authors, 12 pt italic titles, 11.5 pt publication details.
+- 6 primary core citations backing the literature review, safety standard, ROS 2 architecture, and AI vision.
+- Strict GCTU corporate color palette: Deep Navy (#002060), Gold (#B8860B), Charcoal (#1E293B), Muted Slate (#475569).
 """
 
 import os
@@ -17,7 +19,7 @@ from pptx.enum.text import PP_ALIGN
 
 PPTX_PATH = "write_up/Project Final Defense Slides_FINAL.pptx"
 
-def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=False, color_rgb=None, space_before_pt=0, space_after_pt=2, line_spacing=1.12, align=PP_ALIGN.LEFT):
+def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=False, color_rgb=None, space_before_pt=0, space_after_pt=2, line_spacing=1.14, align=PP_ALIGN.LEFT):
     p.text = text
     p.font.name = font_name
     p.font.size = Pt(size_pt)
@@ -33,7 +35,7 @@ def set_para(p, text, font_name="Calisto MT", size_pt=14, bold=False, italic=Fal
 def main():
     prs = pptx.Presentation(PPTX_PATH)
 
-    # If slide 16 doesn't exist, duplicate layout from slide 15 or add slide
+    # Ensure slide 16 exists
     if len(prs.slides) < 16:
         slide = prs.slides.add_slide(prs.slide_layouts[1])
     else:
@@ -41,9 +43,10 @@ def main():
 
     # Theme colors
     c_navy   = RGBColor(0, 32, 96)       # #002060 GCTU Deep Navy
+    c_dark   = RGBColor(30, 41, 59)      # #1E293B High-Contrast Charcoal
     c_body   = RGBColor(51, 65, 85)      # #334155 Slate Charcoal
     c_gold   = RGBColor(184, 134, 11)    # #B8860B Accent Gold
-    c_muted  = RGBColor(100, 116, 139)   # #64748B Muted Slate
+    c_muted  = RGBColor(71, 85, 105)     # #475569 Slate Muted
 
     # 1. Slide Title (Single Line Fit at 24 pt Bold Navy)
     for shape in slide.shapes:
@@ -75,21 +78,15 @@ def main():
     p_sub = tf_sub.paragraphs[0]
     set_para(p_sub, "PRIMARY PEER-REVIEWED LITERATURE, ROBOTICS BENCHMARKS & INTERNATIONAL STANDARDS", font_name="Calisto MT", size_pt=11, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 3. Two-Column Reference Grid (7 Key IEEE References)
-    # Left Column: In-text literature review papers and ISO standard
-    # Right Column: Architecture, Vision, and Autonomous Navigation
-    col_w = Inches(5.65)
-    col_h = Inches(4.90)
-    top_y = Inches(1.38)
+    # 3. Single Full-Width Reference Container (No Split Columns, High Projection Visibility)
+    # Full width: 11.63", Top: 1.40", Height: 5.10"
+    tx_box = slide.shapes.add_textbox(Inches(0.85), Inches(1.40), Inches(11.63), Inches(5.10))
+    tx_box.name = "Ref_FullWidth_Box"
+    tf = tx_box.text_frame
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Inches(0.02)
 
-    # Left Column Box
-    tx_col1 = slide.shapes.add_textbox(Inches(0.85), top_y, col_w, col_h)
-    tx_col1.name = "Ref_Col1"
-    tf1 = tx_col1.text_frame
-    tf1.word_wrap = True
-    tf1.margin_left = tf1.margin_right = tf1.margin_top = tf1.margin_bottom = Inches(0.02)
-
-    col1_refs = [
+    references = [
         ("[1]", "A. Tsitos, M. Dagioglou, and T. Giannakopoulos",
          "Real-Time Feasibility of a Human Intention Method Evaluated Through a Competitive Human-Robot Reaching Game",
          "IEEE Transactions on Human-Machine Systems, vol. 52, no. 5, pp. 912–922, Oct. 2022. DOI: 10.1109/THMS.2022.3179574."),
@@ -104,101 +101,58 @@ def main():
 
         ("[4]", "ISO/TS 15066:2016",
          "Robots and Robotic Devices — Collaborative Robots",
-         "International Organization for Standardization (ISO), Technical Specification, Geneva, Switzerland, 2016.")
-    ]
+         "International Organization for Standardization (ISO), Technical Specification, Geneva, Switzerland, 2016."),
 
-    for idx, (num, authors, title, publication) in enumerate(col1_refs):
-        p = tf1.paragraphs[0] if idx == 0 else tf1.add_paragraph()
-        p.space_after = Pt(12)
-        p.line_spacing = 1.12
-        p.alignment = PP_ALIGN.LEFT
-
-        r_num = p.add_run()
-        r_num.text = f"{num} "
-        r_num.font.name = "Calisto MT"
-        r_num.font.size = Pt(10)
-        r_num.font.bold = True
-        r_num.font.color.rgb = c_gold
-
-        r_auth = p.add_run()
-        r_auth.text = f"{authors}, "
-        r_auth.font.name = "Calisto MT"
-        r_auth.font.size = Pt(10)
-        r_auth.font.bold = True
-        r_auth.font.color.rgb = c_navy
-
-        r_title = p.add_run()
-        r_title.text = f'"{title}," '
-        r_title.font.name = "Calisto MT"
-        r_title.font.size = Pt(9.5)
-        r_title.font.italic = True
-        r_title.font.color.rgb = c_body
-
-        r_pub = p.add_run()
-        r_pub.text = publication
-        r_pub.font.name = "Calisto MT"
-        r_pub.font.size = Pt(9.5)
-        r_pub.font.bold = False
-        r_pub.font.color.rgb = c_muted
-
-    # Right Column Box
-    tx_col2 = slide.shapes.add_textbox(Inches(6.80), top_y, col_w, col_h)
-    tx_col2.name = "Ref_Col2"
-    tf2 = tx_col2.text_frame
-    tf2.word_wrap = True
-    tf2.margin_left = tf2.margin_right = tf2.margin_top = tf2.margin_bottom = Inches(0.02)
-
-    col2_refs = [
         ("[5]", "S. Macenski, T. Foote, B. Gerkey, C. Lalancette, and W. Woodall",
          "Robot Operating System 2: Design, Architecture, and Uses in the Wild",
          "Science Robotics, vol. 7, no. 66, Art. no. eabm6074, May 2022. DOI: 10.1126/scirobotics.abm6074."),
 
-        ("[6]", "F. Zhang, V. Bazarevsky, A. Vakunov, A. Tkachenka, G. Sung, C. L. Chang, and M. Grundmann",
+        ("[6]", "F. Zhang, V. Bazarevsky, A. Vakunov, A. Tkachenka, G. Sung, C.-L. Chang, and M. Grundmann",
          "MediaPipe Hands: On-Device Real-Time Hand Tracking",
-         "arXiv preprint arXiv:2006.10214, presented at CVPR Workshop on Computer Vision for AR/VR, 2020."),
-
-        ("[7]", "S. Macenski, I. Jambrecic, A. Filippov, and C. Stiffler",
-         "From the Ground Up: Building an Intelligent Mobile Robot with Nav2",
-         "IEEE Robotics & Automation Magazine, vol. 30, no. 4, pp. 88–98, Dec. 2023. DOI: 10.1109/MRA.2023.3323060.")
+         "arXiv preprint arXiv:2006.10214, presented at CVPR Workshop on Computer Vision for AR/VR, 2020.")
     ]
 
-    for idx, (num, authors, title, publication) in enumerate(col2_refs):
-        p = tf2.paragraphs[0] if idx == 0 else tf2.add_paragraph()
-        p.space_after = Pt(14)
-        p.line_spacing = 1.12
+    for idx, (num, authors, title, publication) in enumerate(references):
+        p = tf.paragraphs[0] if idx == 0 else tf.add_paragraph()
+        p.space_after = Pt(13)
+        p.line_spacing = 1.15
         p.alignment = PP_ALIGN.LEFT
 
+        # IEEE Citation Bracket [X]
         r_num = p.add_run()
         r_num.text = f"{num} "
         r_num.font.name = "Calisto MT"
-        r_num.font.size = Pt(10)
+        r_num.font.size = Pt(12.5)
         r_num.font.bold = True
         r_num.font.color.rgb = c_gold
 
+        # Authors
         r_auth = p.add_run()
         r_auth.text = f"{authors}, "
         r_auth.font.name = "Calisto MT"
-        r_auth.font.size = Pt(10)
+        r_auth.font.size = Pt(12)
         r_auth.font.bold = True
         r_auth.font.color.rgb = c_navy
 
+        # Paper Title in Quotes
         r_title = p.add_run()
         r_title.text = f'"{title}," '
         r_title.font.name = "Calisto MT"
-        r_title.font.size = Pt(9.5)
+        r_title.font.size = Pt(11.5)
         r_title.font.italic = True
-        r_title.font.color.rgb = c_body
+        r_title.font.color.rgb = c_dark
 
+        # Publication Venue & DOI
         r_pub = p.add_run()
         r_pub.text = publication
         r_pub.font.name = "Calisto MT"
-        r_pub.font.size = Pt(9.5)
+        r_pub.font.size = Pt(11)
         r_pub.font.bold = False
         r_pub.font.color.rgb = c_muted
 
     # Save upgraded presentation
     prs.save(PPTX_PATH)
-    print(f"Slide 16 (Key References in IEEE Format) successfully built and saved to {PPTX_PATH}!")
+    print(f"Slide 16 (Full-Width High-Visibility IEEE References) successfully built and saved to {PPTX_PATH}!")
 
 if __name__ == "__main__":
     main()
