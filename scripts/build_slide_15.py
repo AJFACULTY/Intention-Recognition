@@ -229,7 +229,7 @@ def main():
 
     recommendations = [
         ("Edge NPU Acceleration", "Add an M.2 Neural Processing Unit (Hailo-8) to run face recognition, hand gestures, and body tracking concurrently at 30 FPS."),
-        ("Dual-Mode Navigation", "Implement human-led mapping in unknown areas ('Follow-to-Map'), and autonomous semantic waypoint dispatch in mapped spaces."),
+        ("Social Navigation Costmaps", "Integrate human trajectory forecasts directly into Nav2 costmaps for proactive deceleration and smooth social yielding."),
         ("High-Speed PCIe NVMe Storage", "Equip the Pi 5 with an NVMe SSD to record full-rate video streams and sensor logs without SD card bottlenecks."),
         ("Multi-Sensor Redundancy", "Add ultrasonic sonar or depth cameras to detect transparent glass walls and low obstacles below the 2D LiDAR plane.")
     ]
