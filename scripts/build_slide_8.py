@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-build_slide_8.py — Formal Academic Slide 8 (End-to-End System Architecture)
-- 5-Tier Cognitive System Architecture + Reactive Hardware Safety Bypass.
+build_slide_8.py — Formal Academic Slide 8 (Software Architecture & Inter-Node Dataflow)
+- ROS 2 Humble Middleware & Inter-Process Topic Dataflow.
 - 2-Column Split:
-  * Left: Open Editorial structured breakdown of the 5 Cognitive Tiers + Safety Bypass (11.5 pt).
+  * Left: Open Editorial structured breakdown of the Software & Communication Pipeline (11 pt).
   * Right: Publication-grade system architecture diagram (system_architecture.png).
 - Un-grillable plain English, zero jargon traps.
 - Generous bottom clearance (>0.75" above footer bar).
@@ -57,7 +57,7 @@ def main():
             tf = shape.text_frame
             tf.clear()
             p = tf.paragraphs[0]
-            set_para(p, "06. SYSTEM ARCHITECTURE & COGNITIVE DATAFLOW", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
+            set_para(p, "06. SOFTWARE ARCHITECTURE & INTER-NODE DATAFLOW", font_name="Calisto MT", size_pt=24, bold=True, color_rgb=c_navy, align=PP_ALIGN.CENTER)
 
         if shape.name == "Content Placeholder 2" and shape.has_text_frame:
             shape.text_frame.clear()
@@ -75,9 +75,9 @@ def main():
     tf_sub.word_wrap = True
     tf_sub.margin_left = tf_sub.margin_right = tf_sub.margin_top = tf_sub.margin_bottom = 0
     p_sub = tf_sub.paragraphs[0]
-    set_para(p_sub, "5-TIER MODULAR PIPELINE FROM RAW SENSING TO AUTONOMOUS WHEEL ACTUATION", font_name="Calisto MT", size_pt=11, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
+    set_para(p_sub, "MODULAR ROS 2 HUMBLE MIDDLEWARE, TOPIC PIPELINES & HARDWARE BRIDGE", font_name="Calisto MT", size_pt=11, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 3. Left Column: Structured 5-Tier Breakdown + Safety Bypass (11.5 pt for High Legibility)
+    # 3. Left Column: Structured Software & Dataflow Breakdown (11 pt)
     # Left: 0.85", Top: 1.38", Width: 6.35", Height: 4.70"
     tx_left = slide.shapes.add_textbox(Inches(0.85), Inches(1.38), Inches(6.35), Inches(4.70))
     tx_left.name = "Arch_Tiers_Text"
@@ -85,18 +85,18 @@ def main():
     tf_left.word_wrap = True
     tf_left.margin_left = tf_left.margin_right = tf_left.margin_top = tf_left.margin_bottom = Inches(0.02)
 
-    tiers = [
-        ("Tier 1: Sensory Input", "Captures environmental data via 2MP wide-angle camera on 2-DOF gimbal, 360° planar LiDAR, and 6-axis IMU.", c_navy),
-        ("Tier 2: Target Isolation", "Centers on the active human operator in the field of view and tracks 21 hand joints in real time.", c_navy),
-        ("Tier 3: Neural Classifier", "Converts hand joints into 19 normalized geometric angles; classifies gestures in under 2 ms on the CPU.", c_navy),
-        ("Tier 4: Supervisory Control", "Filters accidental motions by confirming steady hand gestures; plans collision-free paths via Nav2.", c_navy),
-        ("Tier 5: Motor Actuation", "Dedicated ESP32-S3 co-processor receives driving commands over micro-ROS to control the 4 DC motors.", c_navy),
-        ("Reactive Safety Bypass", "Direct laser safety interlock: immediately overrides driving commands and halts the robot if an obstacle is within 0.36 m.", c_red)
+    software_pipeline = [
+        ("Middleware Core (ROS 2 Humble)", "Executes modular software nodes communicating over asynchronous publish/subscribe topics on dedicated Domain 20.", c_navy),
+        ("Sensory Streaming", "Camera and 2D LiDAR continuously stream uncompressed video (/camera/image_raw at 20 FPS) and laser scans (/scan at 12.5 Hz).", c_navy),
+        ("Neural Perception Node", "Consumes camera frames, extracts hand joint coordinates, and publishes discrete gesture tokens (/cognition/gesture).", c_navy),
+        ("Supervisory Control (brain_node)", "Filters accidental motions through multi-frame consensus and computes directional driving commands (/cmd_vel).", c_navy),
+        ("Real-Time Bridge (micro-ROS)", "Streams velocity setpoints across a high-speed 921,600 baud serial UART link to the ESP32-S3 motor co-processor.", c_navy),
+        ("Priority Multiplexer (twist_mux)", "Hardware safety monitor immediately preempts autonomous gestures and halts the robot if a LiDAR obstacle is within 0.36 m.", c_red)
     ]
 
-    for idx, (tag, desc, tag_color) in enumerate(tiers):
+    for idx, (tag, desc, tag_color) in enumerate(software_pipeline):
         p = tf_left.paragraphs[0] if idx == 0 else tf_left.add_paragraph()
-        p.space_after = Pt(8 if idx < len(tiers) - 1 else 0)
+        p.space_after = Pt(8 if idx < len(software_pipeline) - 1 else 0)
         p.line_spacing = 1.15
         p.alignment = PP_ALIGN.LEFT
 
@@ -134,7 +134,7 @@ def main():
         set_para(p_cap, "Figure 3.1: End-to-End Cognitive System Architecture & Safety Interlock", font_name="Calisto MT", size_pt=9.0, italic=True, color_rgb=c_muted, align=PP_ALIGN.CENTER)
 
     prs.save(PPTX_PATH)
-    print(f"Slide 8 (System Architecture) successfully updated in {PPTX_PATH}")
+    print(f"Slide 8 (Software Architecture & Dataflow) successfully updated in {PPTX_PATH}")
 
 if __name__ == "__main__":
     main()
