@@ -57,8 +57,8 @@ def main():
         "02. Literature Review & Critical Research Gaps",
         "03. System Architecture & 6-Phase Methodology",
         "04. Implementation & Intelligent Algorithms",
-        "05. Experimental Results & ISO Safety Compliance",
-        "06. Conclusion & Physical Demonstration Transition"
+        "05. Testing, Results & Safety Analysis",
+        "06. Conclusion, Limitations & Recommendations"
     ]
 
     txBox = slide.shapes.add_textbox(Inches(1.5), Inches(1.8), Inches(10.33), Inches(4.5))
