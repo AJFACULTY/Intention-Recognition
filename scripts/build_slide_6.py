@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-build_slide_6.py — Clean 2-Tone, Plain-English Slide 6 (Literature Review & Gaps)
+build_slide_6.py — 1-to-1 Paired Literature Review & Solutions Slide
 - Title: 04. LITERATURE REVIEW & RESEARCH GAPS
-- Palette: Restricted strictly to GCTU Deep Navy (#002060), Accent Gold (#B8860B), and Charcoal (#1E293B).
-- Zero traffic-light red/green coloring — calm, mature, and academic.
-- Plain English text: 100% understandable on the first read.
-- Grounded in Chapter 2 core benchmark literature (Tsitos et al., Mahmud et al., Li et al.).
+- Top Section: BENCHMARK RESEARCH GAPS IN LITERATURE
+  Col 1: Mahmud et al. (Cloud/GPU dependency)
+  Col 2: Tsitos et al. (Stationary arm without mobile base)
+  Col 3: Li et al. (Virtual simulation without physical robot)
+- Subtle Divider Rule.
+- Bottom Section: HOW OUR SYSTEM CLOSES THESE GAPS
+  Col 1: 01. All-Onboard Edge AI (Direct answer to Mahmud)
+  Col 2: 02. Direct Vision-to-Wheels (Direct answer to Tsitos)
+  Col 3: 03. Physical Deployment & Safety (Direct answer to Li)
+- Calm 2-tone palette: Navy, Gold, Charcoal. Zero traffic-light red/green.
 """
 
 import pptx
@@ -68,16 +74,16 @@ def main():
         el.getparent().remove(el)
 
     # 2. Top Section Label: Left-aligned Gold Eyebrow
-    # Left=1.00", Top=1.20", Width=4.50", Height=0.28"
-    tx_bench_lbl = slide.shapes.add_textbox(Inches(1.00), Inches(1.20), Inches(4.50), Inches(0.28))
+    # Left=1.00", Top=1.20", Width=5.50", Height=0.28"
+    tx_bench_lbl = slide.shapes.add_textbox(Inches(1.00), Inches(1.20), Inches(5.50), Inches(0.28))
     tx_bench_lbl.name = "Lit_Bench_Label"
     tf_lbl = tx_bench_lbl.text_frame
     tf_lbl.word_wrap = True
     tf_lbl.margin_left = tf_lbl.margin_right = tf_lbl.margin_top = tf_lbl.margin_bottom = 0
     p_lbl = tf_lbl.paragraphs[0]
-    set_para(p_lbl, "BENCHMARK LITERATURE EVALUATION", font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
+    set_para(p_lbl, "BENCHMARK RESEARCH GAPS IN LITERATURE", font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 3. Top Section: 3 Benchmark Studies (Plain English & Calm Colors)
+    # 3. Top Section: 3 Benchmark Studies (Vertically paired with solutions below)
     # 3 Columns: Lefts = 1.00", 4.90", 8.80", Width = 3.53", Top = 1.48", Height = 1.90"
     lefts = [Inches(1.00), Inches(4.90), Inches(8.80)]
     col_w = Inches(3.53)
@@ -86,22 +92,22 @@ def main():
 
     studies = [
         {
-            "author": "Tsitos et al. (2022)",
-            "focus": "Fast Reaching Intention (Robotic Arm)",
-            "strength": "Strength: Fast reaction time under 150 ms threshold.",
-            "limitation": "Limitation: Fixed on a desk — cannot drive on wheels or accept hand gestures."
-        },
-        {
             "author": "Mahmud et al. (2022)",
             "focus": "3D Deep Gesture Tracking",
-            "strength": "Strength: High accuracy across multi-class hand gestures.",
-            "limitation": "Limitation: Relies on cloud servers — suffers from network lag and Wi-Fi dropouts."
+            "method": "Kinect v2 3D skeleton + deep neural nets.",
+            "gap": "Cloud/GPU Dependency: Relies on offboard computing clusters; vulnerable to network lag & Wi-Fi drops."
+        },
+        {
+            "author": "Tsitos et al. (2022)",
+            "focus": "Fast Reaching Intention (Robotic Arm)",
+            "method": "Monocular depth camera + SVM on UR3 arm.",
+            "gap": "No Mobile Navigation: Confined to a static tabletop; cannot drive on wheels or accept gesture navigation."
         },
         {
             "author": "Li et al. (2023)",
             "focus": "Intention-Aware Navigation",
-            "strength": "Strength: Smart path planning around moving humans.",
-            "limitation": "Limitation: Computer simulation only — never tested on a real physical robot."
+            "method": "2D LiDAR + CNN in Isaac Sim simulator.",
+            "gap": "Simulation Only: Never verified on physical robot hardware; lacks touchless human gesture steering."
         }
     ]
 
@@ -120,41 +126,41 @@ def main():
         p_foc = tf.add_paragraph()
         set_para(p_foc, s["focus"], font_name="Calisto MT", size_pt=11, italic=True, color_rgb=c_muted, space_after_pt=4, align=PP_ALIGN.LEFT)
 
-        # Strength (Charcoal body, bold prefix)
-        p_str = tf.add_paragraph()
-        p_str.space_after = Pt(3)
-        p_str.line_spacing = 1.15
-        p_str.alignment = PP_ALIGN.LEFT
-        r_str_lbl = p_str.add_run()
-        r_str_lbl.text = "• Strength: "
-        r_str_lbl.font.name = "Calisto MT"
-        r_str_lbl.font.size = Pt(11.5)
-        r_str_lbl.font.bold = True
-        r_str_lbl.font.color.rgb = c_dark
-        r_str_txt = p_str.add_run()
-        r_str_txt.text = s["strength"].replace("Strength: ", "")
-        r_str_txt.font.name = "Calisto MT"
-        r_str_txt.font.size = Pt(11.5)
-        r_str_txt.font.bold = False
-        r_str_txt.font.color.rgb = c_body
+        # Method
+        p_met = tf.add_paragraph()
+        p_met.space_after = Pt(3)
+        p_met.line_spacing = 1.15
+        p_met.alignment = PP_ALIGN.LEFT
+        r_met_lbl = p_met.add_run()
+        r_met_lbl.text = "• Method: "
+        r_met_lbl.font.name = "Calisto MT"
+        r_met_lbl.font.size = Pt(11.5)
+        r_met_lbl.font.bold = True
+        r_met_lbl.font.color.rgb = c_dark
+        r_met_txt = p_met.add_run()
+        r_met_txt.text = s["method"]
+        r_met_txt.font.name = "Calisto MT"
+        r_met_txt.font.size = Pt(11.5)
+        r_met_txt.font.bold = False
+        r_met_txt.font.color.rgb = c_body
 
-        # Limitation (Charcoal body, bold prefix)
-        p_lim = tf.add_paragraph()
-        p_lim.space_after = Pt(0)
-        p_lim.line_spacing = 1.15
-        p_lim.alignment = PP_ALIGN.LEFT
-        r_lim_lbl = p_lim.add_run()
-        r_lim_lbl.text = "• Limitation: "
-        r_lim_lbl.font.name = "Calisto MT"
-        r_lim_lbl.font.size = Pt(11.5)
-        r_lim_lbl.font.bold = True
-        r_lim_lbl.font.color.rgb = c_dark
-        r_lim_txt = p_lim.add_run()
-        r_lim_txt.text = s["limitation"].replace("Limitation: ", "")
-        r_lim_txt.font.name = "Calisto MT"
-        r_lim_txt.font.size = Pt(11.5)
-        r_lim_txt.font.bold = False
-        r_lim_txt.font.color.rgb = c_body
+        # Research Gap
+        p_gap = tf.add_paragraph()
+        p_gap.space_after = Pt(0)
+        p_gap.line_spacing = 1.15
+        p_gap.alignment = PP_ALIGN.LEFT
+        r_gap_lbl = p_gap.add_run()
+        r_gap_lbl.text = "• Gap: "
+        r_gap_lbl.font.name = "Calisto MT"
+        r_gap_lbl.font.size = Pt(11.5)
+        r_gap_lbl.font.bold = True
+        r_gap_lbl.font.color.rgb = c_dark
+        r_gap_txt = p_gap.add_run()
+        r_gap_txt.text = s["gap"]
+        r_gap_txt.font.name = "Calisto MT"
+        r_gap_txt.font.size = Pt(11.5)
+        r_gap_txt.font.bold = False
+        r_gap_txt.font.color.rgb = c_body
 
     # 4. Subtle Horizontal Divider Rule
     # Y = 3.55", spanning from X=1.00" to X=12.33"
@@ -171,9 +177,9 @@ def main():
     tf_gap.word_wrap = True
     tf_gap.margin_left = tf_gap.margin_right = tf_gap.margin_top = tf_gap.margin_bottom = 0
     p_gap_hdr = tf_gap.paragraphs[0]
-    set_para(p_gap_hdr, "CRITICAL RESEARCH GAPS RESOLVED IN THIS WORK", font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
+    set_para(p_gap_hdr, "HOW OUR SYSTEM CLOSES THESE GAPS", font_name="Calisto MT", size_pt=12, bold=True, color_rgb=c_gold, align=PP_ALIGN.LEFT)
 
-    # 6. Bottom Section: 3 Research Gaps Addressed (Clean Plain English)
+    # 6. Bottom Section: 3 Vertically Paired Solutions
     # Top = 4.08", Height = 1.95", Bottom = 6.03" (clean 0.72" margin above footer)
     gap_top = Inches(4.08)
     gap_h = Inches(1.95)
@@ -182,17 +188,17 @@ def main():
         {
             "num": "01",
             "title": "All-Onboard Edge AI",
-            "desc": "All computer vision runs directly on the robot (Raspberry Pi 5) without cloud lag, internet dependency, or Wi-Fi dropouts."
+            "desc": "Executes 100% of vision AI directly on the robot (Raspberry Pi 5) with zero cloud lag, zero internet dependency, and zero Wi-Fi dropouts."
         },
         {
             "num": "02",
             "title": "Direct Vision-to-Wheels",
-            "desc": "Hand gestures directly guide the robot's physical wheel motors in real time through an active visual-tracking camera gimbal."
+            "desc": "Bridges hand gestures directly to physical wheel motors in real time through an active visual-tracking camera gimbal and ROS 2 middleware."
         },
         {
             "num": "03",
-            "title": "Dual-Modality & Safety",
-            "desc": "Unifies 6 deliberate hand gestures with continuous human tracking and automatic 360° LiDAR collision safety stops."
+            "title": "Physical Hardware & Safety",
+            "desc": "Empirically validated on a physical robot with 2D LiDAR SLAM, continuous human tracking, and automatic ISO 15066 safety stops."
         }
     ]
 
@@ -218,7 +224,7 @@ def main():
         set_para(p_desc, g["desc"], font_name="Calisto MT", size_pt=11.5, color_rgb=c_body, line_spacing=1.15, align=PP_ALIGN.LEFT)
 
     prs.save(PPTX_PATH)
-    print(f"Slide 6 rebuilt with clean 2-tone plain-English layout in {PPTX_PATH}")
+    print(f"Slide 6 rebuilt with 1-to-1 paired layout in {PPTX_PATH}")
 
 if __name__ == "__main__":
     main()
