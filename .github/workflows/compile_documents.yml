@@ -1,0 +1,74 @@
+name: Auto-Compile Documents and Live Release
+
+on:
+  push:
+    branches: [ main, master, thesis_ws_working ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Tectonic Compiler
+        uses: willemvds/setup-tectonic@v1
+        with:
+          version: latest
+
+      - name: Compile GCTU Final Thesis
+        run: |
+          cd write_up
+          tectonic -X compile thesis_final.tex
+          mv thesis_final.pdf ../thesis_final.pdf
+          cd ..
+
+      - name: Compile IEEE Conference Paper
+        run: |
+          if [ -f publications/conference_paper/conference_paper.tex ]; then
+            cd publications/conference_paper
+            tectonic -X compile conference_paper.tex
+            mv conference_paper.pdf ../../conference_paper.pdf
+            cd ../..
+          fi
+
+      - name: Compile IEEE Journal Manuscript
+        run: |
+          if [ -f publications/journal_paper/journal_paper.tex ]; then
+            cd publications/journal_paper
+            tectonic -X compile journal_paper.tex
+            mv journal_paper.pdf ../../journal_paper.pdf
+            cd ../..
+          fi
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-academic-documents
+          path: |
+            thesis_final.pdf
+            conference_paper.pdf
+            journal_paper.pdf
+
+      - name: Update Continuous Release for Co-Authors
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/thesis_ws_working'
+        with:
+          tag_name: latest
+          name: "Latest Continuous Build (Live PDFs)"
+          body: |
+            ### Automated Academic Document Build
+            This release is automatically updated on every Git commit.
+            Co-authors can download or view the latest compiled documents directly using the permanent links below:
+
+            - 📘 **GCTU Final Thesis:** [`thesis_final.pdf`](https://github.com/${{ github.repository }}/releases/download/latest/thesis_final.pdf)
+            - 📑 **IEEE Conference Paper (6 Pages):** [`conference_paper.pdf`](https://github.com/${{ github.repository }}/releases/download/latest/conference_paper.pdf)
+            - 🏛️ **IEEE Journal Manuscript:** [`journal_paper.pdf`](https://github.com/${{ github.repository }}/releases/download/latest/journal_paper.pdf)
+          files: |
+            thesis_final.pdf
+            conference_paper.pdf
+            journal_paper.pdf

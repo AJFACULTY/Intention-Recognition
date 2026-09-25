@@ -17,6 +17,7 @@ photo_*.jpg
 *.mcap
 *.db3
 *.bag
+*.zip
 
 # ==========================================
 # ROS2 & Colcon Build Artifacts

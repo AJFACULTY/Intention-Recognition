@@ -127,18 +127,31 @@
   - Record structured empirical test trials into standard `.csv` files (`experiment_logs/trial_data.csv`).
   - Fields logged: `trial_id`, `timestamp`, `participant`, `distance_m`, `lighting`, `ground_truth`, `predicted`, `is_correct`, `confidence`, `consensus_votes`, `e2e_latency_ms`, `linear_cmd`, `angular_cmd`, `min_lidar_m`, `safety_status`.
 
-### [ ] 2. Comprehensive Bibliography & References Overhaul
-- [ ] **Investigate Overleaf Citation Visibility:**
-  - Identify why only two references were appearing in the compiled Overleaf bibliography (ensure BibTeX/biber correctly resolves all keys and citations are called via `\cite{}` rather than plaintext).
-- [ ] **Expand `references.bib`:**
-  - Broaden the bibliography beyond the initial set to include 25+ high-impact peer-reviewed journal and conference publications spanning:
-    - Edge Deep Learning & Real-Time Computer Vision (YOLO, MediaPipe, MobileNet, ONNX).
+### [x] 2. Comprehensive Bibliography & References Overhaul (COMPLETED)
+- [x] **Investigate Overleaf Citation Visibility:**
+  - Resolved BibTeX/Tectonic citation resolution; all 30 citations are formally invoked via `\cite{}` with numeric IEEE format.
+- [x] **Expand `references.bib`:**
+  - Broadened the bibliography to 30 high-impact peer-reviewed IEEE and robotics publications spanning:
+    - Edge Deep Learning & Real-Time Computer Vision (YOLOv8, MediaPipe, MobileNet, ONNX).
     - ROS 2 Architecture, DDS Middleware, and Real-Time Robot Operating Systems.
     - Human-Robot Interaction (HRI), Touchless Gesture Interfaces, and Ergonomic Cobots.
     - 2D LiDAR SLAM, Cartographer, Ceres Scan-Matching, and Nav2 Costmaps.
     - Safety Standards: ISO 15066:2016, ISO 12100:2010, ROS REP-103/105.
-- [ ] **Enrich In-Text Citations Across Chapters 1–5:**
-  - Strategically embed citations throughout Chapters 1, 2, 3, 4, and 5 to demonstrate deep scholarship and contextual grounding.
+- [x] **Enrich In-Text Citations Across Chapters 1–5:**
+  - Embedded citations throughout Chapters 1, 2, 3, 4, and 5 to demonstrate deep scholarship and contextual grounding.
+
+### [x] 5. Academic Publications Suite — Dual-Track IEEE Manuscripts (COMPLETED)
+- [x] **Dual-Track Architecture (`publications/`):**
+  - Established `publications/conference_paper/` (6-page `\documentclass[conference]{IEEEtran}`) targeting IEEE ICRA, IROS, RO-MAN, or AFRICON.
+  - Established `publications/journal_paper/` (10–12 page `\documentclass[journal]{IEEEtran}`) targeting *IEEE Transactions on Human-Machine Systems* or *IEEE Robotics and Automation Letters (RA-L)*.
+  - Authored standalone builders: `build_conference_paper.sh`, `build_journal_paper.sh`, and `build_all_papers.sh`.
+  - Both manuscripts compile cleanly via Tectonic in under 10 seconds.
+- [x] **Zero-Presentation Solution for Student Authors:**
+  - Formally articulated the journal submission route (100% online written peer review with zero travel/presentation requirements) alongside conference co-author proxy presentation options.
+- [x] **Automated Continuous Co-Author Sharing & Zero-Plagiarism Framework:**
+  - Built GitHub Actions CI/CD workflow (`.github/workflows/compile_documents.yml`) providing permanent, automated release download links on every git push without Overleaf subscription limits.
+  - Established local cloud sync script (`scripts/sync_to_cloud.sh`) for shared Google Drive/Dropbox folders.
+  - Formulated Turnitin pre-check filter parameters (exclude bibliography, exclude $<10$ word matches) and formal thesis self-citation footnote disclosure.
 
 ### [x] 3. Statistical Analysis of Logged Data (.csv)
 - [x] **Statistical Processing Script (`scripts/analyze_trial_data.py`):**
