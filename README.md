@@ -1,157 +1,210 @@
 # Autonomous Mobile Robot Cognition System
-## Human Intention Recognition Using Motion and Hand Gesture
+### Human Intention Recognition Using Motion and Hand Gesture
 
 [![ROS 2](https://img.shields.io/badge/ROS_2-Humble-22314E.svg)](https://docs.ros.org/en/humble/)
-[![Platform](https://img.shields.io/badge/Hardware-Raspberry%20Pi%205%20(8GB)-C51A4A.svg)](https://www.raspberrypi.com/)
-[![Micro-ROS](https://img.shields.io/badge/Micro--ROS-ESP32--S3-E7352C.svg)](https://micro.ros.org/)
-[![Safety](https://img.shields.io/badge/Compliance-ISO%2015066%3A2016-blue.svg)](https://www.iso.org/standard/69263.html)
+[![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205%20(8GB)-C51A4A.svg)](https://www.raspberrypi.com/)
+[![Safety](https://img.shields.io/badge/Compliance-ISO%2015066%3A2016-0057B8.svg)](https://www.iso.org/standard/69263.html)
+[![Accuracy](https://img.shields.io/badge/Gesture%20Accuracy-99.38%25-brightgreen.svg)]()
+[![Latency](https://img.shields.io/badge/End--to--End%20Latency-132%20ms-orange.svg)]()
 
 ---
 
-## 1. Executive Summary
+## Overview
 
-This repository contains the complete robotics codebase, edge AI perception stack, simulation environments, academic write-up, and oral defense artifacts for the undergraduate engineering thesis:
+This repository contains the complete source code, trained models, configuration files, empirical test data, and academic write-up for an undergraduate engineering thesis project at the **Ghana Communication Technology University (GCTU)**.
 
-* **Title:** Development and Implementation of a Robotic Application for Human Intention Recognition Using Motion and Hand Gesture
-* **Institution:** Ghana Communication Technology University (GCTU), Faculty of Engineering, Department of Computer Engineering
-* **Authors:** Eleana & Joel
-* **Supervisor:** Mr. Michael Xenya
+The system implements a **real-time human intention recognition pipeline** on a physical mobile robot, enabling a person to control the robot entirely through hand gestures — with no physical contact, wearable devices, or cloud connectivity required.
 
----
-
-## 2. Hardware Architecture & Testbed
-
-The system operates across a dual-tier distributed compute topology:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Physical Mobile Robot Platform                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  [Raspberry Pi 5 (8GB RAM)]  ─── High-Level Cognition & Perception          │
-│    • Ubuntu 22.04 LTS + ROS 2 Humble                                        │
-│    • MediaPipe Hand Landmark Extractor (21 3D Landmarks)                    │
-│    • 19-D Position-Invariant Geometric MLP Gesture Classifier (99.38% Acc)  │
-│    • Supervisory Brain Finite State Machine (FSM) Node                      │
-│    • Active Vision 2-DOF Gimbal Pan/Tilt Servoing Node                      │
-│    • twist_mux Velocity Priority Arbitrator & Emergency Brake Preemption    │
-│    • Nav2 Navigation Stack & SLAM Toolbox                                   │
-├───────────────────────────────────┬─────────────────────────────────────────┤
-│          Hardware UART Bus        │             USB 2.0 / 3.0 Bus           │
-│         (/dev/ttyAMA0 @ 115.2k)   │                                         │
-▼                                   ▼                                         ▼
-[Yahboom micro-ROS ESP32-S3]     [MS200 2D ToF LiDAR]             [2-DOF Gimbal + USB Cam]
- • 4-Wheel Differential Drive     • 12.5 Hz Scan Rate              • Pan (-90° to +90°)
- • Real-time Closed-Loop PID      • 12 m Detection Range           • Tilt (-45° to +45°)
- • Odometry Publisher             • ISO 15066 <0.36m Safety Bubble • 640×480 @ 20 FPS Stream
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+> **Authors:** Eleana & Joel  
+> **Supervisor:** Mr. Michael Xenya  
+> **Institution:** GCTU, Faculty of Engineering — Department of Computer Engineering
 
 ---
 
-## 3. Directory Layout
+## Key Capabilities
 
-The workspace is organized into modular engineering domains:
+| Feature | Detail |
+|---|---|
+| 🤚 **Gesture Recognition** | 6 gestures (`STOP`, `GO`, `FOLLOW`, `LEFT`, `RIGHT`, `BACK`) using a 19-D geometric MLP |
+| 🎯 **Position-Invariant** | Scale-invariant features work at 1.0 m, 1.75 m, and 2.5 m operator distances |
+| 👁️ **Active Vision** | 2-DOF pan/tilt camera gimbal with closed-loop visual servoing |
+| 🧠 **Supervisory Brain FSM** | 5-frame rolling consensus + 3.0 s command lock + emergency LiDAR preemption |
+| 🗺️ **Autonomous Navigation** | Nav2 stack with SLAM Toolbox; multi-waypoint room patrol (15.89 m, 100% success) |
+| 🔒 **Safety Compliance** | ISO 15066:2016 — reactive obstacle stop within 0.36 m at all times |
+| ⚡ **Edge-Only Inference** | Runs fully on Raspberry Pi 5 (8 GB) — no GPU, no cloud |
+
+---
+
+## Hardware Architecture
 
 ```
-ros2_cognition_ws/
-├── README.md                      # Canonical project documentation (this file)
-├── OPERATOR_COMMAND_MANUAL.md     # Turnkey field commands and cheat-sheet for robot operators
-├── PROJECT_EXPLAINER_AND_DEFENSE_HANDBOOK.md # Deep-dive Q&A handbook for academic defense
-│
-├── src_nodes/                     # Production ROS 2 Python nodes (Active perception & brain)
-│   ├── active_vision_node.py      # Closed-loop 2-DOF camera gimbal visual servoing
-│   ├── brain_node.py              # Central supervisory FSM (gesture command arbitration)
-│   ├── camera_pub.py              # Throttled 20 Hz low-latency camera publisher
-│   ├── face_recognition_node.py   # InsightFace ArcFace biometric authentication
-│   ├── gesture_node.py            # Real-time 19-D geometric invariant feature extraction & MLP
-│   ├── hand_features.py           # Shared 19-D geometric vector feature extractor
-│   ├── person_detection_node.py   # YOLOv8-based spatial person localization
-│   ├── safety_audio_node.py       # Acoustic safety horn (/beep) and state transition chimes
-│   └── odom_imu_republisher.py    # Odometry & IMU message republisher
-│
-├── launch/                        # ROS 2 launch orchestrations
-│   ├── cognition_autonomy.launch.py # Full autonomy stack bringup
-│   ├── demo_system.launch.py        # Complete live demonstration orchestration
-│   ├── master_robot.launch.py       # Master system launch on physical robot
-│   ├── nav2.launch.py               # Nav2 navigation stack launcher
-│   ├── slam_real.launch.py          # Real-time SLAM Toolbox bringup
-│   └── twist_mux.yaml               # Safety velocity multiplexer priority rules
-│
-├── config/                        # Configuration parameters
-│   └── nav2_params.yaml           # Nav2 planner, controller, and costmap configurations
-│
-├── ml_models/                     # Machine learning pipelines & trained weights
-│   ├── datasets/                  # Gesture & trajectory training CSVs
-│   ├── training/                  # Model training, feature engineering, and evaluation scripts
-│   └── weights/                   # Production models (gesture_model_features.pkl, ONNX)
-│
-├── scripts/                       # Operational, deployment, and diagnostic utilities
-│   ├── menu.sh                    # Turnkey visual menu launcher (Workstation & Robot)
-│   ├── master_demo_menu.py        # Interactive CLI operations dashboard
-│   ├── sync_to_bot.sh             # One-click SSH/SCP deployment to physical Raspberry Pi 5
-│   ├── bench_autonomy_monitor.py  # Real-time terminal telemetry monitor
-│   ├── mission_manager.py         # Autonomous multi-waypoint patrol dispatcher
-│   ├── web_map_visualizer.py      # Real-time browser-based map & robot trajectory visualizer
-│   └── diagnostics/               # Diagnostic shell scripts and sensor profilers
-│
-├── tests/                         # Master automated test and verification suite
-│   ├── test_active_vision_logic.py # Gimbal control law and search state machine tests
-│   ├── test_brain_logic.py        # Supervisory brain state transitions and command lock tests
-│   ├── test_gesture_mlp.py        # 19-D feature extraction and classification tests
-│   ├── test_perception_throttling.py # Camera throttling and FPS stability tests
-│   ├── test_safety_audio.py       # Acoustic horn generation and audio topic tests
-│   └── verify_writeup.py          # Academic LaTeX formatting compliance linter
-│
-├── write_up/                      # Academic thesis and oral defense package
-│   ├── main.tex                   # Master LaTeX document (GCTU handbook compliant)
-│   ├── chapters/                  # Chapters 1 through 5 (TeX sources)
-│   ├── figures/                   # High-resolution architectural schematics & empirical plots
-│   ├── references.bib             # IEEE-formatted bibliography
-│   └── Project Final Defense Slides_FINAL.pptx # Authoritative defense presentation deck
-│
-├── experiment_logs/               # Empirical trial CSV datasets from physical robot tests
-├── maps/                          # Metric occupancy grid maps (YAML + PNG)
-├── cognition_dashboard/           # Lightweight web-based status and control dashboard
-└── publications/                  # IEEE dual-track conference & journal manuscripts
+┌─────────────────────────────────────────────────────────────────┐
+│                    Physical Robot Platform                       │
+├─────────────────────────────────────────────────────────────────┤
+│  Raspberry Pi 5 (8 GB RAM) — Ubuntu 22.04 + ROS 2 Humble        │
+│  ├── MediaPipe Hand Landmark Extractor (21 3D landmarks)         │
+│  ├── 19-D Geometric Invariant MLP Gesture Classifier (99.38%)   │
+│  ├── Supervisory Brain FSM Node (command arbitration)            │
+│  ├── Active Vision 2-DOF Gimbal Servoing Node                    │
+│  ├── twist_mux Velocity Priority Arbitrator                      │
+│  └── Nav2 Navigation Stack + SLAM Toolbox                        │
+├────────────────────┬────────────────────────────────────────────┤
+│  UART /dev/ttyAMA0 │  USB Bus                                    │
+▼                    ▼                                             ▼
+Yahboom ESP32-S3    MS200 2D ToF LiDAR          2-DOF Gimbal + USB Cam
+(Differential Drive) (12.5 Hz, 12 m range)     (640×480 @ 20 FPS)
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Quickstart Guide
+## Repository Structure
 
-### 4.1. Turnkey Operational Menu
-To interact with the robot, run health diagnostics, or start autonomous missions:
-```bash
-./scripts/menu.sh
 ```
-* Automatically detects whether the physical robot is reachable on the local network (`10.27.122.136` / `10.27.122.135`).
-* If reachable, allows 1-click SSH connection straight into the live interactive robot dashboard.
-* If offline, launches local workstation simulation and diagnostic mode.
-
-### 4.2. Run Master Automated Verification Suite
-Verify all core modules (Perception, Gimbal, MLP, Brain, Safety Audio, and LiDAR Preemption):
-```bash
-python3 scripts/run_all_local_verifications.py
+Intention-Recognition/
+│
+├── src_nodes/                  # Core ROS 2 perception and brain nodes
+│   ├── gesture_node.py         # 19-D MLP gesture classifier (primary)
+│   ├── hand_features.py        # Geometric invariant feature extractor
+│   ├── brain_node.py           # Supervisory FSM — command arbitration
+│   ├── active_vision_node.py   # 2-DOF gimbal closed-loop visual servoing
+│   ├── person_detection_node.py# YOLOv8 + LSTM trajectory prediction
+│   ├── camera_pub.py           # 20 Hz throttled camera publisher
+│   ├── face_recognition_node.py# ArcFace biometric authentication
+│   ├── safety_audio_node.py    # Acoustic safety horn node
+│   └── odom_imu_republisher.py # Odometry republisher
+│
+├── launch/                     # ROS 2 launch orchestrations
+│   ├── master_robot.launch.py  # Full system bringup (recommended)
+│   ├── cognition_autonomy.launch.py
+│   ├── demo_system.launch.py
+│   ├── nav2.launch.py
+│   ├── slam_real.launch.py
+│   ├── follow_to_map.launch.py
+│   └── twist_mux.yaml
+│
+├── config/
+│   └── nav2_params.yaml        # Nav2 planner, controller, and costmap config
+│
+├── ml_models/
+│   ├── datasets/               # Training CSVs (gesture + trajectory)
+│   ├── training/               # Training and evaluation scripts
+│   └── weights/                # Production ONNX + pickle model files
+│       ├── gesture_model_features.pkl   # Primary 19-D MLP
+│       ├── gesture_model.onnx           # Portable ONNX format
+│       ├── scaler_features.pkl
+│       ├── label_encoder_features.pkl
+│       ├── path_predictor.onnx          # LSTM trajectory predictor
+│       ├── path_predictor.onnx.data
+│       └── path_predictor_config.pkl
+│
+├── maps/                       # SLAM occupancy grid maps (YAML + PNG)
+│
+├── scripts/                    # Operational and deployment scripts
+│   ├── sync_to_bot.sh          # One-click deploy to robot (SSH + Docker)
+│   ├── start_bench_pipeline.sh # Launch full autonomy stack on robot
+│   ├── menu.sh                 # Interactive launcher menu
+│   ├── master_demo_menu.py     # CLI operations dashboard
+│   ├── bench_autonomy_monitor.py # Real-time terminal HUD
+│   ├── mission_manager.py      # Multi-waypoint patrol dispatcher
+│   ├── navigate_waypoints.py   # Nav2 waypoint navigation client
+│   ├── web_map_visualizer.py   # Browser-based live map viewer
+│   ├── run_nav2_patrol.sh      # Autonomous patrol runner
+│   ├── experiment_logger.py    # Live ROS 2 trial data recorder
+│   ├── analyze_trial_data.py   # Statistical analysis of trial CSVs
+│   ├── plot_multi_waypoint_trajectory.py
+│   ├── run_all_local_verifications.py
+│   ├── system_preflight_diagnostics.py
+│   └── diagnostics/            # Sensor and SLAM health check scripts
+│
+├── tests/                      # Automated unit and integration test suite
+│   ├── test_gesture_mlp.py
+│   ├── test_brain_logic.py
+│   ├── test_active_vision_logic.py
+│   ├── test_perception_throttling.py
+│   ├── test_safety_audio.py
+│   ├── test_safety_reactive_reverse.py
+│   ├── test_face_recognition.py
+│   └── verify_writeup.py
+│
+├── write_up/                   # Undergraduate thesis (LaTeX source)
+│   ├── main.tex                # Master document
+│   ├── chapters/               # ch1 – ch5 (TeX source files)
+│   ├── figures/                # All publication figures (PNG/JPG)
+│   └── references.bib          # IEEE-formatted bibliography (30 works)
+│
+├── publications/               # IEEE dual-track manuscripts
+│   ├── conference_paper/       # 6-page IEEEtran conference format
+│   └── journal_paper/          # 10-page IEEEtran journal format
+│
+├── experiment_logs/
+│   └── trial_data.csv          # Empirical trial data (180 physical trials)
+│
+├── docs/                       # Technical reference documents
+│   ├── ROBOT_OPERATIONS_MANUAL_AND_USER_GUIDE.md
+│   ├── ACTIVE_VISION_GIMBAL_AND_FACE_RECOGNITION_SPEC.md
+│   └── *.png                   # Empirical navigation trajectory plots
+│
+├── assets/                     # Demo media
+├── cognition_dashboard/        # Web-based robot status dashboard
+├── OPERATOR_COMMAND_MANUAL.md  # Quick-reference command cheat sheet
+└── .gitignore
 ```
 
-### 4.3. One-Click Synchronization to Physical Robot
-To synchronize verified nodes, models, and configs to the Raspberry Pi 5 (`yahboom_gesture` container):
+---
+
+## Quickstart
+
+### 1. Deploy to Physical Robot
+Synchronize all nodes, models, and configs into the running Docker container on the Raspberry Pi 5:
 ```bash
 ./scripts/sync_to_bot.sh
 ```
 
-### 4.4. Verify Thesis LaTeX Formatting
-Validate that all body paragraphs satisfy GCTU formatting standards (minimum 3 sentences, zero indentation, no commercial brand names):
+### 2. Launch Full Autonomy Stack (on robot)
 ```bash
-python3 tests/verify_writeup.py
+bash ~/start_bench_pipeline.sh
+```
+
+### 3. Run Automated Test Suite (on workstation)
+```bash
+python3 scripts/run_all_local_verifications.py
+```
+Expected output: **5/5 PASS** — Perception, Gimbal, MLP, Brain, Safety Audio.
+
+### 4. Multi-Waypoint Autonomous Patrol
+```bash
+bash scripts/run_nav2_patrol.sh
+python3 scripts/navigate_waypoints.py
+```
+
+### 5. Compile Thesis (requires [Tectonic](https://tectonic-typesetting.github.io/))
+```bash
+cd write_up && tectonic main.tex
 ```
 
 ---
 
-## 5. Engineering Standards Compliance
+## Results Summary
 
-The system is rigorously engineered to comply with international robotics and software standards:
-* **ISO 15066:2016 (Collaborative Robots):** Strict power, force, and speed limiting; dynamic speed reduction in transient contact zones; immediate preemption and emergency reverse within 0.36 m obstacle proximity.
-* **ISO 12100:2010 (Safety of Machinery):** Risk assessment and layered redundancy (hardware multiplexer `twist_mux` priority over software commands).
-* **ROS REP-103 & REP-105:** Standard coordinate frames (`base_link`, `odom`, `map`, `laser`), SI units (m/s, rad/s), and right-hand orientation conventions.
-* **OMG DDS v1.4 QoS:** Transient local durability for metric occupancy maps, Best-Effort QoS for high-rate LiDAR scans (`/scan`), and Reliable QoS for safety control topics.
+| Metric | Result |
+|---|---|
+| MLP Test Accuracy (6-class) | **99.38%** |
+| Physical Trial Accuracy (180 trials) | **96.67%** |
+| End-to-End Pipeline Latency | **132 ms** (Camera → Motor) |
+| Multi-Waypoint Patrol Distance | **15.89 m**, 100% legs completed |
+| Cross-Track Error (MAE) | **15.5 cm** |
+| Emergency Stop Distance | **< 0.36 m** (ISO 15066 compliant) |
+| CPU Utilization (4 cores) | **311%** — no thermal throttling |
+
+---
+
+## Engineering Standards Compliance
+
+| Standard | Application |
+|---|---|
+| **ISO 15066:2016** | Collaborative robot safety — reactive stop within 0.36 m |
+| **ISO 12100:2010** | Risk mitigation — hardware `twist_mux` priority over software |
+| **ROS REP-103** | SI units (m/s, rad/s), right-hand coordinate frames |
+| **ROS REP-105** | Standard TF frames: `base_link`, `odom`, `map`, `laser` |
+| **OMG DDS v1.4** | QoS profiles — Reliable for safety topics, Best-Effort for `/scan` |
