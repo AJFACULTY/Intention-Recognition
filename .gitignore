@@ -6,7 +6,7 @@ AGENTS.md
 GEMINI.md
 .agents/
 .vscode/
-# Internal planning & milestone tracker
+# Internal planning & milestone trackers
 MASTER_WRITEUP_ROADMAP.md
 CRASH_PREVENTION_AND_RECOVERY_GUIDE.md
 # Private chat sessions & implementation decisions
@@ -15,6 +15,67 @@ project_history/
 .github/workflows/
 # Raw bench test photos
 test_pics/
+
+# ==========================================
+# write_up/ — Internal dev & academic working files
+# ==========================================
+write_up/generate_*.py
+write_up/TODO_AND_ROADMAP.md
+write_up/ORAL_DEFENSE_*.md
+write_up/PRESENTATION_AUDIT*.md
+write_up/SYSTEM_OPERATIONAL*.md
+write_up/GLOSSARY*.md
+write_up/Template*.pptx
+write_up/thesis_overleaf.zip
+write_up/thesis_final.pdf
+write_up/Project\ Final\ Defense\ Slides_FINAL.pdf
+write_up/Project\ Final\ Defense\ Slides_FINAL.pptx
+write_up/PROJECT\ HANDBOOK*.pdf
+write_up/front_matter/
+write_up/overleaf_ready/
+write_up/presentations_archive/
+write_up/.~lock.*
+
+# ==========================================
+# scripts/ — Internal dev & one-off tooling scripts
+# ==========================================
+scripts/slides/
+scripts/pipeline/
+scripts/export_chat_history.py
+scripts/export_overleaf_zip.py
+scripts/notify_milestone.sh
+scripts/generate_*.py
+scripts/build_pdf.sh
+scripts/sync_to_cloud.sh
+scripts/qualify_hardware_dominos.py
+scripts/simulate_visual_servoing.py
+scripts/probe_gimbal_limits.py
+scripts/capture_spatial_zone_snapshot.py
+scripts/record_map_video.py
+scripts/gimbal_video_demo.py
+scripts/smooth_servo_move.py
+scripts/mock_navigation_simulator.py
+scripts/audit_robot_filesystem.py
+scripts/record_autonomy_bag.sh
+scripts/diagnose_autonomy_bench.sh
+
+# ==========================================
+# docs/ — Internal history, chat logs, audits
+# ==========================================
+docs/SESSION_PROMPTS*.md
+docs/CHRONOLOGICAL_HISTORY*.md
+docs/HISTORICAL_ERROR*.md
+docs/MASTER_AUDIT*.md
+docs/MASTER_COMPLETION*.md
+docs/DEV_MACHINE*.md
+docs/bot_full_audit.txt
+docs_and_figures/
+
+# ==========================================
+# ml_models/ — Redundant/legacy weight files
+# ==========================================
+ml_models/weights/gesture_model.pkl
+ml_models/weights/label_encoder.pkl
 
 # ==========================================
 # Large Artifacts & Backups (Prevent Git Bloat)
