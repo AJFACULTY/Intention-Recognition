@@ -9,6 +9,7 @@ GEMINI.md
 # Internal planning & milestone trackers
 MASTER_WRITEUP_ROADMAP.md
 CRASH_PREVENTION_AND_RECOVERY_GUIDE.md
+PROJECT_EXPLAINER_AND_DEFENSE_HANDBOOK.md
 # Private chat sessions & implementation decisions
 project_history/
 # CI/CD workflow (requires special PAT scope — manage separately)
