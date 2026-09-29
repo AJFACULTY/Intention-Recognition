@@ -14,8 +14,8 @@ This repository contains the complete robotics codebase, edge AI perception stac
 
 * **Title:** Development and Implementation of a Robotic Application for Human Intention Recognition Using Motion and Hand Gesture
 * **Institution:** Ghana Communication Technology University (GCTU), Faculty of Engineering, Department of Computer Engineering
-* **Authors:** Eleana Osei Owusu (Index: `4121230024`), Joel Nii Adjetey Ahulu (Index: `4121230020`)
-* **Supervisor:** Mr. Micheal Xenya
+* **Authors:** Eleana & Joel
+* **Supervisor:** Mr. Michael Xenya
 
 ---
 
@@ -55,11 +55,8 @@ The workspace is organized into modular engineering domains:
 ```
 ros2_cognition_ws/
 ├── README.md                      # Canonical project documentation (this file)
-├── AGENTS.md                      # Mandatory AI agent operating rules & turn safety budgets
-├── MASTER_WRITEUP_ROADMAP.md      # Symlink to active roadmap (write_up/TODO_AND_ROADMAP.md)
 ├── OPERATOR_COMMAND_MANUAL.md     # Turnkey field commands and cheat-sheet for robot operators
 ├── PROJECT_EXPLAINER_AND_DEFENSE_HANDBOOK.md # Deep-dive Q&A handbook for academic defense
-├── CRASH_PREVENTION_AND_RECOVERY_GUIDE.md   # System recovery and environment stability guide
 │
 ├── src_nodes/                     # Production ROS 2 Python nodes (Active perception & brain)
 │   ├── active_vision_node.py      # Closed-loop 2-DOF camera gimbal visual servoing
@@ -86,7 +83,7 @@ ros2_cognition_ws/
 ├── ml_models/                     # Machine learning pipelines & trained weights
 │   ├── datasets/                  # Gesture & trajectory training CSVs
 │   ├── training/                  # Model training, feature engineering, and evaluation scripts
-│   └── weights/                   # Production models (gesture_model_features.pkl, yolov8n.pt, ONNX)
+│   └── weights/                   # Production models (gesture_model_features.pkl, ONNX)
 │
 ├── scripts/                       # Operational, deployment, and diagnostic utilities
 │   ├── menu.sh                    # Turnkey visual menu launcher (Workstation & Robot)
@@ -95,18 +92,14 @@ ros2_cognition_ws/
 │   ├── bench_autonomy_monitor.py  # Real-time terminal telemetry monitor
 │   ├── mission_manager.py         # Autonomous multi-waypoint patrol dispatcher
 │   ├── web_map_visualizer.py      # Real-time browser-based map & robot trajectory visualizer
-│   ├── slides/                    # Python-pptx individual slide generation scripts
 │   └── diagnostics/               # Diagnostic shell scripts and sensor profilers
 │
 ├── tests/                         # Master automated test and verification suite
-│   ├── README.md                  # Test suite inventory and execution guide
 │   ├── test_active_vision_logic.py # Gimbal control law and search state machine tests
 │   ├── test_brain_logic.py        # Supervisory brain state transitions and command lock tests
-│   ├── test_face_recognition.py   # ArcFace embedding extraction & matching tests
 │   ├── test_gesture_mlp.py        # 19-D feature extraction and classification tests
 │   ├── test_perception_throttling.py # Camera throttling and FPS stability tests
 │   ├── test_safety_audio.py       # Acoustic horn generation and audio topic tests
-│   ├── test_safety_reactive_reverse.py # LiDAR safety zone preemption (<0.36m) tests
 │   └── verify_writeup.py          # Academic LaTeX formatting compliance linter
 │
 ├── write_up/                      # Academic thesis and oral defense package
@@ -114,20 +107,12 @@ ros2_cognition_ws/
 │   ├── chapters/                  # Chapters 1 through 5 (TeX sources)
 │   ├── figures/                   # High-resolution architectural schematics & empirical plots
 │   ├── references.bib             # IEEE-formatted bibliography
-│   ├── TODO_AND_ROADMAP.md        # Chapter-by-chapter completion checklist
 │   └── Project Final Defense Slides_FINAL.pptx # Authoritative defense presentation deck
 │
-├── project_history/               # Canonical historical persistence (Never lose a decision)
-│   ├── chat_sessions/             # Chronological transcripts of engineering sessions
-│   ├── implementation_plans/      # Architectural designs and engineering plans
-│   ├── walkthroughs/              # Verified test benchmarks and hardware bringup notes
-│   ├── robot_audits/              # Physical robot filesystem audits and sensor dumps
-│   └── technical_evolution/       # Error catalogs, historical retrospectives, and legacy nodes
-│
+├── experiment_logs/               # Empirical trial CSV datasets from physical robot tests
 ├── maps/                          # Metric occupancy grid maps (YAML + PNG)
-├── bags/                          # Empirical physical robot test datasets (rosbag2)
 ├── cognition_dashboard/           # Lightweight web-based status and control dashboard
-└── archives/                      # Cold backups and legacy compressed releases
+└── publications/                  # IEEE dual-track conference & journal manuscripts
 ```
 
 ---

@@ -1,4 +1,22 @@
 # ==========================================
+# Private & Internal Files (Never Push to Remote)
+# ==========================================
+# Agent / IDE operating rules
+AGENTS.md
+GEMINI.md
+.agents/
+.vscode/
+# Internal planning & milestone tracker
+MASTER_WRITEUP_ROADMAP.md
+CRASH_PREVENTION_AND_RECOVERY_GUIDE.md
+# Private chat sessions & implementation decisions
+project_history/
+# CI/CD workflow (requires special PAT scope — manage separately)
+.github/workflows/
+# Raw bench test photos
+test_pics/
+
+# ==========================================
 # Large Artifacts & Backups (Prevent Git Bloat)
 # ==========================================
 archives/
