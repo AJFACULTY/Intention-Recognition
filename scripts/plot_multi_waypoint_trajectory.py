@@ -2,7 +2,6 @@
 """
 plot_multi_waypoint_trajectory.py — Publication Trajectory & Kinematics Plotter
 Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
-Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu
 Institution: Ghana Communication Technology University (GCTU), Department of Computer Engineering
 Supervisor: Mr. Micheal Xenya
 

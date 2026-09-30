@@ -2,7 +2,6 @@
 # ==============================================================================
 # run_nav2_patrol.sh — Autonomous Waypoint Patrol with Synchronized Bag Recording
 # Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
-# Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu
 # Institution: Ghana Communication Technology University (GCTU)
 # ==============================================================================
 

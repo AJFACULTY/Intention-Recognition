@@ -2,7 +2,6 @@
 """
 navigate_waypoints.py — Multi-Waypoint Patrol & Trajectory Action Client
 Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
-Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu
 Institution: Ghana Communication Technology University (GCTU)
 
 Dispatches autonomous multi-leg waypoint navigation using Nav2 action servers.

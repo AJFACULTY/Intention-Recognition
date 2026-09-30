@@ -3,7 +3,6 @@
 master_demo_menu.py — Master Consolidated Turnkey Demonstration & Mission Menu
 ==============================================================================
 Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
-Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu
 Institution: Ghana Communication Technology University (GCTU)
 Standards Compliance: ROS REP-103/105, ISO 15066:2016, OMG DDS v1.4
 

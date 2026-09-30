@@ -2,7 +2,6 @@
 # ==============================================================================
 # run_mission.sh — Turnkey Terminal Mission Dispatcher for Autonomous AMR
 # Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
-# Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu
 # Institution: Ghana Communication Technology University (GCTU)
 # ==============================================================================
 

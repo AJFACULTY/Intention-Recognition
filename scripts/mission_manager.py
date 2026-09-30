@@ -2,7 +2,6 @@
 """
 mission_manager.py — Industrial-Grade Autonomous Mission Dispatcher
 Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
-Author: Eleana Osei Owusu & Joel Nii Adjetey Ahulu
 Institution: Ghana Communication Technology University (GCTU)
 
 Provides a production pool of selectable autonomous missions:

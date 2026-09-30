@@ -2,7 +2,6 @@
 """
 web_map_visualizer.py — Island Minimalist Cockpit Visualizer for AMR Cognition
 Platform: ROS 2 / Standalone (Raspberry Pi 5 & x86_64 Host Workstation)
-Authors: Eleana Osei Owusu & Joel Nii Adjetey Ahulu (GCTU)
 
 Features:
   - Dynamic Dual-Mode Architecture (Unmapped HRI & Mapped Facility Autonomy):
