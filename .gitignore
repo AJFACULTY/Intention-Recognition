@@ -156,6 +156,21 @@ write_up/chapters/*.aux
 write_up/compile.log
 
 # ==========================================
+# Publications (Unpublished IEEE manuscripts — protect double-blind review)
+# ==========================================
+publications/
+
+# ==========================================
+# Internal-Only Files (not relevant for public)
+# ==========================================
+OPERATOR_COMMAND_MANUAL.md
+assets/preview_camera.jpg
+scripts/test_*.py
+scripts/verify_writeup.py
+tests/verify_writeup.py
+write_up/figures/*.dot
+
+# ==========================================
 # Operating System & IDE Temporary Files
 # ==========================================
 .DS_Store

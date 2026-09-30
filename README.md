@@ -50,8 +50,7 @@ tests/               Automated test suite
 maps/                SLAM occupancy grids
 experiment_logs/     Physical trial data (180 trials)
 write_up/            Undergraduate thesis (LaTeX)
-publications/        IEEE conference & journal manuscripts
-docs/                Technical reference docs
+docs/                Technical reference & operations guide
 ```
 
 ---
@@ -77,6 +76,12 @@ ros2 launch launch/master_robot.launch.py
 ```bash
 python3 scripts/run_all_local_verifications.py
 ```
+
+## Documentation
+
+For detailed hardware setup, power-on sequences, SLAM mapping, Nav2 navigation, active vision operation, and troubleshooting, see the full operations guide:
+
+📖 **[Robot Operations Manual & User Guide](docs/ROBOT_OPERATIONS_MANUAL_AND_USER_GUIDE.md)**
 
 ---
 
