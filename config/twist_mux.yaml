@@ -1,0 +1,21 @@
+twist_mux:
+  ros__parameters:
+    use_sim_time: false
+    topics:
+      joystick:
+        topic: /cmd_vel_joy
+        timeout: 0.5
+        priority: 100
+      navigation:
+        topic: /cmd_vel_nav
+        timeout: 0.5
+        priority: 50
+      gesture:
+        topic: /cmd_vel_gesture
+        timeout: 0.5
+        priority: 40
+    locks:
+      e_stop:
+        topic: /e_stop
+        timeout: 0.0
+        priority: 255

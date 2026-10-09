@@ -1,0 +1,45 @@
+# ==========================================
+# Core ROS 2 & Colcon Build Artifacts
+# ==========================================
+build/
+install/
+log/
+
+# ==========================================
+# Python & Environment
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+env/
+ros2_venv/
+face_test_env/
+.tempmediaStorage/
+
+# ==========================================
+# Data, Bags & Model Weights
+# ==========================================
+*.bag
+*.db3
+*.mcap
+*.pt
+*.task
+*.onnx.data
+*.csv
+*.zip
+*.tar.gz
+
+# ==========================================
+# Operating System & Editor Artifacts
+# ==========================================
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.~lock.*
+.vscode/
+.idea/

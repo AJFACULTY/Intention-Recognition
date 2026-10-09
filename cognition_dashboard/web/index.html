@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cognition Dashboard</title>
+  <script src="vendor/roslib.min.js"></script>
+  <script src="config.sim.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0b0d14;
+      color: #e0e0e0;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    #top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    #top-bar h1 { font-size: 15px; color: #aaa; margin: 0; }
+    #status-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888; }
+    #status-dot {
+      width: 9px; height: 9px; border-radius: 50%; background: #f0a500; flex-shrink: 0;
+    }
+    #status-dot.connected    { background: #3ecf6e; }
+    #status-dot.disconnected { background: #e05252; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .panel {
+      background: #13151f;
+      border: 1px solid #1e2130;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .panel-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #555;
+      margin: 0 0 10px;
+    }
+    .field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid #1a1d2a;
+      font-size: 13px;
+    }
+    .field:last-child { border-bottom: none; }
+    .field-label { color: #666; }
+    .field-value { font-weight: bold; color: #e0e0e0; }
+
+    /* velocity bars */
+    .vel-bar-row {
+      padding: 5px 0;
+      border-bottom: 1px solid #1a1d2a;
+      font-size: 12px;
+    }
+    .vel-bar-row:last-of-type { border-bottom: none; }
+    .vel-bar-label { color: #666; margin-bottom: 3px; display: flex; justify-content: space-between; }
+    .vel-bar-track {
+      height: 6px;
+      background: #1e2130;
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+    .vel-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.1s, background 0.1s;
+      position: absolute;
+    }
+    .vel-bar-center {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 1px;
+      height: 100%;
+      background: #333;
+    }
+
+    /* gesture colours */
+    .g-STOP   { color: #e05252; }
+    .g-GO     { color: #3ecf6e; }
+    .g-FOLLOW { color: #4a9eff; }
+    .g-LEFT   { color: #f0a500; }
+    .g-RIGHT  { color: #f0a500; }
+    .g-NONE   { color: #555; }
+
+    /* gesture buffer */
+    #gesture-buffer { display: flex; gap: 5px; margin-top: 8px; }
+    .buf-slot {
+      flex: 1;
+      text-align: center;
+      padding: 3px 0;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      border: 1px solid #1e2130;
+      color: #333;
+      background: #1a1d2a;
+    }
+    .buf-slot.filled-STOP   { background: #3a1a1a; color: #e05252; border-color: #5a2a2a; }
+    .buf-slot.filled-GO     { background: #1a3a2a; color: #3ecf6e; border-color: #2a5a3a; }
+    .buf-slot.filled-FOLLOW { background: #1a2a3a; color: #4a9eff; border-color: #2a3a5a; }
+    .buf-slot.filled-LEFT   { background: #3a2a1a; color: #f0a500; border-color: #5a3a1a; }
+    .buf-slot.filled-RIGHT  { background: #3a2a1a; color: #f0a500; border-color: #5a3a1a; }
+
+    /* gesture history timeline */
+    #gesture-timeline {
+      display: flex;
+      gap: 3px;
+      margin-top: 10px;
+      align-items: flex-end;
+      height: 32px;
+      overflow: hidden;
+    }
+    .timeline-pip {
+      flex: 1;
+      border-radius: 2px;
+      min-width: 4px;
+      transition: height 0.2s;
+    }
+
+    /* node health */
+    .node-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid #1a1d2a; font-size: 12px;
+    }
+    .node-row:last-child { border-bottom: none; }
+    .node-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; flex-shrink: 0; }
+    .node-dot.active { background: #3ecf6e; }
+    .node-dot.nodata { background: #f0a500; }
+    .node-dot.error  { background: #e05252; }
+    .node-name { flex: 1; color: #888; }
+    .node-hz   { font-size: 11px; color: #555; }
+
+    /* d-pad */
+    .dpad { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .btn {
+      background: #1e2130; border: 1px solid #2a2d3a; border-radius: 8px;
+      color: #e0e0e0; font-size: 16px; padding: 12px 0;
+      cursor: pointer; text-align: center; user-select: none; touch-action: none;
+    }
+    .btn.pressed { background: #1e3a6e; border-color: #2e5fa3; }
+    .btn-stop {
+      grid-column: 1 / -1; background: #2a1010; border-color: #5a1a1a;
+      color: #e05252; font-size: 13px; font-weight: bold; padding: 12px 0;
+    }
+    .btn-stop.engaged { background: #7a1a1a; border-color: #e05252; }
+    .btn-fwd   { grid-column: 2; }
+    .btn-left  { grid-column: 1; }
+    .btn-blank { grid-column: 2; background: transparent; border: none; cursor: default; }
+    .btn-right { grid-column: 3; }
+    .btn-back  { grid-column: 2; }
+    .mode-label { font-size: 11px; color: #555; text-align: center; margin-top: 4px; }
+    .mode-label span { color: #3ecf6e; font-weight: bold; }
+    .mode-label span.override { color: #f0a500; }
+
+    /* params */
+    .param-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 0; border-bottom: 1px solid #1a1d2a; font-size: 12px;
+    }
+    .param-row:last-child { border-bottom: none; }
+    .param-label { color: #666; }
+    .param-right { display: flex; align-items: center; gap: 6px; }
+    .param-input {
+      width: 56px; background: #1e2130; border: 1px solid #2a2d3a;
+      border-radius: 4px; color: #e0e0e0; font-size: 12px; padding: 3px 6px; text-align: right;
+    }
+    .param-input:focus { outline: none; border-color: #2e5fa3; }
+    .param-input.invalid { border-color: #e05252; }
+    .param-feedback { font-size: 10px; width: 36px; }
+    .param-feedback.ok  { color: #3ecf6e; }
+    .param-feedback.err { color: #e05252; }
+
+    /* system stats */
+    .stat-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
+    }
+    .stat-card {
+      background: #1a1d2a; border-radius: 6px; padding: 8px 10px; text-align: center;
+    }
+    .stat-label { font-size: 10px; color: #555; margin-bottom: 2px; }
+    .stat-value { font-size: 18px; font-weight: bold; color: #e0e0e0; }
+    .stat-value.warn { color: #f0a500; }
+    .stat-value.crit { color: #e05252; }
+
+    /* log */
+    .log-area {
+      font-family: monospace; font-size: 11px; color: #555;
+      max-height: 120px; overflow-y: auto; line-height: 1.7;
+    }
+    .log-WARN  { color: #f0a500; }
+    .log-ERROR { color: #e05252; }
+    .log-INFO  { color: #666; }
+
+    .span2 { grid-column: span 2; }
+    .span3 { grid-column: span 3; }
+
+    /* keyboard hint */
+    .kb-hint {
+      font-size: 10px; color: #333; text-align: center; margin-top: 6px;
+    }
+    .kb-hint kbd {
+      background: #1e2130; border: 1px solid #2a2d3a; border-radius: 3px;
+      padding: 1px 5px; font-size: 10px; color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div id="top-bar">
+    <h1 id="top-title">Cognition Robot Dashboard &mdash; Physical Robot</h1>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <select id="env-select" style="background:#13151f; color:#3ecf6e; border:1px solid #1e2130; padding:4px 10px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;">
+        <option value="robot_bridge" selected>Physical Robot (Local Bridge ws://localhost:9090 on Domain 20)</option>
+        <option value="robot_direct">Physical Robot (Direct Robot Host ws://...:9090)</option>
+        <option value="sim">Simulation (ws://localhost:9090)</option>
+      </select>
+      <div id="status-bar">
+        <span id="status-dot"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- Live Camera Stream -->
+    <div class="panel">
+      <p class="panel-title">Live Camera Stream</p>
+      <div style="width:100%; height:160px; background:#0b0d14; border:1px solid #1e2130; border-radius:6px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;">
+        <img id="camera-stream" src="" style="width:100%; height:100%; object-fit:contain; display:none;" onerror="this.style.display='none';document.getElementById('no-stream-msg').style.display='block';" />
+        <div id="no-stream-msg" style="color:#555; font-size:11px; text-align:center; padding:10px;">
+          Camera Stream Offline<br><span style="font-size:10px; color:#3ecf6e;">web_video_server :8080</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Gimbal & Robot Hardware -->
+    <div class="panel">
+      <p class="panel-title">Active Gimbal &amp; Chassis</p>
+      <div class="field">
+        <span class="field-label">Gimbal Pan</span>
+        <span class="field-value" id="gimbal-pan">0°</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Gimbal Tilt</span>
+        <span class="field-value" id="gimbal-tilt">25°</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Robot Battery</span>
+        <span class="field-value" id="robot-battery" style="color:#3ecf6e;">-- %</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Biometric Face ID</span>
+        <span class="field-value" id="face-id" style="font-size:11px; color:#aaa;">Searching...</span>
+      </div>
+      <div class="field">
+        <span class="field-label">System Mode</span>
+        <span class="field-value" id="system-mode-display" style="color:#4a9eff;">GESTURE</span>
+      </div>
+    </div>
+
+    <!-- cmd_vel with velocity bars -->
+    <div class="panel">
+      <p class="panel-title">cmd_vel live</p>
+      <div class="vel-bar-row">
+        <div class="vel-bar-label">
+          <span>linear.x</span>
+          <span id="vel-linear">0.000</span>
+        </div>
+        <div class="vel-bar-track">
+          <div class="vel-bar-center"></div>
+          <div class="vel-bar-fill" id="bar-linear" style="width:50%;left:50%;background:#3ecf6e;"></div>
+        </div>
+      </div>
+      <div class="vel-bar-row">
+        <div class="vel-bar-label">
+          <span>angular.z</span>
+          <span id="vel-angular">0.000</span>
+        </div>
+        <div class="vel-bar-track">
+          <div class="vel-bar-center"></div>
+          <div class="vel-bar-fill" id="bar-angular" style="width:50%;left:50%;background:#4a9eff;"></div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:6px;">
+        <span class="field-label">motion</span>
+        <span class="field-value" id="vel-motion">—</span>
+      </div>
+    </div>
+
+    <!-- gesture state + buffer + timeline -->
+    <div class="panel">
+      <p class="panel-title">Gesture state</p>
+      <div class="field">
+        <span class="field-label">Confirmed</span>
+        <span class="field-value g-NONE" id="gesture-label">NONE</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Confidence</span>
+        <span class="field-value" id="gesture-conf">—</span>
+      </div>
+      <div id="gesture-buffer">
+        <div class="buf-slot" id="buf-0">—</div>
+        <div class="buf-slot" id="buf-1">—</div>
+        <div class="buf-slot" id="buf-2">—</div>
+        <div class="buf-slot" id="buf-3">—</div>
+        <div class="buf-slot" id="buf-4">—</div>
+      </div>
+      <div id="gesture-timeline"></div>
+    </div>
+
+    <!-- person detection -->
+    <div class="panel">
+      <p class="panel-title">Person detection</p>
+      <div class="field">
+        <span class="field-label">Label</span>
+        <span class="field-value" id="det-label">—</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Confidence</span>
+        <span class="field-value" id="det-conf">—</span>
+      </div>
+      <div class="field">
+        <span class="field-label">center_x</span>
+        <span class="field-value" id="det-cx">—</span>
+      </div>
+      <div class="field">
+        <span class="field-label">width</span>
+        <span class="field-value" id="det-w">—</span>
+      </div>
+      <div class="field">
+        <span class="field-label">direction</span>
+        <span class="field-value" id="det-dir">—</span>
+      </div>
+      <div class="field">
+        <span class="field-label">velocity_x</span>
+        <span class="field-value" id="det-vx">—</span>
+      </div>
+      <div class="field">
+        <span class="field-label">predicted_x</span>
+        <span class="field-value" id="det-px">—</span>
+      </div>
+    </div>
+
+    <!-- manual override -->
+    <div class="panel">
+      <p class="panel-title">Manual override</p>
+      <div class="dpad">
+        <div class="btn btn-fwd"   id="btn-fwd" >&#9650;</div>
+        <div class="btn btn-left"  id="btn-left">&#9664;</div>
+        <div class="btn btn-blank"></div>
+        <div class="btn btn-right" id="btn-right">&#9654;</div>
+        <div class="btn btn-back"  id="btn-back">&#9660;</div>
+        <div class="btn btn-stop"  id="btn-stop">&#9632; STOP</div>
+      </div>
+      <div class="mode-label">mode: <span id="mode-text">GESTURE</span></div>
+      <button id="btn-toggle-mode" style="margin:6px 0; background:#1e2130; border:1px solid #333; color:#4a9eff; padding:5px 8px; border-radius:4px; font-size:11px; cursor:pointer; width:100%; font-weight:bold;">Switch to AUTO (Nav2)</button>
+      <div class="kb-hint">
+        <kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&larr;</kbd><kbd>&rarr;</kbd> drive &nbsp;|&nbsp; <kbd>space</kbd> e-stop
+      </div>
+    </div>
+
+    <!-- runtime parameters -->
+    <div class="panel">
+      <p class="panel-title">Runtime parameters</p>
+      <div class="param-row">
+        <span class="param-label">linear_speed</span>
+        <div class="param-right">
+          <input class="param-input" id="p-linear-speed" type="number" step="0.01" min="0" max="2">
+          <span class="param-feedback" id="fb-linear-speed"></span>
+        </div>
+      </div>
+      <div class="param-row">
+        <span class="param-label">angular_speed</span>
+        <div class="param-right">
+          <input class="param-input" id="p-angular-speed" type="number" step="0.01" min="0" max="2">
+          <span class="param-feedback" id="fb-angular-speed"></span>
+        </div>
+      </div>
+      <div class="param-row">
+        <span class="param-label">follow_speed</span>
+        <div class="param-right">
+          <input class="param-input" id="p-follow-speed" type="number" step="0.01" min="0" max="2">
+          <span class="param-feedback" id="fb-follow-speed"></span>
+        </div>
+      </div>
+      <div class="param-row">
+        <span class="param-label">gesture_buffer_size</span>
+        <div class="param-right">
+          <input class="param-input" id="p-gesture-buffer-size" type="number" step="1" min="1" max="10">
+          <span class="param-feedback" id="fb-gesture-buffer-size"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- node health -->
+    <div class="panel">
+      <p class="panel-title">Node health</p>
+      <div class="node-row">
+        <div class="node-dot nodata" id="dot-brain"></div>
+        <span class="node-name">brain_node</span>
+        <span class="node-hz" id="hz-brain">— Hz</span>
+      </div>
+      <div class="node-row">
+        <div class="node-dot nodata" id="dot-perception"></div>
+        <span class="node-name">person_detection_node</span>
+        <span class="node-hz" id="hz-perception">— Hz</span>
+      </div>
+      <div class="node-row">
+        <div class="node-dot nodata" id="dot-gesture"></div>
+        <span class="node-name">gesture_node</span>
+        <span class="node-hz" id="hz-gesture">— Hz</span>
+      </div>
+
+      <!-- system stats -->
+      <p class="panel-title" style="margin-top:12px;">System stats</p>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">CPU %</div>
+          <div class="stat-value" id="stat-cpu">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Temp °C</div>
+          <div class="stat-value" id="stat-temp">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Mem %</div>
+          <div class="stat-value" id="stat-mem">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value" style="font-size:13px;" id="stat-uptime">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- log spanning full width -->
+    <div class="panel span3">
+      <p class="panel-title">rosout console</p>
+      <div class="log-area" id="log-area">
+        <span style="color:#333;font-style:italic">Waiting for log messages...</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    var dot        = document.getElementById("status-dot");
+    var statusText = document.getElementById("status-text");
+    var modeText   = document.getElementById("mode-text");
+
+    var ros = new ROSLIB.Ros({ url: CONFIG.rosbridgeUrl });
+
+    var cmdVelTopic;
+    var publishInterval = null;
+    var estopEngaged = false;
+    var reconnectTimer = null;
+    var reconnectAttempts = 0;
+    var subscribedOnce = false;
+
+    var SPEEDS = { linear: 0.3, angular: 0.5 };
+    var COMMANDS = {
+      fwd:   { linear: { x:  SPEEDS.linear, y:0, z:0 }, angular: { x:0, y:0, z:0 } },
+      back:  { linear: { x: -SPEEDS.linear, y:0, z:0 }, angular: { x:0, y:0, z:0 } },
+      left:  { linear: { x:0, y:0, z:0 }, angular: { x:0, y:0, z:  SPEEDS.angular } },
+      right: { linear: { x:0, y:0, z:0 }, angular: { x:0, y:0, z: -SPEEDS.angular } },
+      stop:  { linear: { x:0, y:0, z:0 }, angular: { x:0, y:0, z:0 } }
+    };
+
+    function publishCmd(cmd) {
+      if (!cmdVelTopic) return;
+      cmdVelTopic.publish(new ROSLIB.Message(cmd));
+    }
+
+    function startPublishing(cmdKey) {
+      if (estopEngaged) return;
+      stopPublishing();
+      publishCmd(COMMANDS[cmdKey]);
+      publishInterval = setInterval(function() { publishCmd(COMMANDS[cmdKey]); }, 100);
+      modeText.textContent = "OVERRIDE";
+      modeText.className = "override";
+    }
+
+    function stopPublishing() {
+      if (publishInterval) { clearInterval(publishInterval); publishInterval = null; }
+    }
+
+    function stopRobot() {
+      stopPublishing();
+      publishCmd(COMMANDS.stop);
+      modeText.textContent = "GESTURE";
+      modeText.className = "";
+    }
+
+    // ---- Velocity bars ----
+    function updateVelBar(barId, value, maxVal, color) {
+      var bar = document.getElementById(barId);
+      if (!bar) return;
+      var pct = Math.min(Math.abs(value) / maxVal, 1.0) * 50;
+      if (value >= 0) {
+        bar.style.left = "50%";
+        bar.style.width = pct + "%";
+      } else {
+        bar.style.left = (50 - pct) + "%";
+        bar.style.width = pct + "%";
+      }
+      bar.style.background = Math.abs(value) > 0.01 ? color : "#333";
+    }
+
+    // ---- Gesture buffer + timeline ----
+    var gestureBuffer = [];
+    var gestureHistory = [];
+    var bufferSize = 5;
+    var GESTURE_COLORS = {
+      STOP: "#e05252", GO: "#3ecf6e", FOLLOW: "#4a9eff",
+      LEFT: "#f0a500", RIGHT: "#f0a500", NONE: "#333"
+    };
+
+    function updateBufferDisplay() {
+      for (var i = 0; i < 5; i++) {
+        var slot = document.getElementById("buf-" + i);
+        if (i < gestureBuffer.length) {
+          var label = gestureBuffer[i];
+          slot.textContent = label;
+          slot.className = "buf-slot filled-" + label;
+        } else {
+          slot.textContent = "—";
+          slot.className = "buf-slot";
+        }
+      }
+    }
+
+    function updateTimeline() {
+      var tl = document.getElementById("gesture-timeline");
+      tl.innerHTML = "";
+      var last30 = gestureHistory.slice(-40);
+      last30.forEach(function(entry) {
+        var pip = document.createElement("div");
+        pip.className = "timeline-pip";
+        pip.style.background = GESTURE_COLORS[entry.label] || "#333";
+        pip.style.height = (entry.label === "NONE" ? 4 : 20) + "px";
+        pip.title = entry.label;
+        tl.appendChild(pip);
+      });
+    }
+
+    // ---- Node health watchdogs ----
+    var watchdogs = {
+      brain:      { dotId: "dot-brain",      hzId: "hz-brain",      lastSeen: 0, times: [] },
+      perception: { dotId: "dot-perception", hzId: "hz-perception", lastSeen: 0, times: [] },
+      gesture:    { dotId: "dot-gesture",    hzId: "hz-gesture",    lastSeen: 0, times: [] }
+    };
+
+    function heartbeat(key) {
+      var now = Date.now();
+      var w = watchdogs[key];
+      w.lastSeen = now;
+      w.times.push(now);
+      w.times = w.times.filter(function(t) { return now - t < 5000; });
+      document.getElementById(w.dotId).className = "node-dot active";
+      document.getElementById(w.hzId).textContent = (w.times.length / 5).toFixed(1) + " Hz";
+    }
+
+    setInterval(function() {
+      var now = Date.now();
+      Object.keys(watchdogs).forEach(function(key) {
+        var w = watchdogs[key];
+        if (w.lastSeen > 0 && now - w.lastSeen > 2000) {
+          document.getElementById(w.dotId).className = "node-dot nodata";
+          document.getElementById(w.hzId).textContent = "— Hz";
+        }
+      });
+    }, 1000);
+
+    function motionLabel(lx, az) {
+      if (lx === 0 && az === 0) return "STOPPED";
+      if (lx > 0  && az === 0) return "FORWARD";
+      if (lx < 0  && az === 0) return "BACKWARD";
+      if (az > 0  && lx === 0) return "TURNING LEFT";
+      if (az < 0  && lx === 0) return "TURNING RIGHT";
+      return "MOVING";
+    }
+
+    // ---- Parameters ----
+    var PARAMS = [
+      { name: "linear_speed",        id: "p-linear-speed",        fb: "fb-linear-speed",        type: "float", min: 0,  max: 2  },
+      { name: "angular_speed",       id: "p-angular-speed",       fb: "fb-angular-speed",       type: "float", min: 0,  max: 2  },
+      { name: "follow_speed",        id: "p-follow-speed",        fb: "fb-follow-speed",        type: "float", min: 0,  max: 2  },
+      { name: "gesture_buffer_size", id: "p-gesture-buffer-size", fb: "fb-gesture-buffer-size", type: "int",   min: 1,  max: 10 }
+    ];
+
+    function getParams() {
+      var client = new ROSLIB.Service({ ros: ros, name: "/brain_node/get_parameters", serviceType: "rcl_interfaces/srv/GetParameters" });
+      client.callService(new ROSLIB.ServiceRequest({ names: PARAMS.map(function(p) { return p.name; }) }), function(result) {
+        result.values.forEach(function(v, i) {
+          var el = document.getElementById(PARAMS[i].id);
+          if (!el) return;
+          el.value = PARAMS[i].type === "int" ? v.integer_value : v.double_value.toFixed(2);
+        });
+      });
+    }
+
+    function setParam(param, value) {
+      var fb = document.getElementById(param.fb);
+      var client = new ROSLIB.Service({ ros: ros, name: "/brain_node/set_parameters", serviceType: "rcl_interfaces/srv/SetParameters" });
+      var pv = param.type === "int" ? { type: 2, integer_value: parseInt(value) } : { type: 3, double_value: parseFloat(value) };
+      client.callService(new ROSLIB.ServiceRequest({ parameters: [{ name: param.name, value: pv }] }), function() {
+        fb.textContent = "Saved"; fb.className = "param-feedback ok";
+        setTimeout(function() { fb.textContent = ""; }, 2000);
+      }, function() {
+        fb.textContent = "Failed"; fb.className = "param-feedback err";
+        setTimeout(function() { fb.textContent = ""; }, 2000);
+      });
+    }
+
+    function wireParamInputs() {
+      PARAMS.forEach(function(param) {
+        var el = document.getElementById(param.id);
+        el.addEventListener("blur", function() {
+          var val = parseFloat(el.value);
+          var fb  = document.getElementById(param.fb);
+          if (isNaN(val) || val < param.min || val > param.max) {
+            el.classList.add("invalid");
+            fb.textContent = "Bad"; fb.className = "param-feedback err";
+            return;
+          }
+          el.classList.remove("invalid");
+          setParam(param, val);
+        });
+      });
+    }
+
+    // ---- D-pad ----
+    var btnMap = { "btn-fwd":"fwd", "btn-back":"back", "btn-left":"left", "btn-right":"right" };
+    Object.keys(btnMap).forEach(function(id) {
+      var el = document.getElementById(id);
+      var cmdKey = btnMap[id];
+      el.addEventListener("pointerdown",   function(e) { e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add("pressed");    startPublishing(cmdKey); });
+      el.addEventListener("pointerup",     function(e) { e.preventDefault(); el.classList.remove("pressed"); stopPublishing(); });
+      el.addEventListener("pointercancel", function(e) { e.preventDefault(); el.classList.remove("pressed"); stopPublishing(); });
+    });
+
+    // ---- Emergency stop ----
+    function callEmergencyStop(engage) {
+      var client = new ROSLIB.Service({ ros: ros, name: "/brain_node/emergency_stop", serviceType: "std_srvs/srv/SetBool" });
+      client.callService(new ROSLIB.ServiceRequest({ data: engage }), function() {
+        estopEngaged = engage;
+        var btn = document.getElementById("btn-stop");
+        if (engage) {
+          btn.classList.add("engaged");
+          btn.textContent = "\u25a0 E-STOP ENGAGED";
+          modeText.textContent = "E-STOP";
+          modeText.className = "override";
+          stopPublishing();
+        } else {
+          btn.classList.remove("engaged");
+          btn.textContent = "\u25a0 STOP";
+          modeText.textContent = "GESTURE";
+          modeText.className = "";
+        }
+      }, function() {
+        stopRobot();
+      });
+    }
+
+    document.getElementById("btn-stop").addEventListener("pointerdown", function(e) {
+      e.preventDefault();
+      callEmergencyStop(!estopEngaged);
+    });
+
+    // ---- Keyboard shortcuts ----
+    var keysHeld = {};
+    document.addEventListener("keydown", function(e) {
+      if (e.target.tagName === "INPUT") return;
+      if (keysHeld[e.code]) return;
+      keysHeld[e.code] = true;
+      if (e.code === "Space") { e.preventDefault(); callEmergencyStop(!estopEngaged); return; }
+      var keyMap = { "ArrowUp":"fwd", "ArrowDown":"back", "ArrowLeft":"left", "ArrowRight":"right" };
+      if (keyMap[e.code] && !estopEngaged) {
+        e.preventDefault();
+        var el = document.getElementById("btn-" + keyMap[e.code]);
+        if (el) el.classList.add("pressed");
+        startPublishing(keyMap[e.code]);
+      }
+    });
+    document.addEventListener("keyup", function(e) {
+      keysHeld[e.code] = false;
+      var keyMap = { "ArrowUp":"fwd", "ArrowDown":"back", "ArrowLeft":"left", "ArrowRight":"right" };
+      if (keyMap[e.code]) {
+        var el = document.getElementById("btn-" + keyMap[e.code]);
+        if (el) el.classList.remove("pressed");
+        stopPublishing();
+      }
+    });
+
+    // ---- Subscriptions ----
+    function subscribeAll() {
+      if (subscribedOnce) return;
+      subscribedOnce = true;
+
+      var cmdVelSub = new ROSLIB.Topic({ ros: ros, name: "/cmd_vel", messageType: "geometry_msgs/msg/Twist" });
+      cmdVelSub.subscribe(function(msg) {
+        var lx = msg.linear.x, az = msg.angular.z;
+        document.getElementById("vel-linear").textContent  = lx.toFixed(3);
+        document.getElementById("vel-angular").textContent = az.toFixed(3);
+        document.getElementById("vel-motion").textContent  = motionLabel(lx, az);
+        updateVelBar("bar-linear",  lx, 1.0, "#3ecf6e");
+        updateVelBar("bar-angular", az, 1.5, "#4a9eff");
+        heartbeat("brain");
+      });
+
+      var gesture = new ROSLIB.Topic({ ros: ros, name: "/cognition/gesture", messageType: "cognition_interfaces/msg/Gesture" });
+      gesture.subscribe(function(msg) {
+        var label = msg.gesture_label || "NONE";
+        var el = document.getElementById("gesture-label");
+        el.textContent = label;
+        el.className = "field-value g-" + label;
+        document.getElementById("gesture-conf").textContent = msg.confidence.toFixed(2);
+        gestureBuffer.push(label);
+        if (gestureBuffer.length > bufferSize) gestureBuffer.shift();
+        updateBufferDisplay();
+        gestureHistory.push({ label: label, t: Date.now() });
+        if (gestureHistory.length > 40) gestureHistory.shift();
+        updateTimeline();
+        heartbeat("gesture");
+      });
+
+      var detection = new ROSLIB.Topic({ ros: ros, name: "/cognition/detection", messageType: "cognition_interfaces/msg/Detection" });
+      detection.subscribe(function(msg) {
+        document.getElementById("det-label").textContent = msg.label;
+        document.getElementById("det-conf").textContent  = msg.confidence.toFixed(2);
+        document.getElementById("det-cx").textContent    = msg.center_x.toFixed(3);
+        document.getElementById("det-w").textContent     = msg.width.toFixed(3);
+        document.getElementById("det-dir").textContent   = msg.direction || "—";
+        document.getElementById("det-vx").textContent    = (msg.velocity_x || 0).toFixed(3);
+        document.getElementById("det-px").textContent    = (msg.predicted_x || 0).toFixed(3);
+        heartbeat("perception");
+      });
+
+      var rosout = new ROSLIB.Topic({ ros: ros, name: "/rosout", messageType: "rcl_interfaces/msg/Log" });
+      var logArea = document.getElementById("log-area");
+      var logLines = [];
+      var nodeFilter = ["brain_node", "person_detection_node", "gesture_node"];
+      rosout.subscribe(function(msg) {
+        if (!nodeFilter.some(function(n) { return msg.name && msg.name.indexOf(n) !== -1; })) return;
+        var levels = {10:"DEBUG", 20:"INFO", 30:"WARN", 40:"ERROR", 50:"FATAL"};
+        var level = levels[msg.level] || "INFO";
+        if (msg.level >= 40) {
+          var key = msg.name.indexOf("brain") !== -1 ? "brain" : msg.name.indexOf("person") !== -1 ? "perception" : "gesture";
+          document.getElementById("dot-" + key).className = "node-dot error";
+        }
+        logLines.push({ level: level, text: "[" + msg.name + "] " + msg.msg });
+        if (logLines.length > 200) logLines.shift();
+        logArea.innerHTML = logLines.map(function(l) {
+          return "<div class=\"log-" + l.level + "\">" + l.text + "</div>";
+        }).join("");
+        logArea.scrollTop = logArea.scrollHeight;
+      });
+
+      // ---- Active Gimbal Pan/Tilt ----
+      var panSub = new ROSLIB.Topic({ ros: ros, name: "/servo_s1", messageType: "std_msgs/msg/Int32" });
+      panSub.subscribe(function(msg) {
+        var el = document.getElementById("gimbal-pan");
+        if (el) el.textContent = (msg.data >= 0 ? "+" : "") + msg.data + "°";
+      });
+
+      var tiltSub = new ROSLIB.Topic({ ros: ros, name: "/servo_s2", messageType: "std_msgs/msg/Int32" });
+      tiltSub.subscribe(function(msg) {
+        var el = document.getElementById("gimbal-tilt");
+        if (el) el.textContent = (msg.data >= 0 ? "+" : "") + msg.data + "°";
+      });
+
+      // ---- Battery Telemetry ----
+      var batSub = new ROSLIB.Topic({ ros: ros, name: "/battery", messageType: "std_msgs/msg/UInt16" });
+      batSub.subscribe(function(msg) {
+        var el = document.getElementById("robot-battery");
+        if (el) {
+          el.textContent = msg.data + "%";
+          el.style.color = msg.data >= 40 ? "#3ecf6e" : (msg.data >= 20 ? "#f0a500" : "#e05252");
+        }
+      });
+
+      // ---- Biometric Face ID ----
+      var faceSub = new ROSLIB.Topic({ ros: ros, name: "/cognition/face_identity", messageType: "std_msgs/msg/String" });
+      faceSub.subscribe(function(msg) {
+        try {
+          var p = JSON.parse(msg.data);
+          var el = document.getElementById("face-id");
+          if (el) {
+            if (p.authorized) {
+              el.textContent = "AUTH: " + p.name;
+              el.style.color = "#3ecf6e";
+            } else {
+              el.textContent = "UNAUTH: " + p.name;
+              el.style.color = "#f0a500";
+            }
+          }
+        } catch(e) {}
+      });
+
+      // ---- System Mode ----
+      var modeSub = new ROSLIB.Topic({ ros: ros, name: "/system/mode", messageType: "std_msgs/msg/String" });
+      modeSub.subscribe(function(msg) {
+        var el = document.getElementById("system-mode-display");
+        if (el) el.textContent = msg.data;
+        var modeText = document.getElementById("mode-text");
+        if (modeText) modeText.textContent = msg.data;
+        var btn = document.getElementById("btn-toggle-mode");
+        if (btn) {
+          btn.textContent = msg.data.trim().toUpperCase() === "GESTURE" ? "Switch to AUTO (Nav2)" : "Switch to GESTURE";
+        }
+      });
+
+      // Wire Mode Toggle Button
+      var toggleBtn = document.getElementById("btn-toggle-mode");
+      if (toggleBtn && !toggleBtn._wired) {
+        toggleBtn._wired = true;
+        toggleBtn.addEventListener("click", function() {
+          var modeTopic = new ROSLIB.Topic({ ros: ros, name: "/system/mode", messageType: "std_msgs/msg/String" });
+          var cur = (document.getElementById("mode-text").textContent || "GESTURE").trim().toUpperCase();
+          var target = cur === "GESTURE" ? "AUTO" : "GESTURE";
+          modeTopic.publish(new ROSLIB.Message({ data: target }));
+          document.getElementById("mode-text").textContent = target;
+          document.getElementById("system-mode-display").textContent = target;
+          toggleBtn.textContent = target === "GESTURE" ? "Switch to AUTO (Nav2)" : "Switch to GESTURE";
+        });
+      }
+    }
+
+    // ---- System stats subscriber ----
+    // Expects a std_msgs/String topic publishing JSON: {"cpu":42,"temp":55,"mem":60,"uptime":"2h 14m"}
+    // If the topic is not running, stats stay at —
+    function subscribeStats() {
+      var statsTopic = new ROSLIB.Topic({ ros: ros, name: "/cognition/system_stats", messageType: "std_msgs/msg/String" });
+      statsTopic.subscribe(function(msg) {
+        try {
+          var d = JSON.parse(msg.data);
+          var cpuEl   = document.getElementById("stat-cpu");
+          var tempEl  = document.getElementById("stat-temp");
+          var memEl   = document.getElementById("stat-mem");
+          cpuEl.textContent  = d.cpu + "%";
+          tempEl.textContent = d.temp;
+          memEl.textContent  = d.mem + "%";
+          document.getElementById("stat-uptime").textContent = d.uptime || "—";
+          cpuEl.className  = "stat-value" + (d.cpu  > 85 ? " crit" : d.cpu  > 70 ? " warn" : "");
+          tempEl.className = "stat-value" + (d.temp > 80 ? " crit" : d.temp > 70 ? " warn" : "");
+          memEl.className  = "stat-value" + (d.mem  > 85 ? " crit" : d.mem  > 70 ? " warn" : "");
+        } catch(e) {}
+      });
+    }
+
+    // ---- Auto-reconnect ----
+    function scheduleReconnect() {
+      if (reconnectTimer) return;
+      subscribedOnce = false;
+      reconnectTimer = setTimeout(function() {
+        reconnectTimer = null;
+        reconnectAttempts++;
+        statusText.textContent = "Reconnecting... (attempt " + reconnectAttempts + ")";
+        try { ros.connect(CONFIG.rosbridgeUrl); } catch(e) { scheduleReconnect(); }
+      }, 3000);
+    }
+
+    // ---- ROS connection events ----
+    ros.on("connection", function() {
+      reconnectAttempts = 0;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      dot.className = "connected";
+      statusText.textContent = "Connected  \u00b7  " + CONFIG.rosbridgeUrl;
+      document.title = "Cognition Dashboard \u2014 Connected (" + (CONFIG.envLabel || "ROS 2") + ")";
+
+      // Update camera stream
+      var streamImg = document.getElementById("camera-stream");
+      var noStream = document.getElementById("no-stream-msg");
+      if (streamImg && CONFIG.videoStreamUrl) {
+        streamImg.src = CONFIG.videoStreamUrl;
+        streamImg.style.display = "block";
+        if (noStream) noStream.style.display = "none";
+      }
+
+      cmdVelTopic = new ROSLIB.Topic({ ros: ros, name: "/cmd_vel", messageType: "geometry_msgs/msg/Twist" });
+      subscribeAll();
+      subscribeStats();
+      wireParamInputs();
+      getParams();
+    });
+
+    // Environment Switcher logic
+    var envSelect = document.getElementById("env-select");
+    if (envSelect) {
+      envSelect.addEventListener("change", function(e) {
+        var host = (window.location.hostname && window.location.hostname !== "" && window.location.hostname !== "localhost") ? window.location.hostname : "127.0.0.1";
+        if (val === "robot_bridge") {
+          CONFIG.rosbridgeUrl = "ws://localhost:9090";
+          CONFIG.videoStreamUrl = "http://localhost:8080/stream?topic=/camera/image_raw/compressed&quality=60&width=320";
+          CONFIG.envLabel = "Physical Robot (Bridge)";
+        } else if (val === "robot_direct") {
+          CONFIG.rosbridgeUrl = "ws://" + host + ":9090";
+          CONFIG.videoStreamUrl = "http://" + host + ":8080/stream?topic=/camera/image_raw/compressed&quality=60&width=320";
+          CONFIG.envLabel = "Physical Robot (" + host + ")";
+        } else {
+          CONFIG.rosbridgeUrl = "ws://localhost:9090";
+          CONFIG.videoStreamUrl = "http://localhost:8080/stream?topic=/image_raw&quality=60&width=640";
+          CONFIG.envLabel = "Simulation";
+        }
+        var topTitle = document.getElementById("top-title");
+        if (topTitle) topTitle.textContent = "Cognition Robot Dashboard \u2014 " + CONFIG.envLabel;
+        statusText.textContent = "Switching to " + CONFIG.rosbridgeUrl + "...";
+        subscribedOnce = false;
+        try { ros.close(); } catch(err) {}
+        setTimeout(function() {
+          try { ros.connect(CONFIG.rosbridgeUrl); } catch(err) {}
+        }, 600);
+      });
+    }
+
+    ros.on("error", function() {
+      dot.className = "disconnected";
+      statusText.textContent = "Error \u2014 retrying...";
+      stopPublishing();
+      scheduleReconnect();
+    });
+
+    ros.on("close", function() {
+      dot.className = "disconnected";
+      statusText.textContent = "Disconnected \u2014 reconnecting in 3s...";
+      stopPublishing();
+      scheduleReconnect();
+    });
+
+    window.addEventListener("beforeunload", function() { publishCmd(COMMANDS.stop); });
+  </script>
+</body>
+</html>
