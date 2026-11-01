@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    <profiles>
+        <!-- Default participant profile with bounded discovery and memory optimization -->
+        <participant profile_name="lowmem_participant_profile" is_default_profile="true">
+            <rtps>
+                <builtin>
+                    <discovery_config>
+                        <leaseDuration>
+                            <sec>10</sec>
+                            <nanosec>0</nanosec>
+                        </leaseDuration>
+                        <leaseAnnouncement>
+                            <sec>3</sec>
+                            <nanosec>0</nanosec>
+                        </leaseAnnouncement>
+                    </discovery_config>
+                </builtin>
+            </rtps>
+        </participant>
+
+        <!-- Default data writer with dynamic reserve memory policy to eliminate buffer preallocation -->
+        <data_writer profile_name="lowmem_data_writer" is_default_profile="true">
+            <historyMemoryPolicy>DYNAMIC_RESERVE_MEMORY_MODE</historyMemoryPolicy>
+        </data_writer>
+
+        <!-- Default data reader with dynamic reserve memory policy -->
+        <data_reader profile_name="lowmem_data_reader" is_default_profile="true">
+            <historyMemoryPolicy>DYNAMIC_RESERVE_MEMORY_MODE</historyMemoryPolicy>
+        </data_reader>
+    </profiles>
+</dds>
