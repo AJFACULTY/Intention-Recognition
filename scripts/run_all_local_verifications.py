@@ -46,8 +46,8 @@ SUITES = [
         "python": PYTHON_FACE,
     },
     {
-        "name": "Cognition Brain Decision & twist_mux Routing",
-        "script": str(TESTS_DIR / "test_brain_logic.py"),
+        "name": "Cognition Decision State Machine & twist_mux Routing",
+        "script": str(TESTS_DIR / "test_decision_logic.py"),
         "python": PYTHON_ROS,
     },
     {

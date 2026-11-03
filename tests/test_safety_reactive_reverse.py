@@ -28,7 +28,8 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from cognition_interfaces.msg import Gesture, Detection
 
-from src_nodes.brain_node import (
+from src_nodes.decision_node import (
+    DecisionNode,
     BrainNode,
     GESTURE_NONE,
     GESTURE_BACK,

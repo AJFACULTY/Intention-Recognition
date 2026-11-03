@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# sync_to_bot.sh — One-Click Deployment Script to Physical Robot
+# deploy_to_bot.sh — One-Click Deployment Script to Physical Robot
 # Synchronizes the verified 19-Feature MLP, hand_features, active_vision_node,
 # and bench monitor directly into the running 'yahboom_gesture' Docker container.
 # ==============================================================================
@@ -51,9 +51,10 @@ scp \
     "$WS_DIR/src_nodes/camera_pub.py" \
     "$WS_DIR/src_nodes/face_recognition_node.py" \
     "$WS_DIR/src_nodes/face_id_lib.py" \
-    "$WS_DIR/src_nodes/brain_node.py" \
+    "$WS_DIR/src_nodes/decision_node.py" \
+    "$WS_DIR/src_nodes/odom_imu_fusion_node.py" \
     "$WS_DIR/src_nodes/safety_audio_node.py" \
-    "$WS_DIR/scripts/master_demo_menu.py" \
+    "$WS_DIR/scripts/operator_cli.py" \
     "$WS_DIR/scripts/menu.sh" \
     "$WS_DIR/scripts/bench_autonomy_monitor.py" \
     "$WS_DIR/scripts/mission_manager.py" \
@@ -67,10 +68,11 @@ scp \
     "$WS_DIR/scripts/diagnostics/test_camera_stream.py" \
     "$WS_DIR/scripts/diagnostics/show_system_resources.py" \
     "$WS_DIR/launch/nav2.launch.py" \
-    "$WS_DIR/launch/demo_system.launch.py" \
-    "$WS_DIR/launch/cognition_autonomy.launch.py" \
-    "$WS_DIR/launch/master_robot.launch.py" \
-    "$WS_DIR/launch/follow_to_map.launch.py" \
+    "$WS_DIR/launch/interactive_simulation.launch.py" \
+    "$WS_DIR/launch/human_intention_pipeline.launch.py" \
+    "$WS_DIR/launch/amr_bringup.launch.py" \
+    "$WS_DIR/launch/collaborative_mapping.launch.py" \
+    "$WS_DIR/launch/slam_mapping.launch.py" \
     "$WS_DIR/config/twist_mux.yaml" \
     "$WS_DIR/config/nav2_params.yaml" \
     "$WS_DIR/config/fastdds_lowmem.xml" \
@@ -156,13 +158,17 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     done
 
     docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
-    docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/master_demo_menu.py
-    docker cp ~/cognition_ws/master_demo_menu.py \${CONTAINER}:/root/cognition_ws/scripts/master_demo_menu.py
+    docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/operator_cli.py
+    docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/scripts/operator_cli.py
+    # Backward compatibility for existing container scripts
+    docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/master_demo_menu.py
+    docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/scripts/master_demo_menu.py
     docker cp ~/cognition_ws/show_system_resources.py \${CONTAINER}:/root/cognition_ws/scripts/diagnostics/show_system_resources.py
     docker cp ~/cognition_ws/show_system_resources.py \${CONTAINER}:/root/cognition_ws/show_system_resources.py
 
-    # Copy Brain Decision node, Mission Manager, Waypoint Navigator & Web Map Visualizer
-    docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${BRAIN_DIR}/brain_node.py
+    # Copy Decision node (with brain_node backwards compatibility)
+    docker cp ~/cognition_ws/decision_node.py \${CONTAINER}:\${BRAIN_DIR}/decision_node.py
+    docker cp ~/cognition_ws/decision_node.py \${CONTAINER}:\${BRAIN_DIR}/brain_node.py
     docker cp ~/cognition_ws/mission_manager.py \${CONTAINER}:/root/cognition_ws/mission_manager.py
     docker cp ~/cognition_ws/navigate_waypoints.py \${CONTAINER}:/root/cognition_ws/navigate_waypoints.py
 
@@ -180,23 +186,42 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     LAUNCH_SRC=/root/cognition_ws/src/cognition_simulation/launch
     LAUNCH_SHARE=/root/cognition_ws/install/cognition_simulation/share/cognition_simulation/launch
     docker exec \${CONTAINER} mkdir -p \${LAUNCH_SRC} \${LAUNCH_SHARE}
+    
+    # New Standard Names
     docker cp ~/cognition_ws/nav2.launch.py \${CONTAINER}:\${LAUNCH_SRC}/nav2.launch.py
-    docker cp ~/cognition_ws/demo_system.launch.py \${CONTAINER}:\${LAUNCH_SRC}/demo_system.launch.py
-    docker cp ~/cognition_ws/cognition_autonomy.launch.py \${CONTAINER}:\${LAUNCH_SRC}/cognition_autonomy.launch.py
-    docker cp ~/cognition_ws/master_robot.launch.py \${CONTAINER}:\${LAUNCH_SRC}/master_robot.launch.py
-    docker cp ~/cognition_ws/follow_to_map.launch.py \${CONTAINER}:\${LAUNCH_SRC}/follow_to_map.launch.py
+    docker cp ~/cognition_ws/interactive_simulation.launch.py \${CONTAINER}:\${LAUNCH_SRC}/interactive_simulation.launch.py
+    docker cp ~/cognition_ws/human_intention_pipeline.launch.py \${CONTAINER}:\${LAUNCH_SRC}/human_intention_pipeline.launch.py
+    docker cp ~/cognition_ws/amr_bringup.launch.py \${CONTAINER}:\${LAUNCH_SRC}/amr_bringup.launch.py
+    docker cp ~/cognition_ws/collaborative_mapping.launch.py \${CONTAINER}:\${LAUNCH_SRC}/collaborative_mapping.launch.py
+    docker cp ~/cognition_ws/slam_mapping.launch.py \${CONTAINER}:\${LAUNCH_SRC}/slam_mapping.launch.py
+
     docker cp ~/cognition_ws/nav2.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/nav2.launch.py
-    docker cp ~/cognition_ws/demo_system.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/demo_system.launch.py
-    docker cp ~/cognition_ws/cognition_autonomy.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/cognition_autonomy.launch.py
-    docker cp ~/cognition_ws/master_robot.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/master_robot.launch.py
-    docker cp ~/cognition_ws/follow_to_map.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/follow_to_map.launch.py
-    docker cp ~/cognition_ws/master_robot.launch.py \${CONTAINER}:/root/cognition_ws/master_robot.launch.py
-    docker cp ~/cognition_ws/follow_to_map.launch.py \${CONTAINER}:/root/cognition_ws/follow_to_map.launch.py
+    docker cp ~/cognition_ws/interactive_simulation.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/interactive_simulation.launch.py
+    docker cp ~/cognition_ws/human_intention_pipeline.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/human_intention_pipeline.launch.py
+    docker cp ~/cognition_ws/amr_bringup.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/amr_bringup.launch.py
+    docker cp ~/cognition_ws/collaborative_mapping.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/collaborative_mapping.launch.py
+    docker cp ~/cognition_ws/slam_mapping.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/slam_mapping.launch.py
+
+    # Backward-compatible links for existing scripts/services calling legacy names
+    docker cp ~/cognition_ws/interactive_simulation.launch.py \${CONTAINER}:\${LAUNCH_SRC}/demo_system.launch.py
+    docker cp ~/cognition_ws/human_intention_pipeline.launch.py \${CONTAINER}:\${LAUNCH_SRC}/cognition_autonomy.launch.py
+    docker cp ~/cognition_ws/amr_bringup.launch.py \${CONTAINER}:\${LAUNCH_SRC}/master_robot.launch.py
+    docker cp ~/cognition_ws/collaborative_mapping.launch.py \${CONTAINER}:\${LAUNCH_SRC}/follow_to_map.launch.py
+    docker cp ~/cognition_ws/slam_mapping.launch.py \${CONTAINER}:\${LAUNCH_SRC}/slam_real.launch.py
+
+    docker cp ~/cognition_ws/interactive_simulation.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/demo_system.launch.py
+    docker cp ~/cognition_ws/human_intention_pipeline.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/cognition_autonomy.launch.py
+    docker cp ~/cognition_ws/amr_bringup.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/master_robot.launch.py
+    docker cp ~/cognition_ws/collaborative_mapping.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/follow_to_map.launch.py
+    docker cp ~/cognition_ws/slam_mapping.launch.py \${CONTAINER}:\${LAUNCH_SHARE}/slam_real.launch.py
+
+    docker cp ~/cognition_ws/amr_bringup.launch.py \${CONTAINER}:/root/cognition_ws/master_robot.launch.py
+    docker cp ~/cognition_ws/collaborative_mapping.launch.py \${CONTAINER}:/root/cognition_ws/follow_to_map.launch.py
 
     # Update installed python package location if present
     INSTALLED_BRAIN=/root/cognition_ws/install/cognition_brain/lib/python3.10/site-packages/cognition_brain/brain_node.py
     if docker exec \${CONTAINER} test -f \${INSTALLED_BRAIN}; then
-        docker cp ~/cognition_ws/brain_node.py \${CONTAINER}:\${INSTALLED_BRAIN}
+        docker cp ~/cognition_ws/decision_node.py \${CONTAINER}:\${INSTALLED_BRAIN}
     fi
 
     # Copy models into package models dir, container models dir, and share dir

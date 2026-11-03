@@ -2,12 +2,13 @@
 ### Human Intention Recognition via Edge-Computed Motion & Hand Gestures
 
 <p align="center">
-  <a href="https://docs.ros.org/en/humble/"><img src="https://img.shields.io/badge/ROS_2-Humble-22314E?logo=ros&logoColor=white" alt="ROS 2 Humble" /></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white" alt="Python 3.10" /></a>
-  <a href="https://www.raspberrypi.com/"><img src="https://img.shields.io/badge/Edge_Compute-Raspberry_Pi_5_(8GB)-C51A4A?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 5" /></a>
+  <a href="https://docs.ros.org/en/humble/"><img src="https://img.shields.io/badge/Robot_Runtime-ROS_2_Humble-22314E?logo=ros&logoColor=white" alt="ROS 2 Humble" /></a>
+  <a href="https://docs.ros.org/en/jazzy/"><img src="https://img.shields.io/badge/Dev_&_Sim-ROS_2_Jazzy-22314E?logo=ros&logoColor=white" alt="ROS 2 Jazzy" /></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10_%7C_3.12-3776AB?logo=python&logoColor=white" alt="Python 3.10 | 3.12" /></a>
+  <a href="https://www.raspberrypi.com/"><img src="https://img.shields.io/badge/Target_SBC-Raspberry_Pi_5_(2GB_%7C_8GB)-C51A4A?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 5" /></a>
   <a href="https://www.iso.org/standard/69263.html"><img src="https://img.shields.io/badge/Safety_Standard-ISO_15066-0057B8" alt="ISO 15066 Compliant" /></a>
   <a href="https://www.iso.org/standard/51528.html"><img src="https://img.shields.io/badge/Risk_Mitigation-ISO_12100-2EA44F" alt="ISO 12100 Compliant" /></a>
-  <a href="#results"><img src="https://img.shields.io/badge/End--to--End_Latency-132_ms-orange" alt="Latency 132ms" /></a>
+  <a href="#empirical-benchmark-results"><img src="https://img.shields.io/badge/End--to--End_Latency-132_ms-orange" alt="Latency 132ms" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT" /></a>
 </p>
 
@@ -21,7 +22,7 @@ An end-to-end, edge-computed robotics application for real-time human intention 
 
 ## Key Highlights
 
-- **Edge-First Neural Inference:** Fully self-contained compute pipeline on a Raspberry Pi 5 (8GB) executing 20 Hz MediaPipe hand tracking and neural classification.
+- **Edge-First Neural Inference:** Fully self-contained compute pipeline developed on Raspberry Pi 5 (8GB) and actively optimized for constrained 2GB embedded targets via dynamic FastDDS buffers and zRAM.
 - **Scale-Invariant 19-D Geometric Features:** Ratio-based geometric normalization invariant to distance, camera perspective, and hand anthropometrics (**99.38% test accuracy** across 6 gesture classes).
 - **2-DOF Active Vision Platform:** Pan/tilt servo gimbal driven by visual servoing, exponential smoothing, and a memory-hold state machine for continuous human target tracking.
 - **ISO 15066 Dual-Layer Safety Arbitration:** `twist_mux` priority arbitration with LiDAR-based emergency preemption and automatic active reverse braking ($<0.36\,\text{m}$).
@@ -56,7 +57,7 @@ An end-to-end, edge-computed robotics application for real-time human intention 
                                                       │  Raw Gesture & Confidence
                                                       ▼
  ┌─────────────────────────────┐       ┌──────────────────────────────────────┐
- │   2D ToF MS200 LiDAR Scan   │       │   Supervisory Cognition Brain FSM    │
+ │   2D ToF MS200 LiDAR Scan   │       │   Supervisory Decision FSM Node      │
  │ (Emergency Distance Bubble) │       │ (5-Frame Consensus + 3s Command Lock)│
  └──────────────┬──────────────┘       └──────────────────┬───────────────────┘
                 │ Safety Preemption (/cmd_vel_safety)     │ Gesture Cmd (/cmd_vel_gesture)
@@ -84,7 +85,7 @@ An end-to-end, edge-computed robotics application for real-time human intention 
 
 | Component | Engineering Specification | Role |
 | :--- | :--- | :--- |
-| **Edge Compute SBC** | Raspberry Pi 5 (Quad-Core Cortex-A76 @ 2.4 GHz, 8GB LPDDR4X) | ROS 2 middleware, perception, neural inference |
+| **Edge Compute SBC** | Raspberry Pi 5 (Quad-Core Cortex-A76 @ 2.4 GHz; 8GB dev prototype, 2GB optimized deployment target) | ROS 2 middleware, perception, neural inference |
 | **Microcontroller** | ESP32-S3 Dual-Core Xtensa LX7 | Low-level motor control, micro-ROS agent |
 | **LiDAR Sensor** | MS200 2D Time-of-Flight (ToF) LiDAR (360°, 12m range, 10 Hz) | Obstacle avoidance, SLAM, safety envelope |
 | **Active Vision Gimbal** | 2-DOF Pan/Tilt platform (Bus Servos, 20 ms update rate) | Dynamic human operator tracking |
@@ -99,13 +100,14 @@ An end-to-end, edge-computed robotics application for real-time human intention 
 | ROS 2 Node | Script / Source | Primary Topic(s) | Function |
 | :--- | :--- | :--- | :--- |
 | `camera_pub` | `src_nodes/camera_pub.py` | `/camera/image_raw` | High-throughput 20 Hz low-latency camera capture |
-| `gesture_node` | `src_nodes/gesture_node.py` | `/gesture/intent` | MediaPipe extraction + 19-D invariant MLP classification |
-| `brain_node` | `src_nodes/brain_node.py` | `/cmd_vel_gesture`, `/brain/state` | Consensus filtering, state transitions, mission lock |
+| `human_pose_gesture_node` | `src_nodes/human_pose_gesture_node.py` | `/cognition/gesture`, `/cognition/detection` | Unified MediaPipe Pose tracking + gated 19-D invariant MLP |
+| `gesture_node` | `src_nodes/gesture_node.py` | `/cognition/gesture` | Standalone MediaPipe extraction + 19-D invariant MLP |
+| `decision_node` | `src_nodes/decision_node.py` | `/cmd_vel_gesture`, `/decision/state` | Consensus filtering, state transitions, mission lock |
 | `active_vision_node` | `src_nodes/active_vision_node.py` | `/gimbal/cmd`, `/camera/target_error` | Proportional pan/tilt visual servoing & memory hold |
 | `safety_audio_node` | `src_nodes/safety_audio_node.py` | `/beep`, `/safety/audio_alert` | Acoustic state chimes & ISO 15066 safety alarms |
-| `person_detection_node` | `src_nodes/person_detection_node.py` | `/human/bbox`, `/human/detected` | Bounding box localization for visual following |
-| `face_recognition_node` | `src_nodes/face_recognition_node.py` | `/face/operator_id` | Operator biometric identification & spatial gating |
-| `odom_imu_republisher` | `src_nodes/odom_imu_republisher.py` | `/odom`, `/imu/data` | Clean TF odometry republishing with covariance tuning |
+| `person_detection_node` | `src_nodes/person_detection_node.py` | `/cognition/detection` | Bounding box localization for visual following |
+| `face_recognition_node` | `src_nodes/face_recognition_node.py` | `/cognition/face_identity` | Operator biometric identification & spatial gating |
+| `odom_imu_fusion_node` | `src_nodes/odom_imu_fusion_node.py` | `/odom_raw_restamped`, `/imu_restamped` | Clean TF odometry republishing with ESP32 clock restamping |
 
 ---
 
@@ -133,7 +135,7 @@ The master menu automatically detects robot connectivity, checks ROS 2 node stat
 ### 2. Deploy Full Robot Stack
 To launch the entire cognitive architecture, active vision tracking, LiDAR safety preemption, and motor drivers in a single command:
 ```bash
-ros2 launch launch/master_robot.launch.py
+ros2 launch launch/amr_bringup.launch.py
 ```
 
 ### 3. Launch Real-Time Web Cockpit HUD

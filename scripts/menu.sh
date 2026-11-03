@@ -15,11 +15,17 @@ if [ -f "/etc/rpi-issue" ] || [ -d "/home/pi" ]; then
     export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     source /opt/ros/humble/setup.bash >/dev/null 2>&1 || true
     
-    # Try container location first, then host location
-    if [ -f "/root/cognition_ws/scripts/master_demo_menu.py" ]; then
+    # Try container location first, then host location (operator_cli.py with master_demo_menu.py fallback)
+    if [ -f "/root/cognition_ws/scripts/operator_cli.py" ]; then
+        exec python3 /root/cognition_ws/scripts/operator_cli.py "$@"
+    elif [ -f "/root/cognition_ws/scripts/master_demo_menu.py" ]; then
         exec python3 /root/cognition_ws/scripts/master_demo_menu.py "$@"
+    elif [ -f "/home/pi/cognition_ws/operator_cli.py" ]; then
+        exec python3 /home/pi/cognition_ws/operator_cli.py "$@"
     elif [ -f "/home/pi/cognition_ws/master_demo_menu.py" ]; then
         exec python3 /home/pi/cognition_ws/master_demo_menu.py "$@"
+    elif [ -f "${SCRIPT_DIR}/operator_cli.py" ]; then
+        exec python3 "${SCRIPT_DIR}/operator_cli.py" "$@"
     elif [ -f "${SCRIPT_DIR}/master_demo_menu.py" ]; then
         exec python3 "${SCRIPT_DIR}/master_demo_menu.py" "$@"
     fi
@@ -48,7 +54,7 @@ if [ -n "$ROBOT_IP" ]; then
     
     if [ "$CHOICE" = "1" ]; then
         echo ">> Connecting to pi@${ROBOT_IP}..."
-        ssh -t "pi@${ROBOT_IP}" "python3 ~/cognition_ws/master_demo_menu.py"
+        ssh -t "pi@${ROBOT_IP}" "python3 ~/cognition_ws/operator_cli.py || python3 ~/cognition_ws/master_demo_menu.py"
         exit $?
     fi
 else
@@ -57,4 +63,8 @@ else
     sleep 1
 fi
 
-python3 "${SCRIPT_DIR}/master_demo_menu.py" "$@"
+if [ -f "${SCRIPT_DIR}/operator_cli.py" ]; then
+    python3 "${SCRIPT_DIR}/operator_cli.py" "$@"
+else
+    python3 "${SCRIPT_DIR}/master_demo_menu.py" "$@"
+fi

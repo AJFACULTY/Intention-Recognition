@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-odom_imu_republisher.py
+odom_imu_fusion_node.py
 
 Re-stamps /odom_raw and /imu messages with this node's own clock at the
 moment of receipt, instead of trusting the ESP32's onboard clock.
@@ -39,11 +39,11 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 
 
-class OdomImuRepublisher(Node):
+class OdomImuFusionNode(Node):
     """Restamps /odom_raw and /imu with the Pi's clock at receipt time."""
 
-    def __init__(self):
-        super().__init__('odom_imu_republisher')
+    def __init__(self, node_name: str = 'odom_imu_fusion_node'):
+        super().__init__(node_name)
 
         # Match the QoS the ESP32 bridge actually publishes with (RELIABLE,
         # per `ros2 topic info /odom_raw --verbose`), so we don't introduce
@@ -105,9 +105,13 @@ class OdomImuRepublisher(Node):
         self._imu_count = 0
 
 
+# Backward-compatibility alias
+OdomImuRepublisher = OdomImuFusionNode
+
+
 def main(args=None):
     rclpy.init(args=args)
-    node = OdomImuRepublisher()
+    node = OdomImuFusionNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

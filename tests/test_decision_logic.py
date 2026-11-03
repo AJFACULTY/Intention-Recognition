@@ -27,7 +27,8 @@ from std_msgs.msg import String
 from std_srvs.srv import SetBool
 from cognition_interfaces.msg import Gesture, Detection
 
-from src_nodes.brain_node import (
+from src_nodes.decision_node import (
+    DecisionNode,
     BrainNode,
     GESTURE_NONE,
     GESTURE_BACK,

@@ -1,28 +1,23 @@
 #!/usr/bin/env python3
 """
-master_robot.launch.py — Consolidated Industrial AMR Bringup Launch File
-========================================================================
+collaborative_mapping.launch.py — Unmapped Environment Collaborative SLAM
+==========================================================================
 Platform: Yahboom Micro-ROS Pi 5 Autonomous Mobile Robot
 Author: Autonomous Systems Engineering Team
-Standards Compliance: ROS REP-103 / REP-105, ISO 15066:2016, OMG DDS v1.4
 
-Orchestrates all robot subsystems into a single lifecycle-synchronized bringup:
-1. Twist Multiplexer (Priority arbitration: E-Stop 255 > Joy 100 > Nav2 50 > Gesture 40)
-2. Industrial Safety Audio Node (/beep acoustic reversing and warning chimes)
-3. Nav2 Autonomous Navigation (AMCL, costmaps, global planner, local controller)
-4. Cognition Autonomy (Active vision tracking, MediaPipe gesture classifier, Brain FSM)
-5. Web Map Visualizer (RViz-equivalent HTTP map dashboard on :8080)
+Enables intuitive, collaborative room mapping without manual joystick driving:
+1. Human raises the FOLLOW hand gesture.
+2. Active Vision locks onto the human operator and visual servoing shadows their path.
+3. SLAM Toolbox (online asynchronous) constructs the metric occupancy grid map in the background.
+4. Reactive planar LiDAR safety bubble (0.36m buffer) continuously prevents collisions.
+5. Safety Audio Node alerts bystanders with reversing and movement beeps.
 
 Usage:
-    ros2 launch launch/master_robot.launch.py
-    ros2 launch launch/master_robot.launch.py enable_cognition:=false
-    ros2 launch launch/master_robot.launch.py enable_nav2:=false
-    ros2 launch launch/master_robot.launch.py enable_visualizer:=false
+    ros2 launch launch/collaborative_mapping.launch.py
 """
 
 import os
 import sys
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -39,38 +34,28 @@ from launch_ros.actions import Node
 def generate_launch_description():
     ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+    def resolve_path(candidates, default_rel):
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+        return os.path.join(ws_dir, default_rel)
+
     # ── 1. Launch Arguments ──────────────────────────────────────────────────
-    declare_nav2 = DeclareLaunchArgument(
-        "enable_nav2",
-        default_value="true",
-        description="Launch Nav2 autonomous navigation & AMCL stack",
-    )
-    declare_cognition = DeclareLaunchArgument(
-        "enable_cognition",
-        default_value="true",
-        description="Launch active vision, gesture perception & cognition brain",
-    )
     declare_audio = DeclareLaunchArgument(
         "enable_audio",
         default_value="true",
         description="Launch industrial acoustic safety buzzer node (/beep)",
-    )
-    declare_visualizer = DeclareLaunchArgument(
-        "enable_visualizer",
-        default_value="true",
-        description="Launch live RViz-equivalent Web Map Visualizer on http://localhost:8080",
     )
     declare_twist_mux = DeclareLaunchArgument(
         "enable_twist_mux",
         default_value="true",
         description="Launch twist_mux priority velocity multiplexer",
     )
-
-    def resolve_path(candidates, default_rel):
-        for p in candidates:
-            if os.path.exists(p):
-                return p
-        return os.path.join(ws_dir, default_rel)
+    declare_visualizer = DeclareLaunchArgument(
+        "enable_visualizer",
+        default_value="true",
+        description="Launch live web map visualizer dashboard on http://localhost:8080",
+    )
 
     # ── 2. Twist Mux Priority Arbiter ────────────────────────────────────────
     twist_mux_config = resolve_path([
@@ -79,6 +64,7 @@ def generate_launch_description():
         os.path.join(ws_dir, "twist_mux.yaml"),
         "/root/cognition_ws/twist_mux.yaml",
         "/root/cognition_ws/config/twist_mux.yaml",
+        "/root/cognition_ws/src/cognition_simulation/config/twist_mux.yaml",
     ], "config/twist_mux.yaml")
 
     twist_mux_node = Node(
@@ -96,7 +82,10 @@ def generate_launch_description():
         os.path.join(ws_dir, "src_nodes", "safety_audio_node.py"),
         os.path.join(ws_dir, "safety_audio_node.py"),
         "/root/cognition_ws/safety_audio_node.py",
+        "/root/cognition_ws/src_nodes/safety_audio_node.py",
         "/root/cognition_ws/src/cognition_perception/cognition_perception/safety_audio_node.py",
+        "/root/cognition_ws/src/cognition_simulation/src_nodes/safety_audio_node.py",
+        "/root/cognition_ws/src/cognition_simulation/safety_audio_node.py",
     ], "src_nodes/safety_audio_node.py")
 
     safety_audio_node = ExecuteProcess(
@@ -106,50 +95,60 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("enable_audio")),
     )
 
-    # ── 4. Nav2 Autonomous Navigation Include ────────────────────────────────
-    nav2_launch_path = resolve_path([
-        os.path.join(ws_dir, "launch", "nav2.launch.py"),
-        os.path.join(ws_dir, "nav2.launch.py"),
-        "/root/cognition_ws/src/cognition_simulation/launch/nav2.launch.py",
-        "/root/cognition_ws/nav2.launch.py",
-    ], "launch/nav2.launch.py")
+    # ── 4. SLAM Toolbox (Online Asynchronous Mapping & EKF) ──────────────────
+    slam_launch_path = resolve_path([
+        os.path.join(ws_dir, "launch", "slam_mapping.launch.py"),
+        os.path.join(ws_dir, "launch", "slam_real.launch.py"),
+        os.path.join(ws_dir, "slam_mapping.launch.py"),
+        os.path.join(ws_dir, "slam_real.launch.py"),
+        "/root/cognition_ws/src/cognition_simulation/launch/slam_mapping.launch.py",
+        "/root/cognition_ws/src/cognition_simulation/launch/slam_real.launch.py",
+        "/root/cognition_ws/slam_real.launch.py",
+    ], "launch/slam_mapping.launch.py")
 
-    nav2_include = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(nav2_launch_path),
-        condition=IfCondition(LaunchConfiguration("enable_nav2")),
+    slam_include = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(slam_launch_path)
     )
 
-    # ── 5. Cognition Perception & Brain Include (Delayed for Nav2 bringup) ────
+    # ── 5. Perception & Intention Include (Follow Mode) ──────────────────────
     cognition_launch_path = resolve_path([
+        os.path.join(ws_dir, "launch", "human_intention_pipeline.launch.py"),
         os.path.join(ws_dir, "launch", "cognition_autonomy.launch.py"),
+        os.path.join(ws_dir, "human_intention_pipeline.launch.py"),
         os.path.join(ws_dir, "cognition_autonomy.launch.py"),
+        "/root/cognition_ws/src/cognition_simulation/launch/human_intention_pipeline.launch.py",
         "/root/cognition_ws/src/cognition_simulation/launch/cognition_autonomy.launch.py",
         "/root/cognition_ws/cognition_autonomy.launch.py",
-    ], "launch/cognition_autonomy.launch.py")
+    ], "launch/human_intention_pipeline.launch.py")
 
     cognition_include = TimerAction(
-        period=4.0,
+        period=3.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(cognition_launch_path),
-                launch_arguments={"cmd_vel_topic": "/cmd_vel_gesture"}.items(),
-                condition=IfCondition(LaunchConfiguration("enable_cognition")),
+                launch_arguments={
+                    "cmd_vel_topic": "/cmd_vel_gesture",
+                    "require_face_auth": "false",
+                }.items(),
             )
         ],
     )
 
-    # ── 6. Web Map Visualizer (Port :8080) ───────────────────────────────────
+    # ── 6. Live Web Map Visualizer Dashboard (Port :8080) ───────────────────
     visualizer_script = resolve_path([
         os.path.join(ws_dir, "scripts", "web_map_visualizer.py"),
         os.path.join(ws_dir, "web_map_visualizer.py"),
         "/root/cognition_ws/web_map_visualizer.py",
+        "/root/cognition_ws/scripts/web_map_visualizer.py",
+        "/root/cognition_ws/src/cognition_simulation/scripts/web_map_visualizer.py",
+        "/root/cognition_ws/src/cognition_simulation/web_map_visualizer.py",
     ], "scripts/web_map_visualizer.py")
 
     visualizer_process = TimerAction(
-        period=6.0,
+        period=5.0,
         actions=[
             ExecuteProcess(
-                cmd=[sys.executable, visualizer_script, '--mode', 'MODE 2.1: CO-WORKER ESCORT (AMCL)', '--mapped', '--view', 'map'],
+                cmd=[sys.executable, visualizer_script, '--mode', 'MODE 1.1: FOLLOW-TO-MAP SLAM', '--unmapped', '--view', 'slam'],
                 name="web_map_visualizer",
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("enable_visualizer")),
@@ -159,14 +158,12 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            declare_nav2,
-            declare_cognition,
             declare_audio,
-            declare_visualizer,
             declare_twist_mux,
+            declare_visualizer,
             twist_mux_node,
             safety_audio_node,
-            nav2_include,
+            slam_include,
             cognition_include,
             visualizer_process,
         ]

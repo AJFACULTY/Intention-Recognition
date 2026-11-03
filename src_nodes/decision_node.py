@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-brain_node.py — Production Multi-Modal Cognition & Decision Node
+decision_node.py — Production Multi-Modal Cognition & Decision Node
 Cognition Robot Project — Milestone 5 Autonomy
 
 Features:
@@ -38,9 +38,9 @@ GESTURE_RIGHT = 4
 GESTURE_STOP = 5
 
 
-class BrainNode(Node):
-    def __init__(self):
-        super().__init__('brain_node')
+class DecisionNode(Node):
+    def __init__(self, node_name: str = 'decision_node'):
+        super().__init__(node_name)
 
         # ── Parameters ─────────────────────────────────────────
         self.declare_parameter('linear_speed', 0.25)
@@ -572,9 +572,13 @@ class BrainNode(Node):
         self.cmd_vel_pub.publish(self.make_cmd(cmd_linear, cmd_angular))
 
 
+# Backward-compatibility alias
+BrainNode = DecisionNode
+
+
 def main(args=None):
     rclpy.init(args=args)
-    node = BrainNode()
+    node = DecisionNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-slam_real.launch.py
+slam_mapping.launch.py
 
 FIX (2026-08-10): Enabled odom yaw in EKF's odom0_config.
 

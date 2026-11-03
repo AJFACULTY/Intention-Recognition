@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-master_demo_menu.py — Master Consolidated Turnkey Demonstration & Mission Menu
-==============================================================================
+operator_cli.py — AMR Operator Control Menu & Mission CLI
+===========================================================
 Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
 Standards Compliance: ROS REP-103/105, ISO 15066:2016, OMG DDS v1.4
 
-Provides a unified, defense-ready operational interface:
+Provides a unified, industrial operational interface:
   1. Automated Pre-Flight Health Audit (Hardware, Docker, Sensors, AI Models, Battery)
   2. Actionable Diagnostics Triage & 1-Click Recovery
-  3. Unmapped Environment Suite (Mode 1: Collaborative Follow-to-Map SLAM, HRI, Safety)
+  3. Unmapped Environment Suite (Mode 1: Collaborative Mapping SLAM, HRI, Safety)
   4. Mapped Environment Suite (Mode 2: Collaborative Escort, Milestone 10 Capstone, Waypoints)
   5. System Benchmark & Diagnostics Utilities
   6. Instant Emergency Chassis Halt
 
 Usage:
-  python3 scripts/master_demo_menu.py
-  python3 scripts/master_demo_menu.py --audit-only
+  python3 scripts/operator_cli.py
+  python3 scripts/operator_cli.py --audit-only
 """
 
 import os
@@ -266,11 +266,11 @@ class SystemHealthChecker:
         self.results["AI Models & Map Assets"] = {
             "ok": assets_ok,
             "detail": "19-D MLP, Scaler, ArcFace, Room Map Verified" if assets_ok else "MISSING ASSET FILES",
-            "fix": "Run: ./scripts/sync_to_bot.sh to synchronize verified model weights and maps."
+            "fix": "Run: ./scripts/deploy_to_bot.sh to synchronize verified model weights and maps."
         }
         if not assets_ok:
             self.overall_ready = False
-            self.remediations.append("Execute ./scripts/sync_to_bot.sh to synchronize models")
+            self.remediations.append("Execute ./scripts/deploy_to_bot.sh to synchronize models")
 
         return self.overall_ready
 
@@ -382,11 +382,11 @@ def dispatch_collaborative_follow_slam():
         "docker exec -it yahboom_gesture bash -c '"
         "export ROS_DOMAIN_ID=20; export RMW_IMPLEMENTATION=rmw_fastrtps_cpp; "
         "source /opt/ros/humble/setup.bash; source /root/cognition_ws/install/setup.bash 2>/dev/null || true; "
-        "ros2 launch /root/cognition_ws/src/cognition_simulation/launch/follow_to_map.launch.py'"
+        "ros2 launch /root/cognition_ws/src/cognition_simulation/launch/collaborative_mapping.launch.py'"
     ) if not IS_INSIDE_CONTAINER else (
         "export ROS_DOMAIN_ID=20; export RMW_IMPLEMENTATION=rmw_fastrtps_cpp; "
         "source /opt/ros/humble/setup.bash; source /root/cognition_ws/install/setup.bash 2>/dev/null || true; "
-        "ros2 launch launch/follow_to_map.launch.py"
+        "ros2 launch launch/collaborative_mapping.launch.py"
     )
     run_interactive_command(cmd)
 
@@ -475,19 +475,19 @@ def dispatch_collaborative_escort_mapped():
         "docker exec -it yahboom_gesture bash -c '"
         "export ROS_DOMAIN_ID=20; export RMW_IMPLEMENTATION=rmw_fastrtps_cpp; "
         "source /opt/ros/humble/setup.bash; source /root/cognition_ws/install/setup.bash 2>/dev/null || true; "
-        "ros2 launch /root/cognition_ws/src/cognition_simulation/launch/master_robot.launch.py'"
+        "ros2 launch /root/cognition_ws/src/cognition_simulation/launch/amr_bringup.launch.py'"
     ) if not IS_INSIDE_CONTAINER else (
         "export ROS_DOMAIN_ID=20; export RMW_IMPLEMENTATION=rmw_fastrtps_cpp; "
         "source /opt/ros/humble/setup.bash; source /root/cognition_ws/install/setup.bash 2>/dev/null || true; "
-        "ros2 launch launch/master_robot.launch.py"
+        "ros2 launch launch/amr_bringup.launch.py"
     )
     run_interactive_command(cmd)
 
 
 def dispatch_capstone_patrol_preemption():
-    """Mapped Mode: Milestone 10 Capstone Autonomous Patrol + Dynamic Gesture Preemption."""
-    set_active_mission_mode("MODE 2.2: DEFENSE CAPSTONE PATROL", is_mapped=True, view="map")
-    print_header("DEFENSE CAPSTONE: PATROL + DYNAMIC PREEMPTION", "Milestone 10 Full Integration Benchmark")
+    """Mapped Mode: Autonomous Patrol + Dynamic Gesture Preemption."""
+    set_active_mission_mode("MODE 2.2: AUTONOMOUS PATROL & PREEMPTION", is_mapped=True, view="map")
+    print_header("AUTONOMOUS PATROL & DYNAMIC PREEMPTION", "Full Integration Benchmark")
     print(f"{C_WHITE}Mission Protocol:{C_RESET}")
     print("  1. Robot executes autonomous multi-waypoint inspection route (Home -> P2 -> P3 -> Home).")
     print("  2. Telemetry is logged to a synchronized rosbag in real time (<150 KB/s).")
@@ -632,7 +632,7 @@ def menu_unmapped_environment():
             dispatch_safety_bubble_test()
         elif choice in ["4", "1.4"]:
             set_active_mission_mode("MODE 1.4: GAMEPAD SLAM MAPPING", is_mapped=False, view="slam")
-            run_interactive_command("ros2 launch launch/slam_real.launch.py")
+            run_interactive_command("ros2 launch launch/slam_mapping.launch.py")
         elif choice in ["5", "1.5"]:
             dispatch_save_map()
         else:

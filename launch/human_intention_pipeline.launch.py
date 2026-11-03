@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-cognition_autonomy.launch.py — Unified Autonomy Pipeline Launch
-================================================================
+human_intention_pipeline.launch.py — Unified Intention & Perception Pipeline Launch
+=====================================================================================
 Launches the complete perception, biometric, active vision, and arbitration pipeline:
 1. FastDDS Low-Memory Dynamic Profile (FASTRTPS_DEFAULT_PROFILES_FILE)
 2. Robust Auto-Probing Camera Publisher (/camera/image_raw/compressed)
@@ -9,15 +9,15 @@ Launches the complete perception, biometric, active vision, and arbitration pipe
    (or fallback to separate YOLOv8n + MediaPipe Hands via use_pose_gesture:=false)
 4. Active Vision Gimbal Visual Servoing (0-Centric Calibrated Pan/Tilt PID + FSM)
 5. InsightFace ArcFace Biometric Authorization (Optional via require_face_auth:=true)
-6. Cognition Brain Decision & Mode Arbitration Node (twist_mux /cmd_vel_gesture)
+6. Intention Decision & Mode Arbitration Node (twist_mux /cmd_vel_gesture)
 7. Optional Operator Web Dashboard (rosbridge_websocket + web_video_server)
 
 Usage:
-    ros2 launch launch/cognition_autonomy.launch.py
-    ros2 launch launch/cognition_autonomy.launch.py require_face_auth:=true
-    ros2 launch launch/cognition_autonomy.launch.py cmd_vel_topic:=/cmd_vel
-    ros2 launch launch/cognition_autonomy.launch.py dashboard:=true
-    ros2 launch launch/cognition_autonomy.launch.py use_pose_gesture:=false
+    ros2 launch launch/human_intention_pipeline.launch.py
+    ros2 launch launch/human_intention_pipeline.launch.py require_face_auth:=true
+    ros2 launch launch/human_intention_pipeline.launch.py cmd_vel_topic:=/cmd_vel
+    ros2 launch launch/human_intention_pipeline.launch.py dashboard:=true
+    ros2 launch launch/human_intention_pipeline.launch.py use_pose_gesture:=false
 """
 
 import os

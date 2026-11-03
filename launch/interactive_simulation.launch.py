@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-demo_system.launch.py — Full-Stack Demonstration Master Launcher
-======================================================================
+interactive_simulation.launch.py — Full-Stack Interactive Simulation & Bringup Launcher
+========================================================================================
 Platform: Autonomous Mobile Robot Cognition System (ROS 2 Humble / Pi 5)
 Standards Compliance: ROS REP-103/105, ISO 15066:2016
 
-Launches the complete, unified Cognition stack for live thesis evaluation:
+Launches the complete, unified stack for interactive verification and simulation:
   1. Sensor & TF Transform Chain (laser_tf, base_link_tf, restampers, EKF)
-  2. Full Perception & Gesture Cognition Pipeline (Camera, YOLO, MediaPipe, Brain)
+  2. Full Perception & Gesture Cognition Pipeline (Camera, YOLO, MediaPipe, Decision FSM)
   3. Nav2 Navigation Stack & AMCL Localization (Calibrated Room Map)
   4. Real-Time Web Map Visualizer Dashboard (HTTP Port 8080)
 
 Usage:
-  # Master Turnkey Demo (Full Autonomy + Nav2 + Live Web Map):
-  ros2 launch launch/demo_system.launch.py
+  # Master Turnkey Bringup (Full Autonomy + Nav2 + Live Web Map):
+  ros2 launch launch/interactive_simulation.launch.py
 
   # Pure Gesture Control & Human-Following Mode:
-  ros2 launch launch/demo_system.launch.py mode:=gesture with_nav2:=false
+  ros2 launch launch/interactive_simulation.launch.py mode:=gesture with_nav2:=false
 
   # Pure Nav2 Waypoint Navigation Mode:
-  ros2 launch launch/demo_system.launch.py mode:=patrol with_cognition:=false
+  ros2 launch launch/interactive_simulation.launch.py mode:=patrol with_cognition:=false
 """
 
 import os
