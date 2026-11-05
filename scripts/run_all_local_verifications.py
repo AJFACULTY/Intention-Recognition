@@ -104,6 +104,13 @@ def main():
         duration = time.time() - start_t
         passed = (proc.returncode == 0)
 
+        # Inter-suite cooldown to allow background DDS threads and processes to teardown cleanly
+        subprocess.run(
+            ["pkill", "-9", "-f", "sim_harness|human_pose_gesture|decision_node|brain_node|active_vision|safety_audio"],
+            stderr=subprocess.DEVNULL
+        )
+        time.sleep(1.0)
+
         results.append({
             "name": suite["name"],
             "passed": passed,

@@ -56,7 +56,6 @@ scp \
     "$WS_DIR/src_nodes/safety_audio_node.py" \
     "$WS_DIR/scripts/operator_cli.py" \
     "$WS_DIR/scripts/menu.sh" \
-    "$WS_DIR/scripts/bench_autonomy_monitor.py" \
     "$WS_DIR/scripts/mission_manager.py" \
     "$WS_DIR/scripts/plot_multi_waypoint_trajectory.py" \
     "$WS_DIR/scripts/web_map_visualizer.py" \
@@ -64,9 +63,6 @@ scp \
     "$WS_DIR/scripts/setup_joystick_service.sh" \
     "$WS_DIR/scripts/setup_zram.sh" \
     "$WS_DIR/scripts/download_models.sh" \
-    "$WS_DIR/scripts/test_safety_audio.py" \
-    "$WS_DIR/scripts/diagnostics/test_camera_stream.py" \
-    "$WS_DIR/scripts/diagnostics/show_system_resources.py" \
     "$WS_DIR/launch/nav2.launch.py" \
     "$WS_DIR/launch/interactive_simulation.launch.py" \
     "$WS_DIR/launch/human_intention_pipeline.launch.py" \
@@ -81,7 +77,6 @@ scp \
 scp \
     "$WS_DIR/scripts/menu.sh" \
     "$WS_DIR/scripts/start_nav2.sh" \
-    "$WS_DIR/scripts/start_bench_pipeline.sh" \
     "$WS_DIR/scripts/run_nav2_patrol.sh" \
     "$WS_DIR/scripts/run_mission.sh" \
     "$WS_DIR/scripts/setup_joystick_service.sh" \
@@ -89,10 +84,10 @@ scp \
     "$WS_DIR/scripts/download_models.sh" \
     "$WS_DIR/scripts/launch_autonomy.sh" \
     "$WS_DIR/scripts/stop_autonomy.sh" \
-    "$WS_DIR/src_nodes/brain_node.py" \
+    "$WS_DIR/src_nodes/decision_node.py" \
     "${ROBOT_USER}@${ROBOT_HOST}:~/"
 
-ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/menu.sh ~/start_nav2.sh ~/start_bench_pipeline.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/setup_zram.sh ~/download_models.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/menu.sh ~/cognition_ws/master_demo_menu.py ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/safety_audio_node.py ~/cognition_ws/plot_multi_waypoint_trajectory.py ~/cognition_ws/show_system_resources.py"
+ssh "${ROBOT_USER}@${ROBOT_HOST}" "chmod +x ~/menu.sh ~/start_nav2.sh ~/run_nav2_patrol.sh ~/run_mission.sh ~/setup_joystick_service.sh ~/setup_zram.sh ~/download_models.sh ~/launch_autonomy.sh ~/stop_autonomy.sh ~/cognition_ws/menu.sh ~/cognition_ws/operator_cli.py ~/cognition_ws/setup_joystick_service.sh ~/cognition_ws/navigate_waypoints.py ~/cognition_ws/mission_manager.py ~/cognition_ws/plot_multi_waypoint_trajectory.py"
 
 scp \
     "$WS_DIR/ml_models/weights/pose_landmarker_lite.task" \
@@ -133,10 +128,13 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     cp ~/cognition_ws/face_recognition_node.py ~/cognition_ws/src/cognition_perception/cognition_perception/
     cp ~/cognition_ws/face_id_lib.py ~/cognition_ws/src/cognition_perception/cognition_perception/
     cp ~/cognition_ws/safety_audio_node.py ~/cognition_ws/src/cognition_perception/cognition_perception/
-    cp ~/cognition_ws/brain_node.py ~/cognition_ws/src/cognition_brain/cognition_brain/
+    cp ~/cognition_ws/decision_node.py ~/cognition_ws/src/cognition_brain/cognition_brain/decision_node.py 2>/dev/null || true
+    cp ~/cognition_ws/decision_node.py ~/cognition_ws/src/cognition_brain/cognition_brain/brain_node.py 2>/dev/null || true
+    cp ~/cognition_ws/odom_imu_fusion_node.py ~/cognition_ws/src/cognition_simulation/src_nodes/odom_imu_fusion_node.py 2>/dev/null || true
+    cp ~/cognition_ws/odom_imu_fusion_node.py ~/cognition_ws/src/cognition_simulation/src_nodes/odom_imu_republisher.py 2>/dev/null || true
 
     # Copy Perception & Audio nodes into container across all fallback locations
-    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/assets /root/cognition_ws/maps_new /root/cognition_ws/maps /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/scripts/diagnostics /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts /root/cognition_ws/config
+    docker exec \${CONTAINER} mkdir -p /root/cognition_ws/assets /root/cognition_ws/maps_new /root/cognition_ws/maps /root/cognition_ws/src_nodes /root/cognition_ws/scripts /root/cognition_ws/src/cognition_simulation/src_nodes /root/cognition_ws/src/cognition_simulation/scripts /root/cognition_ws/config
     docker cp ~/cognition_ws/assets/preview_camera.jpg \${CONTAINER}:/root/cognition_ws/assets/preview_camera.jpg 2>/dev/null || true
     docker cp ~/maps_new/room_map.png \${CONTAINER}:/root/cognition_ws/maps/room_map.png
     docker cp ~/maps_new/room_map.yaml \${CONTAINER}:/root/cognition_ws/maps/room_map.yaml
@@ -155,16 +153,15 @@ ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -c "'
     for dir in \${PERCEPT_DIR} /root/cognition_ws /root/cognition_ws/src_nodes /root/cognition_ws/src/cognition_simulation/src_nodes; do
         docker cp ~/cognition_ws/camera_pub.py \${CONTAINER}:\${dir}/camera_pub.py
         docker cp ~/cognition_ws/safety_audio_node.py \${CONTAINER}:\${dir}/safety_audio_node.py
+        docker cp ~/cognition_ws/odom_imu_fusion_node.py \${CONTAINER}:\${dir}/odom_imu_fusion_node.py 2>/dev/null || true
+        docker cp ~/cognition_ws/odom_imu_fusion_node.py \${CONTAINER}:\${dir}/odom_imu_republisher.py 2>/dev/null || true
     done
 
-    docker cp ~/cognition_ws/bench_autonomy_monitor.py \${CONTAINER}:/root/cognition_ws/bench_autonomy_monitor.py
     docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/operator_cli.py
     docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/scripts/operator_cli.py
     # Backward compatibility for existing container scripts
     docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/master_demo_menu.py
     docker cp ~/cognition_ws/operator_cli.py \${CONTAINER}:/root/cognition_ws/scripts/master_demo_menu.py
-    docker cp ~/cognition_ws/show_system_resources.py \${CONTAINER}:/root/cognition_ws/scripts/diagnostics/show_system_resources.py
-    docker cp ~/cognition_ws/show_system_resources.py \${CONTAINER}:/root/cognition_ws/show_system_resources.py
 
     # Copy Decision node (with brain_node backwards compatibility)
     docker cp ~/cognition_ws/decision_node.py \${CONTAINER}:\${BRAIN_DIR}/decision_node.py
@@ -261,7 +258,9 @@ echo "[4/4] Verification complete."
 echo "=================================================================="
 echo "  DEPLOYMENT READY ON ${ROBOT_HOST}!"
 echo "  When ready on the robot, run:"
-echo "      bash ~/start_bench_pipeline.sh"
+echo "      bash ~/launch_autonomy.sh"
+echo "  Or launch the interactive demonstration menu:"
+echo "      bash ~/menu.sh"
 echo "  Or for autonomous waypoint patrol:"
 echo "      bash ~/run_nav2_patrol.sh"
 echo "=================================================================="

@@ -564,11 +564,11 @@ def dispatch_clean_fastdds():
     print_header("FASTDDS & DOCKER CLEAN RESET UTILITY", "Purges Stale Shared Memory Locks (/dev/shm)")
     cmd = (
         "docker exec yahboom_gesture bash -c '"
-        "pkill -9 -f \"camera_pub|person_detection|active_vision|gesture_node|brain_node|twist_mux|bench_autonomy\" 2>/dev/null || true; "
+        "pkill -9 -f \"camera_pub|human_pose_gesture|person_detection|active_vision|gesture_node|decision_node|brain_node|twist_mux\" 2>/dev/null || true; "
         "rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true' && "
         "echo '>> Stale lockfiles cleared successfully.'"
     ) if not IS_INSIDE_CONTAINER else (
-        "pkill -9 -f 'camera_pub|person_detection|active_vision|gesture_node|brain_node|twist_mux|bench_autonomy' 2>/dev/null || true; "
+        "pkill -9 -f 'camera_pub|human_pose_gesture|person_detection|active_vision|gesture_node|decision_node|brain_node|twist_mux' 2>/dev/null || true; "
         "rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true; "
         "echo '>> Stale lockfiles cleared.'"
     )

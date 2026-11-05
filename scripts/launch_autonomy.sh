@@ -21,7 +21,7 @@ sleep 1
 
 echo "Cleaning previous autonomy nodes..."
 docker exec $CONTAINER bash -c "
-    pkill -9 -f 'camera_pub|human_pose_gesture|person_detection_node|gesture_node|active_vision_node|brain_node|web_map_visualizer' 2>/dev/null || true
+    pkill -9 -f 'camera_pub|human_pose_gesture|person_detection_node|gesture_node|active_vision_node|decision_node|brain_node|web_map_visualizer' 2>/dev/null || true
     rm -f /dev/shm/sem.fastrtps_* /dev/shm/fastrtps_* 2>/dev/null || true
 "
 sleep 1
@@ -83,14 +83,18 @@ docker exec -d $CONTAINER bash -c "
 "
 sleep 1
 
-echo "Starting brain_node.py..."
+echo "Starting decision_node.py..."
 docker exec -d $CONTAINER bash -c "
     export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     export ROS_DOMAIN_ID=20
     export FASTRTPS_DEFAULT_PROFILES_FILE=/root/cognition_ws/config/fastdds_lowmem.xml
     source /opt/ros/humble/setup.bash
     source /root/cognition_ws/install/setup.bash 2>/dev/null || true
-    python3 -u /root/cognition_ws/src/cognition_brain/cognition_brain/brain_node.py --ros-args -p cmd_vel_topic:=/cmd_vel > /tmp/brain.log 2>&1
+    if [ -f /root/cognition_ws/src/cognition_brain/cognition_brain/decision_node.py ]; then
+        python3 -u /root/cognition_ws/src/cognition_brain/cognition_brain/decision_node.py --ros-args -p cmd_vel_topic:=/cmd_vel > /tmp/brain.log 2>&1
+    else
+        python3 -u /root/cognition_ws/src/cognition_brain/cognition_brain/brain_node.py --ros-args -p cmd_vel_topic:=/cmd_vel > /tmp/brain.log 2>&1
+    fi
 "
 sleep 1
 
@@ -106,5 +110,5 @@ docker exec -d $CONTAINER bash -c "
 sleep 1
 
 echo ">> Checking running processes in $CONTAINER:"
-docker exec $CONTAINER ps aux | grep -E 'camera_pub|human_pose_gesture|person_detection|active_vision|gesture_node|brain_node|web_map_visualizer' | grep -v grep || true
+docker exec $CONTAINER ps aux | grep -E 'camera_pub|human_pose_gesture|person_detection|active_vision|gesture_node|decision_node|brain_node|web_map_visualizer' | grep -v grep || true
 echo ">> All autonomy nodes initiated successfully."

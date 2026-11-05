@@ -14,7 +14,7 @@ echo "=================================================================="
 # 1. Always flush old navigation processes to ensure clean costmaps and uncorrupted particle filters
 echo "[1/3] Flushing old navigation processes..."
 docker exec "$CONTAINER" bash -c "
-    pkill -9 -f 'twist_mux|safety_audio_node|web_map_visualizer|laser_tf|scan_republisher|odom_imu_republisher|ekf_node|nav2_|amcl|map_server|planner_server|controller_server|behavior_server|bt_navigator|waypoint_follower|lifecycle_manager' 2>/dev/null || true
+    pkill -9 -f 'twist_mux|safety_audio_node|web_map_visualizer|laser_tf|scan_republisher|odom_imu_fusion_node|odom_imu_republisher|ekf_node|nav2_|amcl|map_server|planner_server|controller_server|behavior_server|bt_navigator|waypoint_follower|lifecycle_manager' 2>/dev/null || true
 "
 sleep 2
 

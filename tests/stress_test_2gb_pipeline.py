@@ -72,6 +72,13 @@ class PipelineStressTestRunner:
         return env
 
     def start_pipeline(self):
+        # Pre-clean any lingering ROS 2 / Python processes from prior suites
+        subprocess.run(
+            ["pkill", "-9", "-f", "sim_harness|human_pose_gesture|decision_node|brain_node|active_vision|safety_audio"],
+            stderr=subprocess.DEVNULL
+        )
+        time.sleep(1.0)
+
         env = self._build_env()
         print(f"\n[INIT] Launching full concurrent stack under FastDDS Dynamic Memory profile...")
         print(f"       FASTRTPS_DEFAULT_PROFILES_FILE={FASTRTPS_PROFILE}")
@@ -113,8 +120,8 @@ class PipelineStressTestRunner:
             self.metrics["per_node_cpu"][name] = []
             print(f"  + Started {name:<20} (PID {p.pid})")
 
-        # Allow DDS discovery handshake
-        time.sleep(3.0)
+        # Allow DDS discovery handshake and first-frame pipeline warm-up
+        time.sleep(6.0)
 
     def stop_pipeline(self):
         print("\n[TEARDOWN] Stopping all nodes...")
@@ -276,8 +283,9 @@ class PipelineStressTestRunner:
         mean_fps = float(np.mean(fps_arr)) if len(fps_arr) else 0.0
         mean_lat = float(np.mean(lat_arr)) if len(lat_arr) else 0.0
 
-        # Memory drift calculation: ignore initial queue buffer fill / warm-up phase (first 24s for 30s runs, or first 35% for soak runs)
-        warmup_cutoff = max(24.0, self.duration_sec * 0.75) if self.duration_sec <= 35 else max(20.0, self.duration_sec * 0.35)
+        # Memory drift calculation: ignore initial model initialization and buffer allocation
+        # For 30s benchmark runs, warm-up stabilizes by t=15s (50% duration).
+        warmup_cutoff = self.duration_sec * 0.50 if self.duration_sec <= 35 else self.duration_sec * 0.35
         valid_indices = [i for i, t in enumerate(self.metrics["timestamps"]) if t >= warmup_cutoff]
         if len(valid_indices) > 5:
             x_times = np.array([self.metrics["timestamps"][i] for i in valid_indices])
